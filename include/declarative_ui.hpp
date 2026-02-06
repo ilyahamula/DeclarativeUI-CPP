@@ -3,10 +3,10 @@
 #include <wx/wx.h>
 
 #include "widgets.hpp"
-#include "sizers.hpp"
+#include "stacks.hpp"
 
 static_assert(CreateAndAddable<Button>);
 static_assert(CreateAndAddable<TextCtrl>);
 static_assert(CreateAndAddable<StaticText>);
-static_assert(CreateAndAddable<HSizer<Button, TextCtrl>>);
-static_assert(CreateAndAddable<VSizer<StaticText, Button>>);
+static_assert(CreateAndAddable<HStack<Button, TextCtrl>>);
+static_assert(CreateAndAddable<VStack<StaticText, Button>>);

@@ -8,15 +8,15 @@
 #include "create_and_add.hpp"
 
 template<CreateAndAddable... W>
-struct Sizer
+struct Stack
 {
-	Sizer(wxOrientation orient, W... widgets)
+	Stack(wxOrientation orient, W... widgets)
 		: m_orient(orient)
 		, m_widgets(std::make_tuple(widgets...))
 	{
 	}
 
-	Sizer(wxOrientation orient, wxSizerFlags flags, W... widgets)
+	Stack(wxOrientation orient, wxSizerFlags flags, W... widgets)
 		: m_orient(orient)
 		, m_flags(flags)
 		, m_widgets(std::make_tuple(widgets...))
@@ -51,29 +51,29 @@ private:
 };
 
 template<CreateAndAddable... W>
-struct HSizer : public Sizer<W...>
+struct HStack : public Stack<W...>
 {
-	HSizer(W... widgets)
-		: Sizer<W...>(wxHORIZONTAL, widgets...)
+	HStack(W... widgets)
+		: Stack<W...>(wxHORIZONTAL, widgets...)
 	{
 	}
 
-	HSizer(wxSizerFlags flags, W... widgets)
-		: Sizer<W...>(wxHORIZONTAL, flags, widgets...)
+	HStack(wxSizerFlags flags, W... widgets)
+		: Stack<W...>(wxHORIZONTAL, flags, widgets...)
 	{
 	}
 };
 
 template<CreateAndAddable... W>
-struct VSizer : public Sizer<W...>
+struct VStack : public Stack<W...>
 {
-	VSizer(W... widgets)
-		: Sizer<W...>(wxVERTICAL, widgets...)
+	VStack(W... widgets)
+		: Stack<W...>(wxVERTICAL, widgets...)
 	{
 	}
 
-	VSizer(wxSizerFlags flags, W... widgets)
-		: Sizer<W...>(wxVERTICAL, flags, widgets...)
+	VStack(wxSizerFlags flags, W... widgets)
+		: Stack<W...>(wxVERTICAL, flags, widgets...)
 	{
 	}
 };
