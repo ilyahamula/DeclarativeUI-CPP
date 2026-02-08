@@ -16,7 +16,7 @@ struct Widget
 
 	void createAndAdd(wxWindow* parent, wxSizer* sizer, wxSizerFlags flags)
 	{
-		sizer->Add(createWidget(parent, m_id, m_str, m_position, m_size, m_style), flags);
+		sizer->Add(createWidget(parent, m_id, m_str, m_position, m_size, m_style), m_flags.value_or(flags));
 	}
 
 	W& withFlags(wxSizerFlags flags)
@@ -143,21 +143,53 @@ private:
 	}
 };
 
+// RadioButton -----------------------------------------------------------
+struct RadioButton : Widget<RadioButton>
+{
+	using super = Widget<RadioButton>;
+
+	explicit RadioButton(wxWindowID id = wxID_ANY, std::string str = "")
+		: super(id, str)
+	{
+	}
+
+	explicit RadioButton(const std::string& str)
+		: super(wxID_ANY, str)
+	{
+	}
+private:
+	wxWindow* createWidget(
+		wxWindow* parent,
+		wxWindowID id,
+		const std::string& str,
+		const wxPoint& pos,
+		const wxSize& size,
+		long style) override
+	{
+		return new wxRadioButton(parent, id, str, pos, size, style);
+	}
+};
+
 // Slider -----------------------------------------------------------
 struct Slider : Widget<Slider>
 {
 	using super = Widget<Slider>;
-	
-	explicit Slider(wxWindowID id, std::pair<int, int> range, std::optional<int> value = std::nullopt)
+
+	struct Range
+	{
+		int min;
+		int max;
+		std::optional<int> value = std::nullopt;
+	};
+
+	explicit Slider(wxWindowID id, Range range)
 		: super(id, "")
-		, m_value(value.value_or(range.first))
 		, m_range(range)
 	{
 	}
 
-	explicit Slider(std::pair<int, int> range, std::optional<int> value = std::nullopt)
+	explicit Slider(Range range)
 		: super(wxID_ANY, "")
-		, m_value(value.value_or(range.first))
 		, m_range(range)
 	{
 	}
@@ -171,10 +203,10 @@ private:
 		const wxSize& size,
 		long style) override
 	{
-		return new wxSlider(parent, id, m_value, m_range.first, m_range.second, pos, size, style);
+		return new wxSlider(parent, id, m_range.value.value_or(m_range.min),
+			m_range.min, m_range.max, pos, size, style);
 	}
 
 private:
-	int m_value { 0 };
-	std::pair<int, int> m_range;
+	Range m_range;
 };

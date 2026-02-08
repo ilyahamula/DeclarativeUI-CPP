@@ -23,23 +23,23 @@ struct Stack
 	{
 	}
 
-	auto createAndAdd(wxWindow* parent, wxSizerFlags parentFlags)
+	wxSizer* createAndAdd(wxWindow* parent, wxSizerFlags parentFlags)
 	{
-		auto* sizer = new wxBoxSizer(m_orient);
+		auto sizer = new wxBoxSizer(m_orient);
 		::createAndAdd(parent, sizer, m_flags.value_or(parentFlags), m_widgets);
 		return sizer;
 	}
 
 	auto createAndAdd(wxWindow* parent, wxSizer* parentSizer, wxSizerFlags parentFlags)
 	{
-		auto* sizer = createAndAdd(parent, parentFlags);
+		auto sizer = createAndAdd(parent, parentFlags);
 		parentSizer->Add(sizer, parentFlags);
 		return sizer;
 	}
 
 	auto fitTo(wxWindow* parent)
 	{
-		auto* sizer = createAndAdd(parent, m_flags.value_or(wxSizerFlags()));
+		auto sizer = createAndAdd(parent, m_flags.value_or(wxSizerFlags()));
 		parent->SetSizerAndFit(sizer);
 		return sizer;
 	}

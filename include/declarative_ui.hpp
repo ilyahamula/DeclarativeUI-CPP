@@ -4,6 +4,7 @@
 
 #include "widgets.hpp"
 #include "stacks.hpp"
+#include "groupboxes.hpp"
 
 static_assert(CreateAndAddable<Button>);
 static_assert(CreateAndAddable<TextCtrl>);
