@@ -1,7 +1,9 @@
 #pragma once
 
 #include <wx/wx.h>
+#include <functional>
 #include <optional>
+#include <vector>
 
 template <typename W>
 struct Widget
@@ -130,6 +132,13 @@ struct Button : Widget<Button>
 		: super(wxID_ANY, str)
 	{
 	}
+
+	Button& onClick(std::function<void()> callback)
+	{
+		m_onClick = std::move(callback);
+		return *this;
+	}
+
 private:
 	wxWindow* createWidget(
 		wxWindow* parent,
@@ -139,8 +148,14 @@ private:
 		const wxSize& size,
 		long style) override
 	{
-		return new wxButton(parent, id, str, pos, size, style);
+		auto* btn = new wxButton(parent, id, str, pos, size, style);
+		if (m_onClick)
+			btn->Bind(wxEVT_BUTTON, [cb = m_onClick](wxCommandEvent&) { cb(); });
+		return btn;
 	}
+
+private:
+	std::function<void()> m_onClick;
 };
 
 // RadioButton -----------------------------------------------------------
@@ -168,6 +183,81 @@ private:
 	{
 		return new wxRadioButton(parent, id, str, pos, size, style);
 	}
+};
+
+// CheckBox -----------------------------------------------------------
+struct CheckBox : Widget<CheckBox>
+{
+	using super = Widget<CheckBox>;
+
+	explicit CheckBox(wxWindowID id = wxID_ANY, std::string str = "")
+		: super(id, str)
+	{
+	}
+
+	explicit CheckBox(const std::string& str)
+		: super(wxID_ANY, str)
+	{
+	}
+
+	CheckBox& setChecked(bool value = true)
+	{
+		m_checked = value;
+		return *this;
+	}
+
+private:
+	wxWindow* createWidget(
+		wxWindow* parent,
+		wxWindowID id,
+		const std::string& str,
+		const wxPoint& pos,
+		const wxSize& size,
+		long style) override
+	{
+		auto* cb = new wxCheckBox(parent, id, str, pos, size, style);
+		cb->SetValue(m_checked);
+		return cb;
+	}
+
+private:
+	bool m_checked { false };
+};
+
+// ComboBox -----------------------------------------------------------
+struct ComboBox : Widget<ComboBox>
+{
+	using super = Widget<ComboBox>;
+
+	explicit ComboBox(wxWindowID id, std::vector<std::string> choices, const std::string& selected = "")
+		: super(id, selected)
+		, m_choices(std::move(choices))
+	{
+	}
+
+	explicit ComboBox(std::vector<std::string> choices, const std::string& selected = "")
+		: super(wxID_ANY, selected)
+		, m_choices(std::move(choices))
+	{
+	}
+
+private:
+	wxWindow* createWidget(
+		wxWindow* parent,
+		wxWindowID id,
+		const std::string& str,
+		const wxPoint& pos,
+		const wxSize& size,
+		long style) override
+	{
+		wxArrayString items;
+		for (const auto& c : m_choices)
+			items.Add(c);
+		return new wxComboBox(parent, id, str, pos, size, items, style);
+	}
+
+private:
+	std::vector<std::string> m_choices;
 };
 
 // Slider -----------------------------------------------------------

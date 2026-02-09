@@ -12,7 +12,10 @@ public:
             wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM | wxTOP, 10),
             HStack {
                 Button{"Browse..."}
-                    .withFlags(wxSizerFlags().CenterVertical().Border(wxRIGHT, 15)),
+                    .withFlags(wxSizerFlags().CenterVertical().Border(wxRIGHT, 15))
+                    .onClick([]() {
+                        wxMessageBox("Browse button clicked!");
+                    }),
                 TextCtrl{""}
                     .withFlags(wxSizerFlags(1).Expand())
             },
