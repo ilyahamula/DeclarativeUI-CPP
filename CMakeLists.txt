@@ -29,7 +29,14 @@ else()
     set(WX_TARGET wx::core wx::base)
 endif()
 
-add_executable(DeclarativeUI main.cpp)
+add_executable(DeclarativeUI
+    main.cpp
+    src/frameworks_core/LayoutFlags.cpp
+    src/frameworks_core/ControlWrapper.cpp
+    src/frameworks_core/ControlWrappers.cpp
+    src/frameworks_core/GroupBoxWrapper.cpp
+    src/frameworks_core/LayoutWrapper.cpp
+)
 target_include_directories(DeclarativeUI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(DeclarativeUI PRIVATE ${WX_TARGET})
 target_compile_definitions(DeclarativeUI PRIVATE USE_WX_WIDGETS)

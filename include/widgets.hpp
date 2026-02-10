@@ -1,39 +1,41 @@
 #pragma once
 
-#include <wx/wx.h>
+#include "frameworks_core/ControlWrappers.hpp"
+
 #include <functional>
+#include <memory>
 #include <optional>
 #include <vector>
 
 template <typename W>
 struct Widget
 {
-	Widget(wxWindowID id, std::string str)
-		: m_id(id)
-		, m_str(str)
+	Widget(std::string str)
+		: m_str(str)
 	{
 	}
 
 	virtual ~Widget() = default;
 
-	void createAndAdd(wxWindow* parent, wxSizer* sizer, wxSizerFlags flags)
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 	{
-		sizer->Add(createWidget(parent, m_id, m_str, m_position, m_size, m_style), m_flags.value_or(flags));
+		auto control = createWrapper(parent, m_str, m_position, m_size, m_style);
+		control->createAndAdd(parent, layout, m_flags.value_or(flags));
 	}
 
-	W& withFlags(wxSizerFlags flags)
+	W& withFlags(LayoutFlags flags)
 	{
 		m_flags = flags;
 		return static_cast<W&>(*this);
 	}
 
-	W& withPosition(const wxPoint& pos)
+	W& withPosition(const Position& pos)
 	{
 		m_position = pos;
 		return static_cast<W&>(*this);
 	}
 
-	W& withSize(const wxSize& size)
+	W& withSize(const Size& size)
 	{
 		m_size = size;
 		return static_cast<W&>(*this);
@@ -46,75 +48,63 @@ struct Widget
 	}
 
 private:
-	virtual wxWindow* createWidget(
-		wxWindow* parent, 
-		wxWindowID id,
+	virtual std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) = 0;
 
 private:
-	wxWindowID m_id;
 	std::string m_str;
-	std::optional<wxSizerFlags> m_flags;
-	wxPoint m_position { wxDefaultPosition };
-	wxSize m_size { wxDefaultSize };
+	std::optional<LayoutFlags> m_flags;
+	Position m_position { -1, -1 };
+	Size m_size { -1, -1 };
 	long m_style { 0 };
 };
 
-// Text  -----------------------------------------------------------
+// StaticText -----------------------------------------------------------
 struct StaticText : Widget<StaticText>
 {
 	using super = Widget<StaticText>;
 
-	explicit StaticText(wxWindowID id = wxID_ANY, std::string str = "")
-		: super(id, str)
+	explicit StaticText(const std::string& str)
+		: super(str)
 	{
 	}
 
-	explicit StaticText(const std::string& str)
-		: super(wxID_ANY, str)
-	{
-	}
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		return new wxStaticText(parent, id, str, pos, size, style);
+		return std::make_unique<StaticTextWrapper>(parent, str, pos, size, style);
 	}
 };
 
 
-// Text Control -----------------------------------------------------------
+// TextCtrl -----------------------------------------------------------
 struct TextCtrl : Widget<TextCtrl>
 {
 	using super = Widget<TextCtrl>;
 
-	explicit TextCtrl(wxWindowID id = wxID_ANY, std::string str = "")
-		: super(id, str)
+	explicit TextCtrl(const std::string& str = "")
+		: super(str)
 	{
 	}
 
-	explicit TextCtrl(const std::string& str)
-		: super(wxID_ANY, str)
-	{
-	}
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		return new wxTextCtrl(parent, id, str, pos, size, style);
+		return std::make_unique<TextCtrlWrapper>(parent, str, pos, size, style);
 	}
 };
 
@@ -123,13 +113,8 @@ struct Button : Widget<Button>
 {
 	using super = Widget<Button>;
 
-	explicit Button(wxWindowID id = wxID_ANY, std::string str = "")
-		: super(id, str)
-	{
-	}
-
-	explicit Button(const std::string& str)
-		: super(wxID_ANY, str)
+	explicit Button(const std::string& str = "")
+		: super(str)
 	{
 	}
 
@@ -140,18 +125,14 @@ struct Button : Widget<Button>
 	}
 
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		auto* btn = new wxButton(parent, id, str, pos, size, style);
-		if (m_onClick)
-			btn->Bind(wxEVT_BUTTON, [cb = m_onClick](wxCommandEvent&) { cb(); });
-		return btn;
+		return std::make_unique<ButtonWrapper>(parent, str, pos, size, style, m_onClick);
 	}
 
 private:
@@ -163,25 +144,20 @@ struct RadioButton : Widget<RadioButton>
 {
 	using super = Widget<RadioButton>;
 
-	explicit RadioButton(wxWindowID id = wxID_ANY, std::string str = "")
-		: super(id, str)
+	explicit RadioButton(const std::string& str = "")
+		: super(str)
 	{
 	}
 
-	explicit RadioButton(const std::string& str)
-		: super(wxID_ANY, str)
-	{
-	}
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		return new wxRadioButton(parent, id, str, pos, size, style);
+		return std::make_unique<RadioButtonWrapper>(parent, str, pos, size, style);
 	}
 };
 
@@ -190,13 +166,8 @@ struct CheckBox : Widget<CheckBox>
 {
 	using super = Widget<CheckBox>;
 
-	explicit CheckBox(wxWindowID id = wxID_ANY, std::string str = "")
-		: super(id, str)
-	{
-	}
-
-	explicit CheckBox(const std::string& str)
-		: super(wxID_ANY, str)
+	explicit CheckBox(const std::string& str = "")
+		: super(str)
 	{
 	}
 
@@ -207,17 +178,14 @@ struct CheckBox : Widget<CheckBox>
 	}
 
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		auto* cb = new wxCheckBox(parent, id, str, pos, size, style);
-		cb->SetValue(m_checked);
-		return cb;
+		return std::make_unique<CheckBoxWrapper>(parent, str, pos, size, style, m_checked);
 	}
 
 private:
@@ -229,31 +197,21 @@ struct ComboBox : Widget<ComboBox>
 {
 	using super = Widget<ComboBox>;
 
-	explicit ComboBox(wxWindowID id, std::vector<std::string> choices, const std::string& selected = "")
-		: super(id, selected)
-		, m_choices(std::move(choices))
-	{
-	}
-
 	explicit ComboBox(std::vector<std::string> choices, const std::string& selected = "")
-		: super(wxID_ANY, selected)
+		: super(selected)
 		, m_choices(std::move(choices))
 	{
 	}
 
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		wxArrayString items;
-		for (const auto& c : m_choices)
-			items.Add(c);
-		return new wxComboBox(parent, id, str, pos, size, items, style);
+		return std::make_unique<ComboBoxWrapper>(parent, m_choices, str, pos, size, style);
 	}
 
 private:
@@ -265,36 +223,21 @@ struct Slider : Widget<Slider>
 {
 	using super = Widget<Slider>;
 
-	struct Range
-	{
-		int min;
-		int max;
-		std::optional<int> value = std::nullopt;
-	};
-
-	explicit Slider(wxWindowID id, Range range)
-		: super(id, "")
-		, m_range(range)
-	{
-	}
-
 	explicit Slider(Range range)
-		: super(wxID_ANY, "")
+		: super("")
 		, m_range(range)
 	{
 	}
 
 private:
-	wxWindow* createWidget(
-		wxWindow* parent,
-		wxWindowID id,
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
 		const std::string& str,
-		const wxPoint& pos,
-		const wxSize& size,
+		const Position& pos,
+		const Size& size,
 		long style) override
 	{
-		return new wxSlider(parent, id, m_range.value.value_or(m_range.min),
-			m_range.min, m_range.max, pos, size, style);
+		return std::make_unique<SliderWrapper>(parent, m_range, pos, size, style);
 	}
 
 private:

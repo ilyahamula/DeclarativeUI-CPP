@@ -1,23 +1,23 @@
 #pragma once
 
-#include <wx/wx.h>
-
+#include <memory>
 #include <optional>
 #include <tuple>
 
+#include "frameworks_core/GroupBoxWrapper.hpp"
 #include "create_and_add.hpp"
 
 template<CreateAndAddable... W>
 struct GroupBox
 {
-	GroupBox(wxOrientation orient, const std::string& label, W... widgets)
+	GroupBox(Orientation orient, const std::string& label, W... widgets)
 		: m_orient(orient)
 		, m_label(label)
 		, m_widgets(std::make_tuple(widgets...))
 	{
 	}
 
-	GroupBox(wxOrientation orient, const std::string& label, wxSizerFlags flags, W... widgets)
+	GroupBox(Orientation orient, const std::string& label, LayoutFlags flags, W... widgets)
 		: m_orient(orient)
 		, m_label(label)
 		, m_flags(flags)
@@ -25,31 +25,31 @@ struct GroupBox
 	{
 	}
 
-	auto createAndAdd(wxWindow* parent, wxSizerFlags parentFlags)
+	std::unique_ptr<GroupBoxWrapper> createAndAdd(ControlWrapper* parent, LayoutFlags parentFlags)
 	{
-		auto* box = new wxStaticBoxSizer(m_orient, parent, m_label);
-		::createAndAdd(box->GetStaticBox(), box, m_flags.value_or(parentFlags), m_widgets);
+		auto box = std::make_unique<GroupBoxWrapper>(parent, m_orient, m_label);
+		::createAndAdd(box->staticBox(), box.get(), m_flags.value_or(parentFlags), m_widgets);
 		return box;
 	}
 
-	auto createAndAdd(wxWindow* parent, wxSizer* parentSizer, wxSizerFlags parentFlags)
+	auto createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
 	{
-		auto* box = createAndAdd(parent, parentFlags);
-		parentSizer->Add(box, parentFlags);
+		auto box = createAndAdd(parent, parentFlags);
+		parentLayout->add(box.get(), parentFlags);
 		return box;
 	}
 
-	auto fitTo(wxWindow* parent)
+	auto fitTo(ControlWrapper* parent)
 	{
-		auto* box = createAndAdd(parent, m_flags.value_or(wxSizerFlags()));
-		parent->SetSizerAndFit(box);
+		auto box = createAndAdd(parent, m_flags.value_or(LayoutFlags()));
+		parent->setLayout(box.get());
 		return box;
 	}
 
 private:
-	wxOrientation m_orient;
+	Orientation m_orient;
 	std::string m_label;
-	std::optional<wxSizerFlags> m_flags;
+	std::optional<LayoutFlags> m_flags;
 	std::tuple<W...> m_widgets;
 };
 
@@ -57,22 +57,22 @@ template<CreateAndAddable... W>
 struct HGroupBox : public GroupBox<W...>
 {
 	HGroupBox(W... widgets)
-		: GroupBox<W...>(wxHORIZONTAL, "", widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, "", widgets...)
 	{
 	}
 
-	HGroupBox(wxSizerFlags flags, W... widgets)
-		: GroupBox<W...>(wxHORIZONTAL, "", flags, widgets...)
+	HGroupBox(LayoutFlags flags, W... widgets)
+		: GroupBox<W...>(Orientation::Horizontal, "", flags, widgets...)
 	{
 	}
 
 	HGroupBox(const std::string& label, W... widgets)
-		: GroupBox<W...>(wxHORIZONTAL, label, widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, label, widgets...)
 	{
 	}
 
-	HGroupBox(const std::string& label, wxSizerFlags flags, W... widgets)
-		: GroupBox<W...>(wxHORIZONTAL, label, flags, widgets...)
+	HGroupBox(const std::string& label, LayoutFlags flags, W... widgets)
+		: GroupBox<W...>(Orientation::Horizontal, label, flags, widgets...)
 	{
 	}
 };
@@ -81,22 +81,22 @@ template<CreateAndAddable... W>
 struct VGroupBox : public GroupBox<W...>
 {
 	VGroupBox(W... widgets)
-		: GroupBox<W...>(wxVERTICAL, "", widgets...)
+		: GroupBox<W...>(Orientation::Vertical, "", widgets...)
 	{
 	}
 
-	VGroupBox(wxSizerFlags flags, W... widgets)
-		: GroupBox<W...>(wxVERTICAL, "", flags, widgets...)
+	VGroupBox(LayoutFlags flags, W... widgets)
+		: GroupBox<W...>(Orientation::Vertical, "", flags, widgets...)
 	{
 	}
 
 	VGroupBox(const std::string& label, W... widgets)
-		: GroupBox<W...>(wxVERTICAL, label, widgets...)
+		: GroupBox<W...>(Orientation::Vertical, label, widgets...)
 	{
 	}
 
-	VGroupBox(const std::string& label, wxSizerFlags flags, W... widgets)
-		: GroupBox<W...>(wxVERTICAL, label, flags, widgets...)
+	VGroupBox(const std::string& label, LayoutFlags flags, W... widgets)
+		: GroupBox<W...>(Orientation::Vertical, label, flags, widgets...)
 	{
 	}
 };

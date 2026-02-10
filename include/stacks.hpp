@@ -1,7 +1,6 @@
 #pragma once
 
-#include <wx/wx.h>
-
+#include <memory>
 #include <optional>
 #include <tuple>
 
@@ -10,43 +9,50 @@
 template<CreateAndAddable... W>
 struct Stack
 {
-	Stack(wxOrientation orient, W... widgets)
+	Stack(Orientation orient, W... widgets)
 		: m_orient(orient)
 		, m_widgets(std::make_tuple(widgets...))
 	{
 	}
 
-	Stack(wxOrientation orient, wxSizerFlags flags, W... widgets)
+	Stack(Orientation orient, LayoutFlags flags, W... widgets)
 		: m_orient(orient)
 		, m_flags(flags)
 		, m_widgets(std::make_tuple(widgets...))
 	{
 	}
 
-	wxSizer* createAndAdd(wxWindow* parent, wxSizerFlags parentFlags)
+	std::unique_ptr<LayoutWrapper> createAndAdd(ControlWrapper* parent, LayoutFlags parentFlags)
 	{
-		auto sizer = new wxBoxSizer(m_orient);
-		::createAndAdd(parent, sizer, m_flags.value_or(parentFlags), m_widgets);
-		return sizer;
+		auto layout = std::make_unique<LayoutWrapper>(m_orient);
+		::createAndAdd(parent, layout.get(), m_flags.value_or(parentFlags), m_widgets);
+		return layout;
 	}
 
-	auto createAndAdd(wxWindow* parent, wxSizer* parentSizer, wxSizerFlags parentFlags)
+	auto createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
 	{
-		auto sizer = createAndAdd(parent, parentFlags);
-		parentSizer->Add(sizer, parentFlags);
-		return sizer;
+		auto layout = createAndAdd(parent, parentFlags);
+		parentLayout->add(layout.get(), parentFlags);
+		return layout;
 	}
 
-	auto fitTo(wxWindow* parent)
+	auto fitTo(ControlWrapper* parent)
 	{
-		auto sizer = createAndAdd(parent, m_flags.value_or(wxSizerFlags()));
-		parent->SetSizerAndFit(sizer);
-		return sizer;
+		auto layout = createAndAdd(parent, m_flags.value_or(LayoutFlags()));
+		parent->setLayout(layout.get());
+		return layout;
+	}
+
+	auto fitTo(ControlWrapper parent)
+	{
+		auto layout = createAndAdd(&parent, m_flags.value_or(LayoutFlags()));
+		parent.setLayout(layout.get());
+		return layout;
 	}
 
 private:
-	wxOrientation m_orient;
-	std::optional<wxSizerFlags> m_flags;
+	Orientation m_orient;
+	std::optional<LayoutFlags> m_flags;
 	std::tuple<W...> m_widgets;
 };
 
@@ -54,12 +60,12 @@ template<CreateAndAddable... W>
 struct HStack : public Stack<W...>
 {
 	HStack(W... widgets)
-		: Stack<W...>(wxHORIZONTAL, widgets...)
+		: Stack<W...>(Orientation::Horizontal, widgets...)
 	{
 	}
 
-	HStack(wxSizerFlags flags, W... widgets)
-		: Stack<W...>(wxHORIZONTAL, flags, widgets...)
+	HStack(LayoutFlags flags, W... widgets)
+		: Stack<W...>(Orientation::Horizontal, flags, widgets...)
 	{
 	}
 };
@@ -68,12 +74,12 @@ template<CreateAndAddable... W>
 struct VStack : public Stack<W...>
 {
 	VStack(W... widgets)
-		: Stack<W...>(wxVERTICAL, widgets...)
+		: Stack<W...>(Orientation::Vertical, widgets...)
 	{
 	}
 
-	VStack(wxSizerFlags flags, W... widgets)
-		: Stack<W...>(wxVERTICAL, flags, widgets...)
+	VStack(LayoutFlags flags, W... widgets)
+		: Stack<W...>(Orientation::Vertical, flags, widgets...)
 	{
 	}
 };

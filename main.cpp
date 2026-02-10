@@ -9,30 +9,30 @@ public:
         : wxDialog(parent, id, title, wxDefaultPosition, wxSize(400, 200))
     {
         VStack {
-            wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM | wxTOP, 10),
+            LayoutFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM | wxTOP, 10),
             HStack {
                 Button{"Browse..."}
-                    .withFlags(wxSizerFlags().CenterVertical().Border(wxRIGHT, 15))
+                    .withFlags(LayoutFlags().CenterVertical().Border(wxRIGHT, 15))
                     .onClick([]() {
                         wxMessageBox("Browse button clicked!");
                     }),
                 TextCtrl{""}
-                    .withFlags(wxSizerFlags(1).Expand())
+                    .withFlags(LayoutFlags(1).Expand())
             },
             HGroupBox {
                 Slider { { .min = 0, .max = 100, .value = 50 } }
-                    .withFlags(wxSizerFlags(1).Expand()),
+                    .withFlags(LayoutFlags(1).Expand()),
                 VGroupBox {
-                    wxSizerFlags().CenterVertical().Border(wxLEFT),
+                    LayoutFlags().CenterVertical().Border(wxLEFT),
                     RadioButton{"On"}.withStyle(wxRB_GROUP),
                     RadioButton{"Off"}
                 }
             },
             HStack {
                 StaticText{"Ready"}
-                    .withFlags(wxSizerFlags(1).CenterVertical().Border(wxRIGHT)),
-                Button{wxID_OK, "OK"}
-                    .withFlags(wxSizerFlags().CenterVertical())
+                    .withFlags(LayoutFlags(1).CenterVertical().Border(wxRIGHT)),
+                Button{"OK"}
+                    .withFlags(LayoutFlags().CenterVertical())
             }
         }.fitTo(this);
     }

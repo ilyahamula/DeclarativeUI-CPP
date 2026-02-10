@@ -1,0 +1,18 @@
+#pragma once
+
+#include "ControlWrapper.hpp"
+#include "LayoutWrapper.hpp"
+
+#include <string>
+
+class wxStaticBoxSizer;
+
+class GroupBoxWrapper : public LayoutWrapper
+{
+public:
+	GroupBoxWrapper(ControlWrapper* parent, Orientation orient, const std::string& label);
+	ControlWrapper* staticBox();
+
+private:
+	ControlWrapper m_staticBox;
+};
