@@ -33,6 +33,12 @@ public:
                     .withFlags(LayoutFlags(1).CenterVertical().Border(wxRIGHT)),
                 Button{"OK"}
                     .withFlags(LayoutFlags().CenterVertical())
+            },
+            HGroupBox { "Combo Group",
+                ComboBox{ {"Hello", "Goodbye", "Nihao" }, "G" }
+                    .withFlags(LayoutFlags(1).CenterVertical().Border(wxRIGHT)),
+                CheckBox{}
+                    .withFlags(LayoutFlags().CenterVertical())
             }
         }.fitTo(this);
     }

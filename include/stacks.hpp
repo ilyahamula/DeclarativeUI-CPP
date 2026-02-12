@@ -43,7 +43,7 @@ struct Stack
 		return layout;
 	}
 
-	auto fitTo(ControlWrapper parent)
+	auto fitTo(ControlWrapper&& parent)
 	{
 		auto layout = createAndAdd(&parent, m_flags.value_or(LayoutFlags()));
 		parent.setLayout(layout.get());
