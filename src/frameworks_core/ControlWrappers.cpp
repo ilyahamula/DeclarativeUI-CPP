@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 
+#ifdef USE_WX
 #include <wx/wx.h>
 
 // ButtonWrapper -----------------------------------------------------------
@@ -75,3 +76,6 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 	m_nativeWidget = new wxComboBox(parent->nativeHandle(), wxID_ANY, selected,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), items, style);
 }
+#elif defined(USE_QT)
+#elif defined(USE_IMGUI)
+#endif

@@ -1,6 +1,7 @@
-#include <wx/wx.h>
-
 #include "declarative_ui.hpp"
+
+#ifdef USE_WX
+#include <wx/wx.h>
 
 class MainDialog : public wxDialog
 {
@@ -69,3 +70,14 @@ int main(int argc, char** argv)
     wxEntryCleanup();
     return code;
 }
+#elif defined(USE_QT)
+int main(int argc, char** argv)
+{
+    return 0;
+}
+#elif defined(USE_IMGUI)
+int main(int argc, char** argv)
+{
+    return 0;
+}
+#endif

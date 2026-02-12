@@ -1,5 +1,6 @@
 #include "frameworks_core/LayoutFlags.hpp"
 
+#ifdef USE_WX
 LayoutFlags::LayoutFlags()
 	: m_flags()
 {
@@ -50,3 +51,6 @@ const wxSizerFlags& LayoutFlags::wx() const
 {
 	return m_flags;
 }
+#elif defined(USE_QT)
+#elif defined(USE_IMGUI)
+#endif

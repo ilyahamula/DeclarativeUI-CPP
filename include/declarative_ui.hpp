@@ -1,7 +1,5 @@
 #pragma once
 
-#include <wx/wx.h>
-
 #include "widgets.hpp"
 #include "stacks.hpp"
 #include "groupboxes.hpp"

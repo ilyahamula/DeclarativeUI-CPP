@@ -1,10 +1,11 @@
 #include "frameworks_core/ControlWrapper.hpp"
 
-#include <wx/wx.h>
-
 ControlWrapper::ControlWrapper() = default;
 
 ControlWrapper::~ControlWrapper() = default;
+
+#ifdef USE_WX
+#include <wx/wx.h>
 
 ControlWrapper::ControlWrapper(wxWindow* window)
 	: m_nativeWidget(window)
@@ -26,3 +27,6 @@ void ControlWrapper::setLayout(LayoutWrapper* layout)
 	if (m_nativeWidget)
 		m_nativeWidget->SetSizerAndFit(layout->nativeHandle());
 }
+#elif defined(USE_QT)
+#elif defined(USE_IMGUI)
+#endif

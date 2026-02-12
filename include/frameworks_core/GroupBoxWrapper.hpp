@@ -5,8 +5,6 @@
 
 #include <string>
 
-class wxStaticBoxSizer;
-
 class GroupBoxWrapper : public LayoutWrapper
 {
 public:
