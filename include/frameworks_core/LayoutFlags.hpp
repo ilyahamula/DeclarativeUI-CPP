@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GeneralTypes.hpp"
+
 #ifdef USE_WX
 #include <wx/sizer.h>
 #elif defined(USE_QT)
@@ -13,7 +15,7 @@ public:
 	explicit LayoutFlags(int proportion);
 
 	LayoutFlags& Expand();
-	LayoutFlags& Border(int direction, int borderInPixels = 5);
+	LayoutFlags& Border(Side direction, int borderInPixels = 5);
 	LayoutFlags& CenterVertical();
 	LayoutFlags& CenterHorizontal();
 	LayoutFlags& Center();

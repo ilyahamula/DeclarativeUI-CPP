@@ -29,21 +29,21 @@ struct Stack
 		return layout;
 	}
 
-	auto createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
+	std::unique_ptr<LayoutWrapper> createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
 	{
 		auto layout = createAndAdd(parent, parentFlags);
 		parentLayout->add(layout.get(), parentFlags);
 		return layout;
 	}
 
-	auto fitTo(ControlWrapper* parent)
+	std::unique_ptr<LayoutWrapper> fitTo(ControlWrapper* parent)
 	{
 		auto layout = createAndAdd(parent, m_flags.value_or(LayoutFlags()));
 		parent->setLayout(layout.get());
 		return layout;
 	}
 
-	auto fitTo(ControlWrapper&& parent)
+	std::unique_ptr<LayoutWrapper> fitTo(ControlWrapper&& parent)
 	{
 		auto layout = createAndAdd(&parent, m_flags.value_or(LayoutFlags()));
 		parent.setLayout(layout.get());

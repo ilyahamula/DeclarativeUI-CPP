@@ -3,17 +3,15 @@
 #ifdef USE_WX
 #include <wx/wx.h>
 
-class MainDialog : public wxDialog
+namespace
 {
-public:
-    MainDialog(wxWindow* parent, wxWindowID id, const wxString& title)
-        : wxDialog(parent, id, title, wxDefaultPosition, wxSize(400, 200))
+    auto drawUI()
     {
-        VStack {
-            LayoutFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM | wxTOP, 10),
+        return VStack {
+            LayoutFlags().Expand().Border(Side::All, 10),
             HStack {
                 Button{"Browse..."}
-                    .withFlags(LayoutFlags().CenterVertical().Border(wxRIGHT, 15))
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 15))
                     .onClick([]() {
                         wxMessageBox("Browse button clicked!");
                     }),
@@ -24,24 +22,34 @@ public:
                 Slider { { .min = 0, .max = 100, .value = 50 } }
                     .withFlags(LayoutFlags(1).Expand()),
                 VGroupBox {
-                    LayoutFlags().CenterVertical().Border(wxLEFT),
+                    LayoutFlags().CenterVertical().Border(Side::Left),
                     RadioButton{"On"}.withStyle(wxRB_GROUP),
                     RadioButton{"Off"}
                 }
             },
             HStack {
                 StaticText{"Ready"}
-                    .withFlags(LayoutFlags(1).CenterVertical().Border(wxRIGHT)),
+                    .withFlags(LayoutFlags(1).CenterVertical().Border(Side::Right)),
                 Button{"OK"}
                     .withFlags(LayoutFlags().CenterVertical())
             },
             HGroupBox { "Combo Group",
                 ComboBox{ {"Hello", "Goodbye", "Nihao" }, "G" }
-                    .withFlags(LayoutFlags(1).CenterVertical().Border(wxRIGHT)),
+                    .withFlags(LayoutFlags(1).CenterVertical().Border(Side::Right)),
                 CheckBox{}
                     .withFlags(LayoutFlags().CenterVertical())
             }
-        }.fitTo(this);
+        };
+    }
+}
+
+class MainDialog : public wxDialog
+{
+public:
+    MainDialog(wxWindow* parent, wxWindowID id, const wxString& title)
+        : wxDialog(parent, id, title, wxDefaultPosition, wxSize(400, 200))
+    {
+        drawUI().fitTo(this);
     }
 };
 
@@ -50,7 +58,10 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
-        auto* dlg = new MainDialog(nullptr, wxID_ANY, "Declarative UI Dialog");
+        //auto* dlg = new MainDialog(nullptr, wxID_ANY, "Declarative UI Dialog");
+        //dlg->Show();
+        auto dlg = new wxDialog(nullptr, wxID_ANY, "Declarative UI Dialog", wxDefaultPosition, wxSize(400, 200));
+        drawUI().fitTo(dlg);
         dlg->Show();
         return true;
     }
