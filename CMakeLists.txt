@@ -21,6 +21,7 @@ add_executable(DeclarativeUI
     src/frameworks_core/ControlWrapper.cpp
     src/frameworks_core/ControlWrappers.cpp
     src/frameworks_core/GroupBoxWrapper.cpp
+    src/frameworks_core/DialogWrapper.cpp
     src/frameworks_core/LayoutWrapper.cpp
 )
 target_include_directories(DeclarativeUI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
