@@ -1,4 +1,5 @@
 #include "frameworks_core/DialogWrapper.hpp"
+#include "frameworks_core/LayoutWrapper.hpp"
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -10,7 +11,7 @@
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::DialogWrapper() -> new wxDialog()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> new wxDialog()\n");
 #endif
 	m_nativeWidget = new wxDialog(nullptr, wxID_ANY, title,
 		wxDefaultPosition, wxSize(size.width, size.height));
@@ -19,7 +20,7 @@ DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 void DialogWrapper::show()
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::show() -> wxDialog->Show()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::show()\t-> wxDialog->Show()\n");
 #endif
 	static_cast<wxDialog*>(m_nativeWidget)->Show();
 }
@@ -30,7 +31,7 @@ void DialogWrapper::show()
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::DialogWrapper() -> ImGui::Begin()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
 #endif
 	ImGui::Begin(title.c_str());
 }
@@ -38,7 +39,7 @@ DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 void DialogWrapper::show()
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::show() -> ImGui::End()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::show()\t-> ImGui::End()\n");
 #endif
 	ImGui::End();
 }

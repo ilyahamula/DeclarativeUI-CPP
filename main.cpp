@@ -110,6 +110,7 @@ int main(int argc, char** argv)
 
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    bool value = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -133,23 +134,38 @@ int main(int argc, char** argv)
         //     ImGui::EndPopup();
         // }
         // ImGui::End();
-        drawUI(m_text, m_sliderValue, []() {
+        drawUI(m_text, m_sliderValue, [&value]() {
+            value = true;  
+        }).show();
+
 #ifdef USE_LOGGER
+        Logger::instance().stopLogging();
+#endif
+        if (value)
+        {
+
             ImGui::OpenPopup("Message");
 
+            ImGui::SetNextWindowSizeConstraints(ImVec2(600, 0), ImVec2(FLT_MAX, FLT_MAX));
             // Then every frame (same place you build UI):
             if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
+                #ifdef USE_LOGGER
                 ImGui::TextUnformatted(Logger::instance().getAll().c_str());
+                #elif
+                ImGui::Text("Button was clicked!");
+                #endif
                 ImGui::Separator();
             
                 if (ImGui::Button("OK", ImVec2(120, 0)))
+                {
                     ImGui::CloseCurrentPopup();
+                    value = false;
+                }
             
                 ImGui::EndPopup();
             }
-#endif
-        }).show();
+        }
 
         ImGui::Render();
         int display_w, display_h;

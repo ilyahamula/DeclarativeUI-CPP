@@ -1,4 +1,5 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/LayoutWrapper.hpp"
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -14,7 +15,7 @@ ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 	std::function<void()> onClick)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("ButtonWrapper::ButtonWrapper() -> new wxButton()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::ButtonWrapper()\t-> new wxButton()\n");
 #endif
 	auto* btn = new wxButton(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -29,7 +30,7 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("TextCtrlWrapper::TextCtrlWrapper() -> new wxTextCtrl()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::TextCtrlWrapper()\t-> new wxTextCtrl()\n");
 #endif
 	m_nativeWidget = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -41,7 +42,7 @@ StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& 
 	const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("StaticTextWrapper::StaticTextWrapper() -> new wxStaticText()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "StaticTextWrapper::StaticTextWrapper()\t-> new wxStaticText()\n");
 #endif
 	m_nativeWidget = new wxStaticText(parent->nativeHandle(), wxID_ANY, text,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -57,7 +58,7 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrVa
 {
 	assert(ptrValue);
 #ifdef USE_LOGGER
-	Logger::instance().log("SliderWrapper::SliderWrapper() -> new wxSlider()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::SliderWrapper()\t-> new wxSlider()\n");
 #endif
 	if constexpr (std::is_floating_point_v<T>)
 	{
@@ -85,7 +86,7 @@ RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string
 	const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("RadioButtonWrapper::RadioButtonWrapper() -> new wxRadioButton()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::RadioButtonWrapper()\t-> new wxRadioButton()\n");
 #endif
 	m_nativeWidget = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -98,7 +99,7 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 	bool checked)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("CheckBoxWrapper::CheckBoxWrapper() -> new wxCheckBox()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::CheckBoxWrapper()\t-> new wxCheckBox()\n");
 #endif
 	auto* cb = new wxCheckBox(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -112,7 +113,7 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 	const std::string& selected, const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("ComboBoxWrapper::ComboBoxWrapper() -> new wxComboBox()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::ComboBoxWrapper()\t-> new wxComboBox()\n");
 #endif
 	wxArrayString items;
 	for (const auto& c : choices)
@@ -131,7 +132,7 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
-	: m_label(label)
+	: m_label(label.empty() ? "##button" : label)
 	, m_onClick(std::move(onClick))
 {
 }
@@ -139,14 +140,14 @@ ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("ButtonWrapper::createAndAdd() -> ImGui::Button()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::createAndAdd()\t-> ImGui::Button()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	if (ImGui::Button(m_label.c_str()))
 	{
 		if (m_onClick)
 			m_onClick();
 	}
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
@@ -160,14 +161,14 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("TextCtrlWrapper::createAndAdd() -> ImGui::InputText()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::createAndAdd()\t-> ImGui::InputText()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
 		m_value = buf;
+
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -181,10 +182,10 @@ StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& 
 void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("StaticTextWrapper::createAndAdd() -> ImGui::TextUnformatted()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "StaticTextWrapper::createAndAdd()\t-> ImGui::TextUnformatted()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	ImGui::TextUnformatted(m_text.c_str());
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // SliderWrapper -----------------------------------------------------------
@@ -200,21 +201,21 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrVa
 template <SliderValue T>
 void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	if constexpr (std::is_same_v<T, int>)
 	{
 #ifdef USE_LOGGER
-		Logger::instance().log("SliderWrapper::createAndAdd() -> ImGui::SliderInt()\n");
+		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderInt()\n");
 #endif
 		ImGui::SliderInt("##slider", m_ptrValue, m_range.min, m_range.max);
 	}
 	else
 	{
 #ifdef USE_LOGGER
-		Logger::instance().log("SliderWrapper::createAndAdd() -> ImGui::SliderFloat()\n");
+		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderFloat()\n");
 #endif
 		ImGui::SliderFloat("##slider", m_ptrValue, m_range.min, m_range.max);
 	}
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 template class SliderWrapper<int>;
@@ -224,18 +225,19 @@ template class SliderWrapper<float>;
 
 RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style)
-	: m_label(label)
+	: m_label(label.empty() ? "##radio" : label)
 {
 }
 
 void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("RadioButtonWrapper::createAndAdd() -> ImGui::RadioButton()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> ImGui::RadioButton()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	if (ImGui::RadioButton(m_label.c_str(), m_active))
 		m_active = !m_active;
+
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // CheckBoxWrapper -----------------------------------------------------------
@@ -243,7 +245,7 @@ void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	bool checked)
-	: m_label(label)
+	: m_label(label.empty() ? "##checkbox" : label)
 {
 	m_checked = checked;
 }
@@ -251,10 +253,10 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("CheckBoxWrapper::createAndAdd() -> ImGui::Checkbox()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::createAndAdd()\t-> ImGui::Checkbox()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	ImGui::Checkbox(m_label.c_str(), &m_checked);
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -281,9 +283,9 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 void ComboBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("ComboBoxWrapper::createAndAdd() -> ImGui::Combo()\n");
+	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> ImGui::Combo()\n");
 #endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
 	ImGui::Combo("##combo", &m_currentItem, m_items.c_str());
+	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 #endif

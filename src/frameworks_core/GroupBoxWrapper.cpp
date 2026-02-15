@@ -4,6 +4,8 @@
 #include "Logger.hpp"
 #endif
 
+int GroupBoxWrapper::s_groupBoxId = 0;
+
 #ifdef USE_WX
 #include <wx/statbox.h>
 
@@ -11,9 +13,9 @@ GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, con
 	: LayoutWrapper(orient)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(orient == Orientation::Horizontal
-		? "GroupBoxWrapper::GroupBoxWrapper() Horizontal -> new wxStaticBoxSizer()\n"
-		: "GroupBoxWrapper::GroupBoxWrapper() Vertical -> new wxStaticBoxSizer()\n");
+	Logger::instance().log(indent() + (orient == Orientation::Horizontal
+		? "GroupBoxWrapper::GroupBoxWrapper() Horizontal\t-> new wxStaticBoxSizer()\n"
+		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\t-> new wxStaticBoxSizer()\n"));
 #endif
 	m_nativeSizer = new wxStaticBoxSizer(
 		(orient == Orientation::Horizontal) ? wxHORIZONTAL : wxVERTICAL, parent->nativeHandle(), label);
@@ -27,6 +29,7 @@ ControlWrapper* GroupBoxWrapper::staticBox()
 
 void GroupBoxWrapper::finilizeLayout()
 {
+	LayoutWrapper::finilizeLayout();
 }
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
@@ -36,11 +39,12 @@ GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, con
 	: LayoutWrapper(orient)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(orient == Orientation::Horizontal
-		? "GroupBoxWrapper::GroupBoxWrapper() Horizontal\n"
-		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\n");
+	Logger::instance().log(indent() + (orient == Orientation::Horizontal
+		? "GroupBoxWrapper::GroupBoxWrapper() Horizontal\t-> ImGui::BeginChild()\n"
+		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\t-> ImGui::BeginChild()\n"));
 #endif
-	ImGui::BeginChild("##radio_frame", ImVec2(-FLT_MIN, -FLT_MIN), ImGuiChildFlags_Borders);
+	std::string childId = "##groupbox_" + std::to_string(s_groupBoxId++);
+	ImGui::BeginChild(childId.c_str(), ImVec2(-FLT_MIN, -FLT_MIN), ImGuiChildFlags_Borders);
 	if (!label.empty())
 	{
 		ImGui::Text("%s", label.c_str());
@@ -56,7 +60,9 @@ ControlWrapper* GroupBoxWrapper::staticBox()
 void GroupBoxWrapper::finilizeLayout()
 {
 #ifdef USE_LOGGER
-	Logger::instance().log("GroupBoxWrapper::finilizeLayout() -> ImGui::EndChild()\n");
+	Logger::instance().log(indent() + (m_orientation == Orientation::Horizontal
+		? "GroupBoxWrapper::finilizeLayout() Horizontal\t-> ImGui::EndChild()\n"
+		: "GroupBoxWrapper::finilizeLayout() Vertical\t-> ImGui::EndChild()\n"));
 #endif
 	ImGui::EndChild();
 	LayoutWrapper::finilizeLayout();
