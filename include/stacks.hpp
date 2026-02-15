@@ -26,6 +26,7 @@ struct Stack
 	{
 		auto layout = std::make_unique<LayoutWrapper>(m_orient);
 		::createAndAdd(parent, layout.get(), m_flags.value_or(parentFlags), m_widgets);
+		layout->finilizeLayout();
 		return layout;
 	}
 

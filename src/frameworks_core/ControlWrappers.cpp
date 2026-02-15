@@ -1,5 +1,9 @@
 #include "frameworks_core/ControlWrappers.hpp"
 
+#ifdef USE_LOGGER
+#include "Logger.hpp"
+#endif
+
 #ifdef USE_WX
 #include <wx/wx.h>
 
@@ -9,6 +13,9 @@ ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("ButtonWrapper::ButtonWrapper() -> new wxButton()\n");
+#endif
 	auto* btn = new wxButton(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 	if (onClick)
@@ -18,9 +25,12 @@ ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 
 // TextCtrlWrapper -----------------------------------------------------------
 
-TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("TextCtrlWrapper::TextCtrlWrapper() -> new wxTextCtrl()\n");
+#endif
 	m_nativeWidget = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 }
@@ -30,25 +40,53 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& valu
 StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& text,
 	const Position& pos, const Size& size, long style)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("StaticTextWrapper::StaticTextWrapper() -> new wxStaticText()\n");
+#endif
 	m_nativeWidget = new wxStaticText(parent->nativeHandle(), wxID_ANY, text,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 }
 
 // SliderWrapper -----------------------------------------------------------
 
-SliderWrapper::SliderWrapper(ControlWrapper* parent, Range range,
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrValue,
 	const Position& pos, const Size& size, long style)
+	: m_range(range)
+	, m_ptrValue(ptrValue)
 {
-	m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
-		range.value.value_or(range.min), range.min, range.max,
-		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	assert(ptrValue);
+#ifdef USE_LOGGER
+	Logger::instance().log("SliderWrapper::SliderWrapper() -> new wxSlider()\n");
+#endif
+	if constexpr (std::is_floating_point_v<T>)
+	{
+		int iMin = static_cast<int>(range.min / range.step);
+		int iMax = static_cast<int>(range.max / range.step);
+		int iVal = static_cast<int>(*ptrValue / range.step);
+		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
+			iVal, iMin, iMax,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	}
+	else
+	{
+		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
+			*ptrValue, range.min, range.max,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	}
 }
+
+template class SliderWrapper<int>;
+template class SliderWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
 
 RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("RadioButtonWrapper::RadioButtonWrapper() -> new wxRadioButton()\n");
+#endif
 	m_nativeWidget = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 }
@@ -59,6 +97,9 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 	const Position& pos, const Size& size, long style,
 	bool checked)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("CheckBoxWrapper::CheckBoxWrapper() -> new wxCheckBox()\n");
+#endif
 	auto* cb = new wxCheckBox(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 	cb->SetValue(checked);
@@ -70,6 +111,9 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
 	const std::string& selected, const Position& pos, const Size& size, long style)
 {
+#ifdef USE_LOGGER
+	Logger::instance().log("ComboBoxWrapper::ComboBoxWrapper() -> new wxComboBox()\n");
+#endif
 	wxArrayString items;
 	for (const auto& c : choices)
 		items.Add(c);
@@ -87,48 +131,110 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
+	: m_label(label)
+	, m_onClick(std::move(onClick))
 {
-	if (ImGui::Button(label.c_str()))
+}
+
+void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ButtonWrapper::createAndAdd() -> ImGui::Button()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (ImGui::Button(m_label.c_str()))
 	{
-		if (onClick)
-			onClick();
+		if (m_onClick)
+			m_onClick();
 	}
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
 
-TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style)
+	: m_value(value)
 {
-	// ImGui::InputText requires a unique label (not provided by wrapper)
-	std::snprintf(m_buf, sizeof(m_buf), "%s", value.c_str());
-	ImGui::InputText("##textctrl", m_buf, sizeof(m_buf));
+}
+
+void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("TextCtrlWrapper::createAndAdd() -> ImGui::InputText()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+
+	char buf[256] = {};
+	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
+		m_value = buf;
 }
 
 // StaticTextWrapper -----------------------------------------------------------
 
 StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& text,
 	const Position& pos, const Size& size, long style)
+	: m_text(text)
 {
-	ImGui::TextUnformatted(text.c_str());
+}
+
+void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("StaticTextWrapper::createAndAdd() -> ImGui::TextUnformatted()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::TextUnformatted(m_text.c_str());
 }
 
 // SliderWrapper -----------------------------------------------------------
 
-SliderWrapper::SliderWrapper(ControlWrapper* parent, Range range,
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrValue,
 	const Position& pos, const Size& size, long style)
+	: m_range(range)
+	, m_ptrValue(ptrValue)
 {
-	// ImGui::SliderInt requires a unique label (not provided by wrapper)
-	m_value = range.value.value_or(range.min);
-	ImGui::SliderInt("##slider", &m_value, range.min, range.max);
 }
+
+template <SliderValue T>
+void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if constexpr (std::is_same_v<T, int>)
+	{
+#ifdef USE_LOGGER
+		Logger::instance().log("SliderWrapper::createAndAdd() -> ImGui::SliderInt()\n");
+#endif
+		ImGui::SliderInt("##slider", m_ptrValue, m_range.min, m_range.max);
+	}
+	else
+	{
+#ifdef USE_LOGGER
+		Logger::instance().log("SliderWrapper::createAndAdd() -> ImGui::SliderFloat()\n");
+#endif
+		ImGui::SliderFloat("##slider", m_ptrValue, m_range.min, m_range.max);
+	}
+}
+
+template class SliderWrapper<int>;
+template class SliderWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
 
 RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style)
+	: m_label(label)
 {
-	if (ImGui::RadioButton(label.c_str(), m_active))
+}
+
+void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("RadioButtonWrapper::createAndAdd() -> ImGui::RadioButton()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (ImGui::RadioButton(m_label.c_str(), m_active))
 		m_active = !m_active;
 }
 
@@ -137,9 +243,18 @@ RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	bool checked)
+	: m_label(label)
 {
 	m_checked = checked;
-	ImGui::Checkbox(label.c_str(), &m_checked);
+}
+
+void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("CheckBoxWrapper::createAndAdd() -> ImGui::Checkbox()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::Checkbox(m_label.c_str(), &m_checked);
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -147,7 +262,6 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
 	const std::string& selected, const Position& pos, const Size& size, long style)
 {
-	// ImGui::Combo requires a unique label (not provided by wrapper)
 	for (int i = 0; i < static_cast<int>(choices.size()); ++i)
 	{
 		if (choices[i] == selected)
@@ -157,12 +271,19 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 		}
 	}
 	// Build null-separated items string for ImGui::Combo
-	std::string items;
 	for (const auto& c : choices)
 	{
-		items += c;
-		items += '\0';
+		m_items += c;
+		m_items += '\0';
 	}
-	ImGui::Combo("##combo", &m_currentItem, items.c_str());
+}
+
+void ComboBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ComboBoxWrapper::createAndAdd() -> ImGui::Combo()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::Combo("##combo", &m_currentItem, m_items.c_str());
 }
 #endif

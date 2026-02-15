@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frameworks_core/ControlWrappers.hpp"
+#include "create_and_add.hpp"
 
 #include <functional>
 #include <memory>
@@ -10,16 +11,13 @@
 template <typename W>
 struct Widget
 {
-	Widget(std::string str)
-		: m_str(str)
-	{
-	}
+	Widget() = default;
 
 	virtual ~Widget() = default;
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 	{
-		auto control = createWrapper(parent, m_str, m_position, m_size, m_style);
+		auto control = createWrapper(parent, m_position, m_size, m_style);
 		control->createAndAdd(parent, layout, m_flags.value_or(flags));
 	}
 
@@ -50,13 +48,11 @@ struct Widget
 private:
 	virtual std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) = 0;
 
 private:
-	std::string m_str;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };
@@ -68,44 +64,49 @@ struct StaticText : Widget<StaticText>
 {
 	using super = Widget<StaticText>;
 
-	explicit StaticText(const std::string& str)
-		: super(str)
+	explicit StaticText(const std::string& text)
+		: super()
+		, m_text(text)
 	{
 	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<StaticTextWrapper>(parent, str, pos, size, style);
+		return std::make_unique<StaticTextWrapper>(parent, m_text, pos, size, style);
 	}
-};
 
+private:
+	std::string m_text;
+};
 
 // TextCtrl -----------------------------------------------------------
 struct TextCtrl : Widget<TextCtrl>
 {
 	using super = Widget<TextCtrl>;
 
-	explicit TextCtrl(const std::string& str = "")
-		: super(str)
+	explicit TextCtrl(std::string& text)
+		: super()
+		, m_text(text)
 	{
 	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(parent, str, pos, size, style);
+		return std::make_unique<TextCtrlWrapper>(parent, m_text, pos, size, style);
 	}
+
+private:
+	std::string& m_text;
 };
 
 // Button -----------------------------------------------------------
@@ -114,7 +115,8 @@ struct Button : Widget<Button>
 	using super = Widget<Button>;
 
 	explicit Button(const std::string& str = "")
-		: super(str)
+		: super()
+		, m_btnTitle(str)
 	{
 	}
 
@@ -127,16 +129,16 @@ struct Button : Widget<Button>
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ButtonWrapper>(parent, str, pos, size, style, m_onClick);
+		return std::make_unique<ButtonWrapper>(parent, m_btnTitle, pos, size, style, m_onClick);
 	}
 
 private:
 	std::function<void()> m_onClick;
+	std::string m_btnTitle;
 };
 
 // RadioButton -----------------------------------------------------------
@@ -145,20 +147,23 @@ struct RadioButton : Widget<RadioButton>
 	using super = Widget<RadioButton>;
 
 	explicit RadioButton(const std::string& str = "")
-		: super(str)
+		: super()
+		, m_label(str)
 	{
 	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<RadioButtonWrapper>(parent, str, pos, size, style);
+		return std::make_unique<RadioButtonWrapper>(parent, m_label, pos, size, style);
 	}
+
+private:
+	std::string m_label;
 };
 
 // CheckBox -----------------------------------------------------------
@@ -167,7 +172,8 @@ struct CheckBox : Widget<CheckBox>
 	using super = Widget<CheckBox>;
 
 	explicit CheckBox(const std::string& str = "")
-		: super(str)
+		: super()
+		, m_label(str)
 	{
 	}
 
@@ -180,16 +186,16 @@ struct CheckBox : Widget<CheckBox>
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<CheckBoxWrapper>(parent, str, pos, size, style, m_checked);
+		return std::make_unique<CheckBoxWrapper>(parent, m_label, pos, size, style, m_checked);
 	}
 
 private:
 	bool m_checked { false };
+	std::string m_label;
 };
 
 // ComboBox -----------------------------------------------------------
@@ -198,48 +204,54 @@ struct ComboBox : Widget<ComboBox>
 	using super = Widget<ComboBox>;
 
 	explicit ComboBox(std::vector<std::string> choices, const std::string& selected = "")
-		: super(selected)
+		: super()
 		, m_choices(std::move(choices))
+		, m_selected(selected)
 	{
 	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ComboBoxWrapper>(parent, m_choices, str, pos, size, style);
+		return std::make_unique<ComboBoxWrapper>(parent, m_choices, m_selected, pos, size, style);
 	}
 
 private:
 	std::vector<std::string> m_choices;
+	std::string m_selected;
 };
 
 // Slider -----------------------------------------------------------
-struct Slider : Widget<Slider>
+template <SliderValue T>
+struct Slider : Widget<Slider<T>>
 {
-	using super = Widget<Slider>;
+	using super = Widget<Slider<T>>;
 
-	explicit Slider(Range range)
-		: super("")
+	Slider(Range<T> range, T& value)
+		: super()
 		, m_range(range)
+		, m_ptrValue(&value)
 	{
 	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		ControlWrapper* parent,
-		const std::string& str,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SliderWrapper>(parent, m_range, pos, size, style);
+		return std::make_unique<SliderWrapper<T>>(parent, m_range, m_ptrValue, pos, size, style);
 	}
 
 private:
-	Range m_range;
+	Range<T> m_range;
+	T* m_ptrValue;
 };
+
+template <SliderValue T>
+Slider(Range<T>, T&) -> Slider<T>;

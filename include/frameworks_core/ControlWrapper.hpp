@@ -10,16 +10,17 @@
 #elif defined(USE_IMGUI)
 #endif
 
-enum class ControlType
-{
-	Button,
-	TextCtrl,
-	StaticText,
-	Slider,
-	RadioButton,
-	CheckBox,
-	GroupBox
-};
+// Probably will not need this enum.
+// enum class ControlType
+// {
+// 	Button,
+// 	TextCtrl,
+// 	StaticText,
+// 	Slider,
+// 	RadioButton,
+// 	CheckBox,
+// 	GroupBox
+// };
 
 class ControlWrapper
 {
@@ -27,7 +28,7 @@ public:
 	ControlWrapper();
 	virtual ~ControlWrapper();
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags);
+	virtual void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags);
 	void setLayout(LayoutWrapper* layout);
 
 #ifdef USE_WX

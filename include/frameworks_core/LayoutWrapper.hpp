@@ -9,6 +9,7 @@
 #endif
 
 class LayoutFlags;
+class ControlWrapper;
 
 class LayoutWrapper
 {
@@ -16,7 +17,11 @@ class LayoutWrapper
 public:
 	LayoutWrapper(Orientation orient);
 	virtual ~LayoutWrapper();
+	
 	void add(LayoutWrapper* stack, LayoutFlags& flags);
+	void add(ControlWrapper* widget, LayoutFlags& flags);
+
+	virtual void finilizeLayout();
 
 #ifdef USE_WX
 	explicit LayoutWrapper(wxSizer* sizer);

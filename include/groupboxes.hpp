@@ -29,6 +29,7 @@ struct GroupBox
 	{
 		auto box = std::make_unique<GroupBoxWrapper>(parent, m_orient, m_label);
 		::createAndAdd(box->staticBox(), box.get(), m_flags.value_or(parentFlags), m_widgets);
+		box->finilizeLayout();
 		return box;
 	}
 

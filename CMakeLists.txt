@@ -15,6 +15,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(UI_FRAMEWORK "WX" CACHE STRING "UI framework to use")
 set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 
+option(USE_LOGGER "Enable logging" ON)
+
 add_executable(DeclarativeUI
     main.cpp
     src/frameworks_core/LayoutFlags.cpp
@@ -23,8 +25,16 @@ add_executable(DeclarativeUI
     src/frameworks_core/GroupBoxWrapper.cpp
     src/frameworks_core/DialogWrapper.cpp
     src/frameworks_core/LayoutWrapper.cpp
+    logger/Logger.cpp
 )
-target_include_directories(DeclarativeUI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(DeclarativeUI PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/logger
+)
+
+if(USE_LOGGER)
+    target_compile_definitions(DeclarativeUI PRIVATE USE_LOGGER)
+endif()
 
 if(UI_FRAMEWORK STREQUAL "WX")
     # Prefer modern CMake package config; fall back to legacy module for platforms like macOS

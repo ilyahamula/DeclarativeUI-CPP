@@ -1,6 +1,7 @@
 #pragma once
 
-#include <optional>
+#include <concepts>
+#include <type_traits>
 
 enum class Orientation
 {
@@ -20,11 +21,15 @@ struct Size
     int height;
 };
 
+template <typename T>
+concept SliderValue = std::same_as<T, int> || std::same_as<T, float>;
+
+template <SliderValue T>
 struct Range
 {
-	int min = 0;
-	int max = 100;
-	std::optional<int> value = std::nullopt;
+	T min{};
+	T max = T(100);
+	T step = T(1);
 };
 
 enum class Side : int

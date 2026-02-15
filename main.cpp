@@ -1,8 +1,12 @@
 #include "declarative_ui.hpp"
 
+#ifdef USE_LOGGER
+#include "Logger.hpp"
+#endif
+
 namespace
 {
-    auto drawUI()
+    auto drawUI(std::string& text, float& sliderValue, std::function<void()> onButtonClick = []() {})
     {
         return Dialog {
             "Declarative UI Dialog",
@@ -11,14 +15,12 @@ namespace
                 HStack {
                     Button{"Browse..."}
                         .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 15))
-                        .onClick([]() {
-                            //wxMessageBox("Browse button clicked!");
-                        }),
-                    TextCtrl{"Some text"}
+                        .onClick(std::move(onButtonClick)),
+                    TextCtrl{text}
                         .withFlags(LayoutFlags(1).Expand())
                 },
                 HGroupBox {
-                    Slider { { .min = 0, .max = 100, .value = 50 } }
+                    Slider { { .min = 0.0f, .max = 65.0f }, sliderValue }
                         .withFlags(LayoutFlags(1).Expand()),
                     VGroupBox {
                         LayoutFlags().CenterVertical().Border(Side::Left),
@@ -48,10 +50,16 @@ namespace
 
 class DeclarativeApp : public wxApp
 {
+    std::string m_text = "Initial text";
+    float m_sliderValue = 50.5f;
 public:
     bool OnInit() override
     {
-        drawUI().show();
+        drawUI(m_text, m_sliderValue, []() {
+#ifdef USE_LOGGER
+            wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
+#endif
+        }).show();
         return true;
     }
 };
@@ -100,6 +108,9 @@ int main(int argc, char** argv)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
 
+    std::string m_text = "Initial text";
+    float m_sliderValue = 50.5f;
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -108,20 +119,37 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Hello ImGui");
-        ImGui::Text("Simple ImGui window example");
-        static float slider_value = 0.5f;
-        ImGui::SliderFloat("Slider", &slider_value, 0.0f, 1.0f);
-        static bool check = false;
-        ImGui::Checkbox("Check me", &check);
-        if (ImGui::Button("OK"))
-            ImGui::OpenPopup("Clicked");
-        if (ImGui::BeginPopup("Clicked"))
-        {
-            ImGui::Text("Button was clicked!");
-            ImGui::EndPopup();
-        }
-        ImGui::End();
+        // ImGui::Begin("Hello ImGui");
+        // ImGui::Text("Simple ImGui window example");
+        // static float slider_value = 0.5f;
+        // ImGui::SliderFloat("Slider", &slider_value, 0.0f, 1.0f);
+        // static bool check = false;
+        // ImGui::Checkbox("Check me", &check);
+        // if (ImGui::Button("OK"))
+        //     ImGui::OpenPopup("Clicked");
+        // if (ImGui::BeginPopup("Clicked"))
+        // {
+        //     ImGui::Text("Button was clicked!");
+        //     ImGui::EndPopup();
+        // }
+        // ImGui::End();
+        drawUI(m_text, m_sliderValue, []() {
+#ifdef USE_LOGGER
+            ImGui::OpenPopup("Message");
+
+            // Then every frame (same place you build UI):
+            if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextUnformatted(Logger::instance().getAll().c_str());
+                ImGui::Separator();
+            
+                if (ImGui::Button("OK", ImVec2(120, 0)))
+                    ImGui::CloseCurrentPopup();
+            
+                ImGui::EndPopup();
+            }
+#endif
+        }).show();
 
         ImGui::Render();
         int display_w, display_h;
