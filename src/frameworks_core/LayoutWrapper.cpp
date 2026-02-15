@@ -1,19 +1,16 @@
 #include "frameworks_core/LayoutWrapper.hpp"
 #include "frameworks_core/LayoutFlags.hpp"
 
-LayoutWrapper::LayoutWrapper(Orientation orient)
-	: m_orientation(orient)
-{
-#ifdef USE_WX
-	m_nativeSizer = new wxBoxSizer(orient == Orientation::Horizontal ? wxHORIZONTAL : wxVERTICAL);
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
-}
-
 LayoutWrapper::~LayoutWrapper() = default;
 
 #ifdef USE_WX
+
+LayoutWrapper::LayoutWrapper(Orientation orient)
+	: m_orientation(orient)
+{
+	m_nativeSizer = new wxBoxSizer(orient == Orientation::Horizontal ? wxHORIZONTAL : wxVERTICAL);
+}
+
 LayoutWrapper::LayoutWrapper(wxSizer* sizer)
 	: m_nativeSizer(sizer)
 {
@@ -30,4 +27,14 @@ wxSizer* LayoutWrapper::nativeHandle() const
 }
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+#include "imgui.h"
+
+LayoutWrapper::LayoutWrapper(Orientation orient)
+	: m_orientation(orient)
+{
+}
+
+void LayoutWrapper::add(LayoutWrapper* stack, LayoutFlags& flags)
+{
+}
 #endif

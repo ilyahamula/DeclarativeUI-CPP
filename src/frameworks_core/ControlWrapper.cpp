@@ -29,4 +29,13 @@ void ControlWrapper::setLayout(LayoutWrapper* layout)
 }
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+#include "imgui.h"
+
+void ControlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+}
+
+void ControlWrapper::setLayout(LayoutWrapper* layout)
+{
+}
 #endif

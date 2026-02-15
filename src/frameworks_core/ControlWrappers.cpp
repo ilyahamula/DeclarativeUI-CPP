@@ -78,4 +78,91 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 }
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+#include "imgui.h"
+
+// pos, size, style: not directly applicable in ImGui immediate mode
+
+// ButtonWrapper -----------------------------------------------------------
+
+ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick)
+{
+	if (ImGui::Button(label.c_str()))
+	{
+		if (onClick)
+			onClick();
+	}
+}
+
+// TextCtrlWrapper -----------------------------------------------------------
+
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+	// ImGui::InputText requires a unique label (not provided by wrapper)
+	std::snprintf(m_buf, sizeof(m_buf), "%s", value.c_str());
+	ImGui::InputText("##textctrl", m_buf, sizeof(m_buf));
+}
+
+// StaticTextWrapper -----------------------------------------------------------
+
+StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style)
+{
+	ImGui::TextUnformatted(text.c_str());
+}
+
+// SliderWrapper -----------------------------------------------------------
+
+SliderWrapper::SliderWrapper(ControlWrapper* parent, Range range,
+	const Position& pos, const Size& size, long style)
+{
+	// ImGui::SliderInt requires a unique label (not provided by wrapper)
+	m_value = range.value.value_or(range.min);
+	ImGui::SliderInt("##slider", &m_value, range.min, range.max);
+}
+
+// RadioButtonWrapper -----------------------------------------------------------
+
+RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style)
+{
+	if (ImGui::RadioButton(label.c_str(), m_active))
+		m_active = !m_active;
+}
+
+// CheckBoxWrapper -----------------------------------------------------------
+
+CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	bool checked)
+{
+	m_checked = checked;
+	ImGui::Checkbox(label.c_str(), &m_checked);
+}
+
+// ComboBoxWrapper -----------------------------------------------------------
+
+ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	const std::string& selected, const Position& pos, const Size& size, long style)
+{
+	// ImGui::Combo requires a unique label (not provided by wrapper)
+	for (int i = 0; i < static_cast<int>(choices.size()); ++i)
+	{
+		if (choices[i] == selected)
+		{
+			m_currentItem = i;
+			break;
+		}
+	}
+	// Build null-separated items string for ImGui::Combo
+	std::string items;
+	for (const auto& c : choices)
+	{
+		items += c;
+		items += '\0';
+	}
+	ImGui::Combo("##combo", &m_currentItem, items.c_str());
+}
 #endif
