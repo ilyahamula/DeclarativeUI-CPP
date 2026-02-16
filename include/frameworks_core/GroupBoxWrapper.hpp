@@ -13,7 +13,13 @@ public:
 
 	void finilizeLayout() override;
 
+#ifdef USE_IMGUI
+	static void resetId() { s_groupBoxId = 0; }
+#endif
+
 private:
 	ControlWrapper m_staticBox;
-	static int s_groupBoxId;
+#ifdef USE_IMGUI
+	static inline int s_groupBoxId = 0;
+#endif
 };

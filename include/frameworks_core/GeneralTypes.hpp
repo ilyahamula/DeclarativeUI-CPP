@@ -1,7 +1,6 @@
 #pragma once
 
-#include <concepts>
-#include <type_traits>
+#include "Concepts.hpp"
 
 enum class Orientation
 {
@@ -20,9 +19,6 @@ struct Size
     int width;
     int height;
 };
-
-template <typename T>
-concept SliderValue = std::same_as<T, int> || std::same_as<T, float>;
 
 template <SliderValue T>
 struct Range

@@ -1,4 +1,5 @@
 #include "frameworks_core/DialogWrapper.hpp"
+#include "frameworks_core/GroupBoxWrapper.hpp"
 #include "frameworks_core/LayoutWrapper.hpp"
 
 #ifdef USE_LOGGER
@@ -30,6 +31,7 @@ void DialogWrapper::show()
 
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
+	GroupBoxWrapper::resetId();
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
 #endif

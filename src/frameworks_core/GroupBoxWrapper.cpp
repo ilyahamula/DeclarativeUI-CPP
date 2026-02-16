@@ -4,8 +4,6 @@
 #include "Logger.hpp"
 #endif
 
-int GroupBoxWrapper::s_groupBoxId = 0;
-
 #ifdef USE_WX
 #include <wx/statbox.h>
 

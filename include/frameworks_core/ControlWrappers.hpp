@@ -57,16 +57,15 @@ template <SliderValue T>
 class SliderWrapper : public ControlWrapper
 {
 public:
-	SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrValue,
+	SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
 		const Position& pos, const Size& size, long style);
 
 #ifdef USE_IMGUI
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
-#endif
-
 private:
 	Range<T> m_range;
-	T* m_ptrValue = nullptr;
+	T& m_value;
+#endif
 };
 
 extern template class SliderWrapper<int>;
@@ -95,31 +94,33 @@ class CheckBoxWrapper : public ControlWrapper
 public:
 	CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 		const Position& pos, const Size& size, long style,
-		bool checked = false);
+		bool& checked);
 
 #ifdef USE_IMGUI
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
 private:
 	std::string m_label;
+	bool& m_checked;
 #endif
-
-private:
-	bool m_checked = false;
 };
 
 // ComboBoxWrapper -----------------------------------------------------------
+template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper
 {
 public:
 	ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
-		const std::string& selected, const Position& pos, const Size& size, long style);
+		T& selected, const Position& pos, const Size& size, long style);
 
 #ifdef USE_IMGUI
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
 private:
 	std::string m_items;
-#endif
-
-private:
+	std::vector<std::string> m_choices;
 	int m_currentItem = 0;
+	T& m_selected = nullptr;
+#endif
 };
+
+extern template class ComboBoxWrapper<std::string>;
+extern template class ComboBoxWrapper<int>;

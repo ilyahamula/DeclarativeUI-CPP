@@ -15,8 +15,6 @@ class ControlWrapper;
 
 class LayoutWrapper
 {
-protected:
-	Orientation m_orientation;
 public:
 	LayoutWrapper(Orientation orient);
 	virtual ~LayoutWrapper();
@@ -25,8 +23,9 @@ public:
 	void add(ControlWrapper* widget, LayoutFlags& flags);
 
 	virtual void finilizeLayout();
-
-	static std::string indent();
+	
+protected:
+	Orientation m_orientation;
 
 #ifdef USE_WX
 	explicit LayoutWrapper(wxSizer* sizer);
@@ -37,6 +36,10 @@ protected:
 #elif defined(USE_IMGUI)
 #endif
 
+#ifdef USE_LOGGER
 private:
-	static int s_depth;
+	static inline int s_depth = 0;
+public:
+	static std::string indent();
+#endif
 };

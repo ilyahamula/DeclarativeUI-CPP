@@ -6,12 +6,12 @@
 #include "Logger.hpp"
 #endif
 
-int LayoutWrapper::s_depth = 0;
-
+#ifdef USE_LOGGER
 std::string LayoutWrapper::indent()
 {
 	return std::string(s_depth, '\t');
 }
+#endif
 
 LayoutWrapper::~LayoutWrapper() = default;
 
@@ -24,8 +24,8 @@ LayoutWrapper::LayoutWrapper(Orientation orient)
 	Logger::instance().log(indent() + (orient == Orientation::Horizontal
 		? "LayoutWrapper::LayoutWrapper() Horizontal\t-> new wxBoxSizer()\n"
 		: "LayoutWrapper::LayoutWrapper() Vertical\t-> new wxBoxSizer()\n"));
-#endif
 	++s_depth;
+#endif
 	m_nativeSizer = new wxBoxSizer(orient == Orientation::Horizontal ? wxHORIZONTAL : wxVERTICAL);
 }
 
@@ -49,7 +49,9 @@ void LayoutWrapper::add(ControlWrapper* widget, LayoutFlags& flags)
 
 void LayoutWrapper::finilizeLayout()
 {
+#ifdef USE_LOGGER
 	--s_depth;
+#endif
 }
 
 wxSizer* LayoutWrapper::nativeHandle() const
@@ -67,8 +69,8 @@ LayoutWrapper::LayoutWrapper(Orientation orient)
 	Logger::instance().log(indent() + (m_orientation == Orientation::Horizontal
 		? "LayoutWrapper::LayoutWrapper() Horizontal\t-> ImGui::BeginGroup()\n"
 		: "LayoutWrapper::LayoutWrapper() Vertical\t-> ImGui::BeginGroup()\n"));
-#endif
 	++s_depth;
+#endif
 	ImGui::BeginGroup();
 }
 
@@ -94,8 +96,8 @@ void LayoutWrapper::add(ControlWrapper* widget, LayoutFlags& flags)
 
 void LayoutWrapper::finilizeLayout()
 {
-	--s_depth;
 #ifdef USE_LOGGER
+	--s_depth;
 	Logger::instance().log(indent() + (m_orientation == Orientation::Horizontal
 		? "LayoutWrapper::finilizeLayout() Horizontal\t-> ImGui::EndGroup()\n"
 		: "LayoutWrapper::finilizeLayout() Vertical\t-> ImGui::EndGroup()\n"));

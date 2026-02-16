@@ -171,16 +171,11 @@ struct CheckBox : Widget<CheckBox>
 {
 	using super = Widget<CheckBox>;
 
-	explicit CheckBox(const std::string& str = "")
+	explicit CheckBox(bool& checked, const std::string& str = "")
 		: super()
+		, m_checked(checked)
 		, m_label(str)
 	{
-	}
-
-	CheckBox& setChecked(bool value = true)
-	{
-		m_checked = value;
-		return *this;
 	}
 
 private:
@@ -194,16 +189,17 @@ private:
 	}
 
 private:
-	bool m_checked { false };
+	bool& m_checked;
 	std::string m_label;
 };
 
 // ComboBox -----------------------------------------------------------
-struct ComboBox : Widget<ComboBox>
+template <ComboBoxValue T>
+struct ComboBox : Widget<ComboBox<T>>
 {
-	using super = Widget<ComboBox>;
+	using super = Widget<ComboBox<T>>;
 
-	explicit ComboBox(std::vector<std::string> choices, const std::string& selected = "")
+	ComboBox(std::vector<std::string> choices, T& selected)
 		: super()
 		, m_choices(std::move(choices))
 		, m_selected(selected)
@@ -217,13 +213,16 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ComboBoxWrapper>(parent, m_choices, m_selected, pos, size, style);
+		return std::make_unique<ComboBoxWrapper<T>>(parent, m_choices, m_selected, pos, size, style);
 	}
 
 private:
 	std::vector<std::string> m_choices;
-	std::string m_selected;
+	T& m_selected;
 };
+
+template <ComboBoxValue T>
+ComboBox(std::vector<std::string>, T&) -> ComboBox<T>;
 
 // Slider -----------------------------------------------------------
 template <SliderValue T>
@@ -234,7 +233,7 @@ struct Slider : Widget<Slider<T>>
 	Slider(Range<T> range, T& value)
 		: super()
 		, m_range(range)
-		, m_ptrValue(&value)
+		, m_value(value)
 	{
 	}
 
@@ -245,13 +244,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SliderWrapper<T>>(parent, m_range, m_ptrValue, pos, size, style);
+		return std::make_unique<SliderWrapper<T>>(parent, m_range, m_value, pos, size, style);
 	}
 
 private:
 	Range<T> m_range;
-	T* m_ptrValue;
+	T& m_value;
 };
 
 template <SliderValue T>
-Slider(Range<T>, T&) -> Slider<T>;
+Slider(Range<T>, T) -> Slider<T>;

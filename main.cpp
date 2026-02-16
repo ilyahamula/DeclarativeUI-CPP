@@ -6,7 +6,11 @@
 
 namespace
 {
-    auto drawUI(std::string& text, float& sliderValue, std::function<void()> onButtonClick = []() {})
+    auto drawUI(std::string& text, 
+        float& sliderValue,
+        std::string& selectedCombo,
+        bool& checked,
+        std::function<void()> onButtonClick = []() {})
     {
         return Dialog {
             "Declarative UI Dialog",
@@ -35,9 +39,9 @@ namespace
                         .withFlags(LayoutFlags().CenterVertical())
                 },
                 HGroupBox { "Combo Group",
-                    ComboBox{ {"Hello", "Goodbye", "Nihao" }, "G" }
+                    ComboBox{ {"Hello", "Goodbye", "Nihao" }, selectedCombo }
                         .withFlags(LayoutFlags(1).CenterVertical().Border(Side::Right)),
-                    CheckBox{}
+                    CheckBox{checked, "Check me!"}
                         .withFlags(LayoutFlags().CenterVertical())
                 }
             }
@@ -52,10 +56,12 @@ class DeclarativeApp : public wxApp
 {
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    std::string m_selectedCombo = "Goodbye";
+    bool m_checked = false;
 public:
     bool OnInit() override
     {
-        drawUI(m_text, m_sliderValue, []() {
+        drawUI(m_text, m_sliderValue, m_selectedCombo, m_checked, []() {
 #ifdef USE_LOGGER
             wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
 #endif
@@ -110,7 +116,9 @@ int main(int argc, char** argv)
 
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
-    bool value = false;
+    std::string m_selectedCombo = "Goodbye";
+    bool m_checked = false;
+    bool showPopup = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -120,34 +128,19 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // ImGui::Begin("Hello ImGui");
-        // ImGui::Text("Simple ImGui window example");
-        // static float slider_value = 0.5f;
-        // ImGui::SliderFloat("Slider", &slider_value, 0.0f, 1.0f);
-        // static bool check = false;
-        // ImGui::Checkbox("Check me", &check);
-        // if (ImGui::Button("OK"))
-        //     ImGui::OpenPopup("Clicked");
-        // if (ImGui::BeginPopup("Clicked"))
-        // {
-        //     ImGui::Text("Button was clicked!");
-        //     ImGui::EndPopup();
-        // }
-        // ImGui::End();
-        drawUI(m_text, m_sliderValue, [&value]() {
-            value = true;  
-        }).show();
+        drawUI(m_text, m_sliderValue, m_selectedCombo, m_checked, 
+            [&showPopup]() {
+                showPopup = true;  
+            }).show();
 
 #ifdef USE_LOGGER
         Logger::instance().stopLogging();
 #endif
-        if (value)
+        if (showPopup)
         {
-
             ImGui::OpenPopup("Message");
 
             ImGui::SetNextWindowSizeConstraints(ImVec2(600, 0), ImVec2(FLT_MAX, FLT_MAX));
-            // Then every frame (same place you build UI):
             if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
                 #ifdef USE_LOGGER
@@ -160,7 +153,7 @@ int main(int argc, char** argv)
                 if (ImGui::Button("OK", ImVec2(120, 0)))
                 {
                     ImGui::CloseCurrentPopup();
-                    value = false;
+                    showPopup = false;
                 }
             
                 ImGui::EndPopup();

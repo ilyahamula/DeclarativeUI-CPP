@@ -51,20 +51,17 @@ StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& 
 // SliderWrapper -----------------------------------------------------------
 
 template <SliderValue T>
-SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrValue,
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
 	const Position& pos, const Size& size, long style)
-	: m_range(range)
-	, m_ptrValue(ptrValue)
 {
-	assert(ptrValue);
-#ifdef USE_LOGGER
+#ifdef USE_LOGGERß
 	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::SliderWrapper()\t-> new wxSlider()\n");
 #endif
 	if constexpr (std::is_floating_point_v<T>)
 	{
 		int iMin = static_cast<int>(range.min / range.step);
 		int iMax = static_cast<int>(range.max / range.step);
-		int iVal = static_cast<int>(*ptrValue / range.step);
+		int iVal = static_cast<int>(value / range.step);
 		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
 			iVal, iMin, iMax,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
@@ -72,7 +69,7 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrVa
 	else
 	{
 		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
-			*ptrValue, range.min, range.max,
+			value, range.min, range.max,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 	}
 }
@@ -109,8 +106,9 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 
 // ComboBoxWrapper -----------------------------------------------------------
 
-ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
-	const std::string& selected, const Position& pos, const Size& size, long style)
+template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	T& selected, const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::ComboBoxWrapper()\t-> new wxComboBox()\n");
@@ -118,11 +116,21 @@ ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string
 	wxArrayString items;
 	for (const auto& c : choices)
 		items.Add(c);
-	m_nativeWidget = new wxComboBox(parent->nativeHandle(), wxID_ANY, selected,
+	m_nativeWidget = new wxComboBox(parent->nativeHandle(), wxID_ANY, "",
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), items, style);
+
+	if constexpr (std::is_same_v<T, std::string>)
+		static_cast<wxComboBox*>(m_nativeWidget)->SetValue(selected);
+	else
+		static_cast<wxComboBox*>(m_nativeWidget)->SetSelection(selected);
 }
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
+
+template class ComboBoxWrapper<std::string>;
+template class ComboBoxWrapper<int>;
+
+#elif defined(USE_QT) // ------------------QT IMPLEMENTATIONS----------------
+// Implementations for Qt would go here, following a similar pattern to the wxWidgets implementations but using Qt's widget classes and signal/slot mechanism.
+#elif defined(USE_IMGUI) // ----------------IMGUI IMPLEMENTATIONS----------------
 #include "imgui.h"
 
 // pos, size, style: not directly applicable in ImGui immediate mode
@@ -191,10 +199,10 @@ void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 // SliderWrapper -----------------------------------------------------------
 
 template <SliderValue T>
-SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T* ptrValue,
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
 	const Position& pos, const Size& size, long style)
 	: m_range(range)
-	, m_ptrValue(ptrValue)
+	, m_value(value)
 {
 }
 
@@ -206,14 +214,14 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderInt()\n");
 #endif
-		ImGui::SliderInt("##slider", m_ptrValue, m_range.min, m_range.max);
+		ImGui::SliderInt("##slider", &m_value, m_range.min, m_range.max);
 	}
 	else
 	{
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderFloat()\n");
 #endif
-		ImGui::SliderFloat("##slider", m_ptrValue, m_range.min, m_range.max);
+		ImGui::SliderFloat("##slider", &m_value, m_range.min, m_range.max);
 	}
 	ControlWrapper::createAndAdd(parent, layout, flags);
 }
@@ -227,6 +235,7 @@ RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string
 	const Position& pos, const Size& size, long style)
 	: m_label(label.empty() ? "##radio" : label)
 {
+	//++s_radioButtonId;
 }
 
 void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
@@ -244,10 +253,10 @@ void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
-	bool checked)
+	bool& checked)
 	: m_label(label.empty() ? "##checkbox" : label)
+	, m_checked(checked)
 {
-	m_checked = checked;
 }
 
 void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
@@ -261,31 +270,54 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 
 // ComboBoxWrapper -----------------------------------------------------------
 
-ComboBoxWrapper::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
-	const std::string& selected, const Position& pos, const Size& size, long style)
+template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	T& selected, const Position& pos, const Size& size, long style)
+	: m_choices(std::move(choices))
+	, m_selected(selected)
 {
-	for (int i = 0; i < static_cast<int>(choices.size()); ++i)
-	{
-		if (choices[i] == selected)
-		{
-			m_currentItem = i;
-			break;
-		}
-	}
-	// Build null-separated items string for ImGui::Combo
-	for (const auto& c : choices)
+	for (const auto& c : m_choices)
 	{
 		m_items += c;
 		m_items += '\0';
 	}
+
+	if constexpr (std::is_same_v<T, int>)
+	{
+		m_currentItem = selected;
+	}
+	else
+	{
+		for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+		{
+			if (m_choices[i] == selected)
+			{
+				m_currentItem = i;
+				break;
+			}
+		}
+	}
 }
 
-void ComboBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+template <ComboBoxValue T>
+void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> ImGui::Combo()\n");
 #endif
-	ImGui::Combo("##combo", &m_currentItem, m_items.c_str());
+	if constexpr (std::is_same_v<T, int>)
+		m_currentItem = m_selected;
+
+	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
+	{
+		if constexpr (std::is_same_v<T, int>)
+			m_selected = m_currentItem;
+		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.size()))
+			m_selected = m_choices[m_currentItem];
+	}
 	ControlWrapper::createAndAdd(parent, layout, flags);
 }
+
+template class ComboBoxWrapper<std::string>;
+template class ComboBoxWrapper<int>;
 #endif
