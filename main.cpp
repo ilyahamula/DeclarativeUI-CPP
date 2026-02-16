@@ -6,8 +6,9 @@
 
 namespace
 {
-    auto drawUI(std::string& text, 
+    auto drawUI(std::string& text,
         float& sliderValue,
+        int& radioChoice,
         std::string& selectedCombo,
         bool& checked,
         std::function<void()> onButtonClick = []() {})
@@ -28,8 +29,8 @@ namespace
                         .withFlags(LayoutFlags(1).Expand()),
                     VGroupBox {
                         LayoutFlags().CenterVertical().Border(Side::Left),
-                        RadioButton{"On"}.withStyle(4), // wxRB_GROUP
-                        RadioButton{"Off"}
+                        RadioButton{radioChoice, "On"},
+                        RadioButton{radioChoice, "Off"}
                     }
                 },
                 HStack {
@@ -56,12 +57,13 @@ class DeclarativeApp : public wxApp
 {
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
 public:
     bool OnInit() override
     {
-        drawUI(m_text, m_sliderValue, m_selectedCombo, m_checked, []() {
+        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked, []() {
 #ifdef USE_LOGGER
             wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
 #endif
@@ -116,6 +118,7 @@ int main(int argc, char** argv)
 
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
     bool showPopup = false;
@@ -128,7 +131,7 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        drawUI(m_text, m_sliderValue, m_selectedCombo, m_checked, 
+        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked,
             [&showPopup]() {
                 showPopup = true;  
             }).show();

@@ -72,21 +72,29 @@ extern template class SliderWrapper<int>;
 extern template class SliderWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
+template <RadioButtonValue T>
 class RadioButtonWrapper : public ControlWrapper
 {
 public:
 	RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
-		const Position& pos, const Size& size, long style);
+		T& value, const Position& pos, const Size& size, long style);
 
 #ifdef USE_IMGUI
+	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
 private:
 	std::string m_label;
+	T& m_value;
+	int m_index = 0;
 #endif
 
 private:
-	bool m_active = false;
+	static inline int s_radioButtonId = 0;
+	static inline int* s_lastGroup = nullptr;
 };
+
+extern template class RadioButtonWrapper<bool>;
+extern template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
 class CheckBoxWrapper : public ControlWrapper

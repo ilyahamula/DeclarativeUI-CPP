@@ -142,13 +142,15 @@ private:
 };
 
 // RadioButton -----------------------------------------------------------
-struct RadioButton : Widget<RadioButton>
+template <RadioButtonValue T>
+struct RadioButton : Widget<RadioButton<T>>
 {
-	using super = Widget<RadioButton>;
+	using super = Widget<RadioButton<T>>;
 
-	explicit RadioButton(const std::string& str = "")
+	RadioButton(T& value, const std::string& label = "")
 		: super()
-		, m_label(str)
+		, m_label(label)
+		, m_value(value)
 	{
 	}
 
@@ -159,12 +161,19 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<RadioButtonWrapper>(parent, m_label, pos, size, style);
+		return std::make_unique<RadioButtonWrapper<T>>(parent, m_label, m_value, pos, size, style);
 	}
 
 private:
 	std::string m_label;
+	T& m_value;
 };
+
+template <RadioButtonValue T>
+RadioButton(T&) -> RadioButton<T>;
+
+template <RadioButtonValue T>
+RadioButton(T&, const std::string&) -> RadioButton<T>;
 
 // CheckBox -----------------------------------------------------------
 struct CheckBox : Widget<CheckBox>

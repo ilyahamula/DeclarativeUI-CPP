@@ -8,3 +8,6 @@ concept SliderValue = std::same_as<T, int> || std::same_as<T, float>;
 
 template <typename T>
 concept ComboBoxValue = std::same_as<T, int> || std::same_as<T, std::string>;
+
+template <typename T>
+concept RadioButtonValue = std::same_as<T, bool> || std::same_as<T, int>;

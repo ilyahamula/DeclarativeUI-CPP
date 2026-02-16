@@ -79,21 +79,46 @@ template class SliderWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
 
-RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
-	const Position& pos, const Size& size, long style)
+template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	T& value, const Position& pos, const Size& size, long style)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::RadioButtonWrapper()\t-> new wxRadioButton()\n");
 #endif
-	m_nativeWidget = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
-		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if constexpr (std::is_same_v<T, bool>)
+	{
+		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		rb->SetValue(value);
+		rb->Bind(wxEVT_RADIOBUTTON, [&value](wxCommandEvent&) { value = true; });
+		m_nativeWidget = rb;
+	}
+	else
+	{
+		if (&value != s_lastGroup)
+		{
+			s_radioButtonId = 0;
+			s_lastGroup = &value;
+		}
+		int index = s_radioButtonId++;
+		long groupStyle = (index == 0) ? wxRB_GROUP : 0;
+		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | groupStyle);
+		rb->SetValue(value == index);
+		rb->Bind(wxEVT_RADIOBUTTON, [&value, index](wxCommandEvent&) { value = index; });
+		m_nativeWidget = rb;
+	}
 }
+
+template class RadioButtonWrapper<bool>;
+template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
 
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
-	bool checked)
+	bool& checked)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::CheckBoxWrapper()\t-> new wxCheckBox()\n");
@@ -231,23 +256,43 @@ template class SliderWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
 
-RadioButtonWrapper::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
-	const Position& pos, const Size& size, long style)
+template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	T& value, const Position& pos, const Size& size, long style)
 	: m_label(label.empty() ? "##radio" : label)
+	, m_value(value)
 {
-	//++s_radioButtonId;
+	if constexpr (std::is_same_v<T, int>)
+	{
+		if (&value != s_lastGroup)
+		{
+			s_radioButtonId = 0;
+			s_lastGroup = &value;
+		}
+		m_index = s_radioButtonId++;
+	}
 }
 
-void RadioButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+template <RadioButtonValue T>
+void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> ImGui::RadioButton()\n");
 #endif
-	if (ImGui::RadioButton(m_label.c_str(), m_active))
-		m_active = !m_active;
-
+	if constexpr (std::is_same_v<T, bool>)
+	{
+		if (ImGui::RadioButton(m_label.c_str(), m_value))
+			m_value = !m_value;
+	}
+	else
+	{
+		ImGui::RadioButton(m_label.c_str(), &m_value, m_index);
+	}
 	ControlWrapper::createAndAdd(parent, layout, flags);
 }
+
+template class RadioButtonWrapper<bool>;
+template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
 

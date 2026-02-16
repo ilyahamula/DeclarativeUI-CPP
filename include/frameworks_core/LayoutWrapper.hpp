@@ -23,11 +23,12 @@ public:
 	void add(ControlWrapper* widget, LayoutFlags& flags);
 
 	virtual void finilizeLayout();
-	
+
 protected:
 	Orientation m_orientation;
 
 #ifdef USE_WX
+public:
 	explicit LayoutWrapper(wxSizer* sizer);
 	wxSizer* nativeHandle() const;
 protected:

@@ -1,4 +1,5 @@
 #include "frameworks_core/DialogWrapper.hpp"
+#include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/GroupBoxWrapper.hpp"
 #include "frameworks_core/LayoutWrapper.hpp"
 
@@ -32,6 +33,7 @@ void DialogWrapper::show()
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
 	GroupBoxWrapper::resetId();
+	RadioButtonWrapper<int>::resetGroupId();
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
 #endif
