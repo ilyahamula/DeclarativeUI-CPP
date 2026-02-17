@@ -19,6 +19,7 @@ public:
 	LayoutWrapper(Orientation orient);
 	virtual ~LayoutWrapper();
 
+	void add(LayoutFlags& flags);
 	void add(LayoutWrapper* stack, LayoutFlags& flags);
 	void add(ControlWrapper* widget, LayoutFlags& flags);
 
@@ -35,6 +36,9 @@ protected:
 	wxSizer* m_nativeSizer = nullptr;
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+private:
+	bool m_firstChild = true;
+	int m_lastBorderRight = 0;
 #endif
 
 #ifdef USE_LOGGER

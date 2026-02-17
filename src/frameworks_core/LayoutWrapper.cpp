@@ -34,6 +34,10 @@ LayoutWrapper::LayoutWrapper(wxSizer* sizer)
 {
 }
 
+void LayoutWrapper::add(LayoutFlags& flags)
+{
+}
+
 void LayoutWrapper::add(LayoutWrapper* stack, LayoutFlags& flags)
 {
 #ifdef USE_LOGGER
@@ -74,6 +78,27 @@ LayoutWrapper::LayoutWrapper(Orientation orient)
 	ImGui::BeginGroup();
 }
 
+void LayoutWrapper::add(LayoutFlags& flags)
+{
+	if (!m_firstChild && m_orientation == Orientation::Horizontal)
+	{
+		float gap = std::max((float)m_lastBorderRight, (float)flags.borderLeft());
+		if (gap > 0)
+			ImGui::SameLine(0, gap);
+		else
+			ImGui::SameLine();
+	}
+	m_firstChild = false;
+
+	if (flags.borderTop() > 0 && m_orientation == Orientation::Vertical)
+		ImGui::Dummy(ImVec2(0, (float)flags.borderTop()));
+
+	if (flags.borderLeft() > 0 && m_orientation == Orientation::Vertical)
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (float)flags.borderLeft());
+
+	m_lastBorderRight = flags.borderRight();
+}
+
 void LayoutWrapper::add(LayoutWrapper* stack, LayoutFlags& flags)
 {
 #ifdef USE_LOGGER
@@ -87,11 +112,22 @@ void LayoutWrapper::add(ControlWrapper* widget, LayoutFlags& flags)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(indent() + (m_orientation == Orientation::Horizontal
-		? "LayoutWrapper::add(widget) Horizontal\t-> ImGui::SameLine()\n"
+		? "LayoutWrapper::add(widget) Horizontal\n"
 		: "LayoutWrapper::add(widget) Vertical\n"));
 #endif
-	if (m_orientation == Orientation::Horizontal)
-		ImGui::SameLine();
+	bool wasFirstChild = m_firstChild;
+	add(flags);
+
+	if (m_orientation == Orientation::Vertical)
+	{
+		if (flags.expand())
+			ImGui::SetNextItemWidth(-FLT_MIN);
+	}
+	else
+	{
+		if (flags.proportion() > 0 && !wasFirstChild)
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+	}
 }
 
 void LayoutWrapper::finilizeLayout()

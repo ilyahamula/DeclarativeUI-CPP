@@ -35,6 +35,7 @@ struct GroupBox
 
 	auto createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
 	{
+		parentLayout->add(parentFlags);
 		auto box = createAndAdd(parent, parentFlags);
 		parentLayout->add(box.get(), parentFlags);
 		return box;

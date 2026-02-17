@@ -42,8 +42,7 @@ GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, con
 		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\t-> ImGui::BeginChild()\n"));
 #endif
 	std::string childId = "##groupbox_" + std::to_string(s_groupBoxId++);
-	float height = ImGui::GetFrameHeight() * 2 + ImGui::GetStyle().ItemSpacing.y + ImGui::GetStyle().WindowPadding.y * 4 + ImGui::GetStyle().ChildBorderSize * 2;
-	ImGui::BeginChild(childId.c_str(), ImVec2(-FLT_MIN, height), ImGuiChildFlags_Borders);
+	ImGui::BeginChild(childId.c_str(), ImVec2(-FLT_MIN, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
 	if (!label.empty())
 	{
 		ImGui::Text("%s", label.c_str());

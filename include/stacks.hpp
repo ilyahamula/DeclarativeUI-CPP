@@ -32,6 +32,7 @@ struct Stack
 
 	std::unique_ptr<LayoutWrapper> createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
 	{
+		parentLayout->add(parentFlags);
 		auto layout = createAndAdd(parent, parentFlags);
 		parentLayout->add(layout.get(), parentFlags);
 		return layout;
