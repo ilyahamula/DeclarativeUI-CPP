@@ -63,9 +63,17 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
-        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked, []() {
+        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked, [this]() {
 #ifdef USE_LOGGER
             wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
+#else
+            wxMessageBox(
+                "text: " + m_text + "\n"
+                "sliderValue: " + std::to_string(m_sliderValue) + "\n"
+                "radioChoice: " + std::to_string(m_radioChoice) + "\n"
+                "selectedCombo: " + m_selectedCombo + "\n"
+                "checked: " + std::string(m_checked ? "true" : "false"),
+                "State", wxOK | wxICON_INFORMATION);
 #endif
         }).show();
         return true;
@@ -148,8 +156,12 @@ int main(int argc, char** argv)
             {
                 #ifdef USE_LOGGER
                 ImGui::TextUnformatted(Logger::instance().getAll().c_str());
-                #elif
-                ImGui::Text("Button was clicked!");
+                #else
+                ImGui::Text("text: %s", m_text.c_str());
+                ImGui::Text("sliderValue: %.2f", m_sliderValue);
+                ImGui::Text("radioChoice: %d", m_radioChoice);
+                ImGui::Text("selectedCombo: %s", m_selectedCombo.c_str());
+                ImGui::Text("checked: %s", m_checked ? "true" : "false");
                 #endif
                 ImGui::Separator();
             

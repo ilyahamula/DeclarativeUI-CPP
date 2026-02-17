@@ -32,8 +32,10 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::TextCtrlWrapper()\t-> new wxTextCtrl()\n");
 #endif
-	m_nativeWidget = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
+	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	tc->Bind(wxEVT_TEXT, [&value](wxCommandEvent& evt) { value = evt.GetString().ToStdString(); });
+	m_nativeWidget = tc;
 }
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -62,15 +64,21 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value
 		int iMin = static_cast<int>(range.min / range.step);
 		int iMax = static_cast<int>(range.max / range.step);
 		int iVal = static_cast<int>(value / range.step);
-		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
+		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
 			iVal, iMin, iMax,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		sl->Bind(wxEVT_SLIDER, [&value, step = range.step](wxCommandEvent& evt) {
+			value = static_cast<T>(evt.GetInt()) * step;
+		});
+		m_nativeWidget = sl;
 	}
 	else
 	{
-		m_nativeWidget = new wxSlider(parent->nativeHandle(), wxID_ANY,
+		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
 			value, range.min, range.max,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		sl->Bind(wxEVT_SLIDER, [&value](wxCommandEvent& evt) { value = evt.GetInt(); });
+		m_nativeWidget = sl;
 	}
 }
 
@@ -126,6 +134,7 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 	auto* cb = new wxCheckBox(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 	cb->SetValue(checked);
+	cb->Bind(wxEVT_CHECKBOX, [&checked](wxCommandEvent& evt) { checked = evt.IsChecked(); });
 	m_nativeWidget = cb;
 }
 
@@ -141,13 +150,20 @@ ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::str
 	wxArrayString items;
 	for (const auto& c : choices)
 		items.Add(c);
-	m_nativeWidget = new wxComboBox(parent->nativeHandle(), wxID_ANY, "",
+	auto* combo = new wxComboBox(parent->nativeHandle(), wxID_ANY, "",
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), items, style);
 
 	if constexpr (std::is_same_v<T, std::string>)
-		static_cast<wxComboBox*>(m_nativeWidget)->SetValue(selected);
+	{
+		combo->SetValue(selected);
+		combo->Bind(wxEVT_COMBOBOX, [&selected](wxCommandEvent& evt) { selected = evt.GetString().ToStdString(); });
+	}
 	else
-		static_cast<wxComboBox*>(m_nativeWidget)->SetSelection(selected);
+	{
+		combo->SetSelection(selected);
+		combo->Bind(wxEVT_COMBOBOX, [&selected](wxCommandEvent& evt) { selected = evt.GetSelection(); });
+	}
+	m_nativeWidget = combo;
 }
 
 template class ComboBoxWrapper<std::string>;
