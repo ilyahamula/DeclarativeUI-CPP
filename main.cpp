@@ -22,11 +22,11 @@ namespace
                         .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 15))
                         .onClick(std::move(onButtonClick)),
                     TextCtrl{text}
-                        .withFlags(LayoutFlags(1).Expand())
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
                 },
                 HGroupBox {
                     Slider { { .min = 0.0f, .max = 65.0f }, sliderValue }
-                        .withFlags(LayoutFlags(1).Expand()),
+                        .withFlags(LayoutFlags().Proportion(1).Expand().CenterVertical()),
                     VGroupBox {
                         LayoutFlags().CenterVertical().Border(Side::Left),
                         RadioButton{radioChoice, "On"},
@@ -35,13 +35,13 @@ namespace
                 },
                 HStack {
                     StaticText{"Ready"}
-                        .withFlags(LayoutFlags(1).CenterVertical().Border(Side::Right)),
+                        .withFlags(LayoutFlags().Proportion(1).CenterVertical()),
                     Button{"OK"}
                         .withFlags(LayoutFlags().CenterVertical())
                 },
                 HGroupBox { "Combo Group",
                     ComboBox{ {"Hello", "Goodbye", "Nihao" }, selectedCombo }
-                        .withFlags(LayoutFlags(1).CenterVertical().Border(Side::Right)),
+                        .withFlags(LayoutFlags().Proportion(1).CenterVertical().Border(Side::Right)),
                     CheckBox{checked, "Check me!"}
                         .withFlags(LayoutFlags().CenterVertical())
                 }

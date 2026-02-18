@@ -10,18 +10,6 @@
 #elif defined(USE_IMGUI)
 #endif
 
-// Probably will not need this enum.
-// enum class ControlType
-// {
-// 	Button,
-// 	TextCtrl,
-// 	StaticText,
-// 	Slider,
-// 	RadioButton,
-// 	CheckBox,
-// 	GroupBox
-// };
-
 class ControlWrapper
 {
 public:

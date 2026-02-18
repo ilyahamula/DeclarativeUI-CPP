@@ -17,11 +17,6 @@ LayoutFlags::LayoutFlags()
 {
 }
 
-LayoutFlags::LayoutFlags(int proportion)
-	: m_flags(proportion)
-{
-}
-
 LayoutFlags& LayoutFlags::Expand()
 {
 	m_flags.Expand();
@@ -66,11 +61,6 @@ const wxSizerFlags& LayoutFlags::wx() const
 #elif defined(USE_IMGUI)
 
 LayoutFlags::LayoutFlags()
-{
-}
-
-LayoutFlags::LayoutFlags(int proportion)
-	: m_proportion(proportion)
 {
 }
 

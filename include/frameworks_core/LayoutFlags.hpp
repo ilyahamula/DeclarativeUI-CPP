@@ -12,7 +12,6 @@ class LayoutFlags
 {
 public:
 	LayoutFlags();
-	explicit LayoutFlags(int proportion);
 
 	LayoutFlags& Expand();
 	LayoutFlags& Border(Side direction, int borderInPixels = 5);
