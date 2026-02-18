@@ -144,9 +144,6 @@ int main(int argc, char** argv)
                 showPopup = true;  
             }).show();
 
-#ifdef USE_LOGGER
-        Logger::instance().stopLogging();
-#endif
         if (showPopup)
         {
             ImGui::OpenPopup("Message");

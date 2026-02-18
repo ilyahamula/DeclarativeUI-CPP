@@ -44,6 +44,7 @@ void DialogWrapper::show()
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::show()\t-> ImGui::End()\n");
+	Logger::instance().stopLogging();
 #endif
 	ImGui::End();
 }
