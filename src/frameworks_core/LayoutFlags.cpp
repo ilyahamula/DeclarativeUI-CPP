@@ -1,6 +1,7 @@
 #include "frameworks_core/LayoutFlags.hpp"
 
 #ifdef USE_WX
+
 static int toWxDirection(Side side)
 {
 	int dir = 0;
@@ -10,91 +11,101 @@ static int toWxDirection(Side side)
 	if (side & Side::Bottom) dir |= wxBOTTOM;
 	return dir;
 }
-#endif
 
 LayoutFlags::LayoutFlags()
-#ifdef USE_WX
 	: m_flags()
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
-{
-}
-
-LayoutFlags::LayoutFlags(int proportion)
-#ifdef USE_WX
-	: m_flags(proportion)
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 {
 }
 
 LayoutFlags& LayoutFlags::Expand()
 {
-#ifdef USE_WX
 	m_flags.Expand();
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
 LayoutFlags& LayoutFlags::Border(Side direction, int borderInPixels)
 {
-#ifdef USE_WX
 	m_flags.Border(toWxDirection(direction), borderInPixels);
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
 LayoutFlags& LayoutFlags::CenterVertical()
 {
-#ifdef USE_WX
 	m_flags.CenterVertical();
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
 LayoutFlags& LayoutFlags::CenterHorizontal()
 {
-#ifdef USE_WX
 	m_flags.CenterHorizontal();
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
 LayoutFlags& LayoutFlags::Center()
 {
-#ifdef USE_WX
 	m_flags.Center();
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
 LayoutFlags& LayoutFlags::Proportion(int proportion)
 {
-#ifdef USE_WX
 	m_flags.Proportion(proportion);
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
 	return *this;
 }
 
-#ifdef USE_WX
 const wxSizerFlags& LayoutFlags::wx() const
 {
 	return m_flags;
 }
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+
+LayoutFlags::LayoutFlags()
+{
+}
+
+LayoutFlags& LayoutFlags::Expand()
+{
+	m_expand = true;
+	return *this;
+}
+
+LayoutFlags& LayoutFlags::Border(Side direction, int borderInPixels)
+{
+	if (direction & Side::Left)   m_borderLeft   = borderInPixels;
+	if (direction & Side::Right)  m_borderRight  = borderInPixels;
+	if (direction & Side::Top)    m_borderTop    = borderInPixels;
+	if (direction & Side::Bottom) m_borderBottom = borderInPixels;
+	return *this;
+}
+
+LayoutFlags& LayoutFlags::CenterVertical()
+{
+	m_centerVertical = true;
+	return *this;
+}
+
+LayoutFlags& LayoutFlags::CenterHorizontal()
+{
+	return *this;
+}
+
+LayoutFlags& LayoutFlags::Center()
+{
+	return *this;
+}
+
+LayoutFlags& LayoutFlags::Proportion(int proportion)
+{
+	m_proportion = proportion;
+	return *this;
+}
+
+bool LayoutFlags::expand() const { return m_expand; }
+bool LayoutFlags::centerVertical() const { return m_centerVertical; }
+int LayoutFlags::proportion() const { return m_proportion; }
+int LayoutFlags::borderLeft() const { return m_borderLeft; }
+int LayoutFlags::borderRight() const { return m_borderRight; }
+int LayoutFlags::borderTop() const { return m_borderTop; }
+int LayoutFlags::borderBottom() const { return m_borderBottom; }
 #endif

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <optional>
+#include "Concepts.hpp"
 
 enum class Orientation
 {
@@ -20,11 +20,12 @@ struct Size
     int height;
 };
 
+template <SliderValue T>
 struct Range
 {
-	int min = 0;
-	int max = 100;
-	std::optional<int> value = std::nullopt;
+	T min{};
+	T max = T(100);
+	T step = T(1);
 };
 
 enum class Side : int
