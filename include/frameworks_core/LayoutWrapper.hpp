@@ -3,6 +3,7 @@
 #include "GeneralTypes.hpp"
 
 #include <string>
+#include <vector>
 
 #ifdef USE_WX
 #include <wx/sizer.h>
@@ -36,9 +37,14 @@ protected:
 	wxSizer* m_nativeSizer = nullptr;
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
+protected:
+	void saveCenterVCache();
 private:
 	bool m_firstChild = true;
 	int m_lastBorderRight = 0;
+	int m_centerVLayoutId = -1;
+	int m_widgetIndex = 0;
+	std::vector<float> m_currentHeights;
 #endif
 
 #ifdef USE_LOGGER

@@ -57,6 +57,8 @@ ControlWrapper* GroupBoxWrapper::staticBox()
 
 void GroupBoxWrapper::finilizeLayout()
 {
+	// Save height cache BEFORE EndChild so GetItemRectSize() measures the last child item
+	saveCenterVCache();
 #ifdef USE_LOGGER
 	Logger::instance().log(indent() + (m_orientation == Orientation::Horizontal
 		? "GroupBoxWrapper::finilizeLayout() Horizontal\t-> ImGui::EndChild()\n"

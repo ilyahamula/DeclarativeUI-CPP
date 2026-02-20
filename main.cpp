@@ -8,7 +8,9 @@ namespace
 {
     auto drawUI(std::string& text,
         float& sliderValue,
+        int& sliderValue1,
         int& radioChoice,
+        int& radioChoice1,
         std::string& selectedCombo,
         bool& checked,
         std::function<void()> onButtonClick = []() {})
@@ -44,6 +46,15 @@ namespace
                         .withFlags(LayoutFlags().Proportion(1).CenterVertical().Border(Side::Right)),
                     CheckBox{checked, "Check me!"}
                         .withFlags(LayoutFlags().CenterVertical())
+                },
+                HGroupBox {
+                    Slider { { .min = 0, .max = 200 }, sliderValue1 }
+                        .withFlags(LayoutFlags().Proportion(1).Expand().CenterVertical()),
+                    VGroupBox {
+                        LayoutFlags().CenterVertical().Border(Side::Left),
+                        RadioButton{radioChoice1, "On"},
+                        RadioButton{radioChoice1, "Off"}
+                    }
                 }
             }
         };
@@ -57,20 +68,24 @@ class DeclarativeApp : public wxApp
 {
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    int m_sliderValue1 = 25;
+    int m_radioChoice1 = 0;
     int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
 public:
     bool OnInit() override
     {
-        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked, [this]() {
+        drawUI(m_text, m_sliderValue, m_sliderValue1, m_radioChoice, m_radioChoice1, m_selectedCombo, m_checked, [this]() {
 #ifdef USE_LOGGER
             wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
 #else
             wxMessageBox(
                 "text: " + m_text + "\n"
                 "sliderValue: " + std::to_string(m_sliderValue) + "\n"
+                "sliderValue1: " + std::to_string(m_sliderValue1) + "\n"
                 "radioChoice: " + std::to_string(m_radioChoice) + "\n"
+                "radioChoice1: " + std::to_string(m_radioChoice1) + "\n"
                 "selectedCombo: " + m_selectedCombo + "\n"
                 "checked: " + std::string(m_checked ? "true" : "false"),
                 "State", wxOK | wxICON_INFORMATION);
@@ -126,6 +141,8 @@ int main(int argc, char** argv)
 
     std::string m_text = "Initial text";
     float m_sliderValue = 50.5f;
+    int m_sliderValue1 = 25;
+    int m_radioChoice1 = 0;
     int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
@@ -139,7 +156,7 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        drawUI(m_text, m_sliderValue, m_radioChoice, m_selectedCombo, m_checked,
+        drawUI(m_text, m_sliderValue, m_sliderValue1, m_radioChoice, m_radioChoice1, m_selectedCombo, m_checked,
             [&showPopup]() {
                 showPopup = true;  
             }).show();
@@ -156,7 +173,9 @@ int main(int argc, char** argv)
                 #else
                 ImGui::Text("text: %s", m_text.c_str());
                 ImGui::Text("sliderValue: %.2f", m_sliderValue);
+                ImGui::Text("sliderValue1: %d", m_sliderValue1);
                 ImGui::Text("radioChoice: %d", m_radioChoice);
+                ImGui::Text("radioChoice1: %d", m_radioChoice1);
                 ImGui::Text("selectedCombo: %s", m_selectedCombo.c_str());
                 ImGui::Text("checked: %s", m_checked ? "true" : "false");
                 #endif

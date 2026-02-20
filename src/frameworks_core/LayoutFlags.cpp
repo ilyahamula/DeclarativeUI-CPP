@@ -81,6 +81,7 @@ LayoutFlags& LayoutFlags::Border(Side direction, int borderInPixels)
 
 LayoutFlags& LayoutFlags::CenterVertical()
 {
+	m_centerVertical = true;
 	return *this;
 }
 
@@ -101,6 +102,7 @@ LayoutFlags& LayoutFlags::Proportion(int proportion)
 }
 
 bool LayoutFlags::expand() const { return m_expand; }
+bool LayoutFlags::centerVertical() const { return m_centerVertical; }
 int LayoutFlags::proportion() const { return m_proportion; }
 int LayoutFlags::borderLeft() const { return m_borderLeft; }
 int LayoutFlags::borderRight() const { return m_borderRight; }

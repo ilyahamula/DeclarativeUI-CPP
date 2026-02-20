@@ -27,6 +27,7 @@ private:
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
 	bool expand() const;
+	bool centerVertical() const;
 	int proportion() const;
 	int borderLeft() const;
 	int borderRight() const;
@@ -34,6 +35,7 @@ private:
 	int borderBottom() const;
 private:
 	bool m_expand = false;
+	bool m_centerVertical = false;
 	int m_proportion = 0;
 	int m_borderLeft = 0;
 	int m_borderRight = 0;
