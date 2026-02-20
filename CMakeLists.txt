@@ -19,8 +19,16 @@ set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 
 option(USE_LOGGER "Enable logging" ON)
 
+if(UI_FRAMEWORK STREQUAL "WX")
+    set(MAIN_FILE examples/main_wx.cpp)
+elseif(UI_FRAMEWORK STREQUAL "QT")
+    set(MAIN_FILE examples/main_qt.cpp)
+elseif(UI_FRAMEWORK STREQUAL "IMGUI")
+    set(MAIN_FILE examples/main_imgui.cpp)
+endif()
+
 add_executable(DeclarativeUI
-    main.cpp
+    ${MAIN_FILE}
     src/frameworks_core/LayoutFlags.cpp
     src/frameworks_core/ControlWrapper.cpp
     src/frameworks_core/ControlWrappers.cpp
@@ -32,6 +40,7 @@ add_executable(DeclarativeUI
 target_include_directories(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/logger
+    ${CMAKE_CURRENT_SOURCE_DIR}/examples
 )
 
 if(USE_LOGGER)
