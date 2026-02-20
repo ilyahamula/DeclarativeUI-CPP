@@ -53,6 +53,12 @@ vgcore.*
 .idea/
 *.code-workspace
 
+# ImGui
+imgui.ini
+
+# Claude
+.claude/settings.json
+
 # Logs/temp
 *.log
 *.swp
