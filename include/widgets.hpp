@@ -89,10 +89,28 @@ struct TextCtrl : Widget<TextCtrl>
 {
 	using super = Widget<TextCtrl>;
 
+	TextCtrl()
+		: super()
+	{
+	}
+
+	explicit TextCtrl(const std::string& text)
+		: super()
+		, m_ownedText(text)
+	{
+	}
+
 	explicit TextCtrl(std::string& text)
 		: super()
-		, m_text(text)
+		, m_ownedText(text)
+		, m_externalRef(text)
 	{
+	}
+
+	TextCtrl& onChange(std::function<void(const std::string&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
 	}
 
 private:
@@ -102,11 +120,15 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(parent, m_text, pos, size, style);
+		if (m_externalRef)
+			return std::make_unique<TextCtrlWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<TextCtrlWrapper>(parent, m_ownedText, pos, size, style, m_onChange);
 	}
 
 private:
-	std::string& m_text;
+	std::string m_ownedText;
+	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	std::function<void(const std::string&)> m_onChange;
 };
 
 // PasswordInput -----------------------------------------------------------

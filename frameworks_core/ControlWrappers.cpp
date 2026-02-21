@@ -32,14 +32,34 @@ ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 // TextCtrlWrapper -----------------------------------------------------------
 
 TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::TextCtrlWrapper()\t-> new wxTextCtrl()\n");
 #endif
 	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
-	tc->Bind(wxEVT_TEXT, [&value](wxCommandEvent& evt) { value = evt.GetString().ToStdString(); });
+	tc->Bind(wxEVT_TEXT, [&value, cb = std::move(onChange)](wxCommandEvent& evt) {
+		value = evt.GetString().ToStdString();
+		if (cb) cb(value);
+	});
+	m_nativeWidget = tc;
+}
+
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::TextCtrlWrapper(unbound)\t-> new wxTextCtrl()\n");
+#endif
+	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, initialValue,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onChange)
+		tc->Bind(wxEVT_TEXT, [cb = std::move(onChange)](wxCommandEvent& evt) {
+			cb(evt.GetString().ToStdString());
+		});
 	m_nativeWidget = tc;
 }
 
@@ -356,8 +376,19 @@ void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, 
 // TextCtrlWrapper -----------------------------------------------------------
 
 TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
-	: m_value(value)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -367,10 +398,18 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::createAndAdd()\t-> ImGui::InputText()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
-		m_value = buf;
+	{
+		m_ownedValue = buf;
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
+	}
 }
 
 // PasswordInputWrapper -----------------------------------------------------------

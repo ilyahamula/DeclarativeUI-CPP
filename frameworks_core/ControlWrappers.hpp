@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,12 +30,18 @@ class TextCtrlWrapper : public ControlWrapper
 {
 public:
 	TextCtrlWrapper(ControlWrapper* parent, std::string& value,
-		const Position& pos, const Size& size, long style);
+		const Position& pos, const Size& size, long style,
+		std::function<void(const std::string&)> onChange = {});
+	TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const std::string&)> onChange = {});
 
 #ifdef USE_IMGUI
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
 private:
-	std::string& m_value;
+	std::string m_ownedValue;
+	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	std::function<void(const std::string&)> m_onChange;
 #endif
 };
 
