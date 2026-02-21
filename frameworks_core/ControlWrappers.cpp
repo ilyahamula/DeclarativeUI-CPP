@@ -39,6 +39,20 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	m_nativeWidget = tc;
 }
 
+// PasswordInputWrapper -----------------------------------------------------------
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::PasswordInputWrapper()\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
+#endif
+	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_PASSWORD);
+	tc->Bind(wxEVT_TEXT, [&value](wxCommandEvent& evt) { value = evt.GetString().ToStdString(); });
+	m_nativeWidget = tc;
+}
+
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
 MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
@@ -275,6 +289,26 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
+		m_value = buf;
+}
+
+// PasswordInputWrapper -----------------------------------------------------------
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
+	const Position& pos, const Size& size, long style)
+	: m_value(value)
+{
+}
+
+void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::createAndAdd()\t-> ImGui::InputText(Password)\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	char buf[256] = {};
+	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
 		m_value = buf;
 }
 
