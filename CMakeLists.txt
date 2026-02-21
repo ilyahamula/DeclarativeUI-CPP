@@ -18,25 +18,32 @@ set(UI_FRAMEWORK "WX" CACHE STRING "UI framework to use")
 set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 
 option(USE_LOGGER "Enable logging" ON)
+option(BUILD_EXAMPLES "Build examples" ON)
 
-add_executable(DeclarativeUI
-    main.cpp
-    src/frameworks_core/LayoutFlags.cpp
-    src/frameworks_core/ControlWrapper.cpp
-    src/frameworks_core/ControlWrappers.cpp
-    src/frameworks_core/GroupBoxWrapper.cpp
-    src/frameworks_core/DialogWrapper.cpp
-    src/frameworks_core/LayoutWrapper.cpp
+# ── Core library ─────────────────────────────────────────────────────────────
+
+add_library(DeclarativeUI STATIC
+    frameworks_core/LayoutFlags.cpp
+    frameworks_core/ControlWrapper.cpp
+    frameworks_core/ControlWrappers.cpp
+    frameworks_core/GroupBoxWrapper.cpp
+    frameworks_core/DialogWrapper.cpp
+    frameworks_core/LayoutWrapper.cpp
     logger/Logger.cpp
 )
-target_include_directories(DeclarativeUI PRIVATE
+
+# include/ holds the public API headers; root exposes frameworks_core/ and logger/
+target_include_directories(DeclarativeUI PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )
 
 if(USE_LOGGER)
-    target_compile_definitions(DeclarativeUI PRIVATE USE_LOGGER)
+    target_compile_definitions(DeclarativeUI PUBLIC USE_LOGGER)
 endif()
+
+# ── Backend configuration ─────────────────────────────────────────────────────
 
 if(UI_FRAMEWORK STREQUAL "WX")
     # Prefer modern CMake package config; fall back to legacy module for platforms like macOS
@@ -52,13 +59,13 @@ if(UI_FRAMEWORK STREQUAL "WX")
     else()
         set(WX_TARGET wx::core wx::base)
     endif()
-    target_link_libraries(DeclarativeUI PRIVATE ${WX_TARGET})
-    target_compile_definitions(DeclarativeUI PRIVATE USE_WX)
+    target_link_libraries(DeclarativeUI PUBLIC ${WX_TARGET})
+    target_compile_definitions(DeclarativeUI PUBLIC USE_WX)
 
 elseif(UI_FRAMEWORK STREQUAL "QT")
     find_package(Qt6 REQUIRED COMPONENTS Widgets)
-    target_link_libraries(DeclarativeUI PRIVATE Qt6::Widgets)
-    target_compile_definitions(DeclarativeUI PRIVATE USE_QT)
+    target_link_libraries(DeclarativeUI PUBLIC Qt6::Widgets)
+    target_compile_definitions(DeclarativeUI PUBLIC USE_QT)
 
 elseif(UI_FRAMEWORK STREQUAL "IMGUI")
     include(FetchContent)
@@ -97,9 +104,15 @@ elseif(UI_FRAMEWORK STREQUAL "IMGUI")
     )
     target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
 
-    target_link_libraries(DeclarativeUI PRIVATE imgui_lib)
-    target_compile_definitions(DeclarativeUI PRIVATE USE_IMGUI)
+    target_link_libraries(DeclarativeUI PUBLIC imgui_lib)
+    target_compile_definitions(DeclarativeUI PUBLIC USE_IMGUI)
 
 else()
     message(FATAL_ERROR "Unknown UI_FRAMEWORK: ${UI_FRAMEWORK}. Use WX, QT, or IMGUI.")
+endif()
+
+# ── Examples ──────────────────────────────────────────────────────────────────
+
+if(BUILD_EXAMPLES)
+    add_subdirectory(examples)
 endif()

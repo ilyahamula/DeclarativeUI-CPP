@@ -1,0 +1,11 @@
+if(UI_FRAMEWORK STREQUAL "WX")
+    set(MAIN_FILE main_wx.cpp)
+elseif(UI_FRAMEWORK STREQUAL "QT")
+    set(MAIN_FILE main_qt.cpp)
+elseif(UI_FRAMEWORK STREQUAL "IMGUI")
+    set(MAIN_FILE main_imgui.cpp)
+endif()
+
+add_executable(DeclarativeUI_example ${MAIN_FILE})
+target_link_libraries(DeclarativeUI_example PRIVATE DeclarativeUI)
+target_include_directories(DeclarativeUI_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

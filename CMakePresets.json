@@ -1,0 +1,55 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "ON"
+            }
+        },
+        {
+            "name": "wx",
+            "displayName": "WX (Debug)",
+            "inherits": "base",
+            "cacheVariables": {
+                "UI_FRAMEWORK": "WX",
+                "CMAKE_PREFIX_PATH": "$env{HOMEBREW_PREFIX}"
+            }
+        },
+        {
+            "name": "qt",
+            "displayName": "QT (Debug)",
+            "inherits": "base",
+            "cacheVariables": {
+                "UI_FRAMEWORK": "QT",
+                "CMAKE_PREFIX_PATH": "$env{HOMEBREW_PREFIX}"
+            }
+        },
+        {
+            "name": "imgui",
+            "displayName": "ImGui (Debug)",
+            "inherits": "base",
+            "cacheVariables": {
+                "UI_FRAMEWORK": "IMGUI"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "wx",
+            "configurePreset": "wx"
+        },
+        {
+            "name": "qt",
+            "configurePreset": "qt"
+        },
+        {
+            "name": "imgui",
+            "configurePreset": "imgui"
+        }
+    ]
+}
