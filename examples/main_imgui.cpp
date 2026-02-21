@@ -49,7 +49,7 @@ int main(int argc, char** argv)
         {
             ImGui::OpenPopup("Message");
 
-            ImGui::SetNextWindowSizeConstraints(ImVec2(600, 0), ImVec2(FLT_MAX, FLT_MAX));
+            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(FLT_MAX, FLT_MAX));
             if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
 #ifdef USE_LOGGER

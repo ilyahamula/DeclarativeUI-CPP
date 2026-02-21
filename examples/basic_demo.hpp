@@ -51,7 +51,10 @@ inline auto drawUI(std::string& text,
             },
             HGroupBox {
                 Slider { { .min = 0, .max = 200 }, sliderValue1 }
-                    .withFlags(LayoutFlags().Proportion(1).Expand().CenterVertical()),
+                    .withFlags(LayoutFlags().Proportion(1).Expand().CenterVertical())
+                    .onChange([](int newValue) {
+
+                    }),
                 VGroupBox {
                     LayoutFlags().CenterVertical().Border(Side::Left),
                     RadioButton{radioChoice1, "On"},

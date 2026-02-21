@@ -66,28 +66,68 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& init
 // PasswordInputWrapper -----------------------------------------------------------
 
 PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::PasswordInputWrapper()\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
 #endif
 	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_PASSWORD);
-	tc->Bind(wxEVT_TEXT, [&value](wxCommandEvent& evt) { value = evt.GetString().ToStdString(); });
+	tc->Bind(wxEVT_TEXT, [&value, cb = std::move(onChange)](wxCommandEvent& evt) {
+		value = evt.GetString().ToStdString();
+		if (cb) cb(value);
+	});
+	m_nativeWidget = tc;
+}
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::PasswordInputWrapper(unbound)\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
+#endif
+	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, initialValue,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_PASSWORD);
+	if (onChange)
+		tc->Bind(wxEVT_TEXT, [cb = std::move(onChange)](wxCommandEvent& evt) {
+			cb(evt.GetString().ToStdString());
+		});
 	m_nativeWidget = tc;
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
 MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper()\t-> new wxTextCtrl(wxTE_MULTILINE)\n");
 #endif
 	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_MULTILINE);
-	tc->Bind(wxEVT_TEXT, [&value](wxCommandEvent& evt) { value = evt.GetString().ToStdString(); });
+	tc->Bind(wxEVT_TEXT, [&value, cb = std::move(onChange)](wxCommandEvent& evt) {
+		value = evt.GetString().ToStdString();
+		if (cb) cb(value);
+	});
+	m_nativeWidget = tc;
+}
+
+MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(unbound)\t-> new wxTextCtrl(wxTE_MULTILINE)\n");
+#endif
+	auto* tc = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, initialValue,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_MULTILINE);
+	if (onChange)
+		tc->Bind(wxEVT_TEXT, [cb = std::move(onChange)](wxCommandEvent& evt) {
+			cb(evt.GetString().ToStdString());
+		});
 	m_nativeWidget = tc;
 }
 
@@ -138,7 +178,8 @@ LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text
 // DatePickerWrapper -----------------------------------------------------------
 
 DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::DatePickerWrapper()\t-> new wxDatePickerCtrl()\n");
@@ -149,19 +190,46 @@ DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
 		value.year);
 	auto* dp = new wxDatePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
-	dp->Bind(wxEVT_DATE_CHANGED, [&value](wxDateEvent& evt) {
+	dp->Bind(wxEVT_DATE_CHANGED, [&value, cb = std::move(onChange)](wxDateEvent& evt) {
 		const wxDateTime& d = evt.GetDate();
 		value.year  = d.GetYear();
 		value.month = static_cast<int>(d.GetMonth()) + 1;
 		value.day   = d.GetDay();
+		if (cb) cb(value);
 	});
+	m_nativeWidget = dp;
+}
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, const Date& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::DatePickerWrapper(unbound)\t-> new wxDatePickerCtrl()\n");
+#endif
+	wxDateTime dt;
+	dt.Set(static_cast<wxDateTime::wxDateTime_t>(initialValue.day),
+		static_cast<wxDateTime::Month>(initialValue.month - 1),
+		initialValue.year);
+	auto* dp = new wxDatePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onChange)
+		dp->Bind(wxEVT_DATE_CHANGED, [cb = std::move(onChange)](wxDateEvent& evt) {
+			const wxDateTime& d = evt.GetDate();
+			Date date;
+			date.year  = d.GetYear();
+			date.month = static_cast<int>(d.GetMonth()) + 1;
+			date.day   = d.GetDay();
+			cb(date);
+		});
 	m_nativeWidget = dp;
 }
 
 // TimePickerWrapper -----------------------------------------------------------
 
 TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::TimePickerWrapper()\t-> new wxTimePickerCtrl()\n");
@@ -172,12 +240,38 @@ TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
 	dt.SetSecond(value.second);
 	auto* tp = new wxTimePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
-	tp->Bind(wxEVT_TIME_CHANGED, [&value](wxDateEvent& evt) {
+	tp->Bind(wxEVT_TIME_CHANGED, [&value, cb = std::move(onChange)](wxDateEvent& evt) {
 		const wxDateTime& d = evt.GetDate();
 		value.hour   = d.GetHour();
 		value.minute = d.GetMinute();
 		value.second = d.GetSecond();
+		if (cb) cb(value);
 	});
+	m_nativeWidget = tp;
+}
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, const Time& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::TimePickerWrapper(unbound)\t-> new wxTimePickerCtrl()\n");
+#endif
+	wxDateTime dt = wxDateTime::Now();
+	dt.SetHour(initialValue.hour);
+	dt.SetMinute(initialValue.minute);
+	dt.SetSecond(initialValue.second);
+	auto* tp = new wxTimePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onChange)
+		tp->Bind(wxEVT_TIME_CHANGED, [cb = std::move(onChange)](wxDateEvent& evt) {
+			const wxDateTime& d = evt.GetDate();
+			Time time;
+			time.hour   = d.GetHour();
+			time.minute = d.GetMinute();
+			time.second = d.GetSecond();
+			cb(time);
+		});
 	m_nativeWidget = tp;
 }
 
@@ -197,9 +291,10 @@ StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& 
 
 template <SliderValue T>
 SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 {
-#ifdef USE_LOGGERß
+#ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::SliderWrapper()\t-> new wxSlider()\n");
 #endif
 	if constexpr (std::is_floating_point_v<T>)
@@ -210,8 +305,9 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value
 		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
 			iVal, iMin, iMax,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
-		sl->Bind(wxEVT_SLIDER, [&value, step = range.step](wxCommandEvent& evt) {
+		sl->Bind(wxEVT_SLIDER, [&value, step = range.step, cb = std::move(onChange)](wxCommandEvent& evt) {
 			value = static_cast<T>(evt.GetInt()) * step;
+			if (cb) cb(value);
 		});
 		m_nativeWidget = sl;
 	}
@@ -220,7 +316,45 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value
 		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
 			value, range.min, range.max,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
-		sl->Bind(wxEVT_SLIDER, [&value](wxCommandEvent& evt) { value = evt.GetInt(); });
+		sl->Bind(wxEVT_SLIDER, [&value, cb = std::move(onChange)](wxCommandEvent& evt) {
+			value = evt.GetInt();
+			if (cb) cb(value);
+		});
+		m_nativeWidget = sl;
+	}
+}
+
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, const T& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::SliderWrapper(unbound)\t-> new wxSlider()\n");
+#endif
+	if constexpr (std::is_floating_point_v<T>)
+	{
+		int iMin = static_cast<int>(range.min / range.step);
+		int iMax = static_cast<int>(range.max / range.step);
+		int iVal = static_cast<int>(initialValue / range.step);
+		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
+			iVal, iMin, iMax,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		if (onChange)
+			sl->Bind(wxEVT_SLIDER, [step = range.step, cb = std::move(onChange)](wxCommandEvent& evt) {
+				cb(static_cast<T>(evt.GetInt()) * step);
+			});
+		m_nativeWidget = sl;
+	}
+	else
+	{
+		auto* sl = new wxSlider(parent->nativeHandle(), wxID_ANY,
+			static_cast<int>(initialValue), range.min, range.max,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		if (onChange)
+			sl->Bind(wxEVT_SLIDER, [cb = std::move(onChange)](wxCommandEvent& evt) {
+				cb(static_cast<T>(evt.GetInt()));
+			});
 		m_nativeWidget = sl;
 	}
 }
@@ -232,7 +366,8 @@ template class SliderWrapper<float>;
 
 template <SpinBoxValue T>
 SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::SpinBoxWrapper()\t-> new wxSpinCtrl[Double]()\n");
@@ -242,7 +377,10 @@ SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& val
 		auto* sc = new wxSpinCtrl(parent->nativeHandle(), wxID_ANY, wxEmptyString,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
 			range.min, range.max, value);
-		sc->Bind(wxEVT_SPINCTRL, [&value](wxSpinEvent& evt) { value = evt.GetInt(); });
+		sc->Bind(wxEVT_SPINCTRL, [&value, cb = std::move(onChange)](wxSpinEvent& evt) {
+			value = evt.GetInt();
+			if (cb) cb(value);
+		});
 		m_nativeWidget = sc;
 	}
 	else
@@ -250,7 +388,40 @@ SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& val
 		auto* sc = new wxSpinCtrlDouble(parent->nativeHandle(), wxID_ANY, wxEmptyString,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
 			range.min, range.max, value, range.step);
-		sc->Bind(wxEVT_SPINCTRLDOUBLE, [&value](wxSpinDoubleEvent& evt) { value = static_cast<T>(evt.GetValue()); });
+		sc->Bind(wxEVT_SPINCTRLDOUBLE, [&value, cb = std::move(onChange)](wxSpinDoubleEvent& evt) {
+			value = static_cast<T>(evt.GetValue());
+			if (cb) cb(value);
+		});
+		m_nativeWidget = sc;
+	}
+}
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const T& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::SpinBoxWrapper(unbound)\t-> new wxSpinCtrl[Double]()\n");
+#endif
+	if constexpr (std::is_same_v<T, int>)
+	{
+		auto* sc = new wxSpinCtrl(parent->nativeHandle(), wxID_ANY, wxEmptyString,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
+			range.min, range.max, static_cast<int>(initialValue));
+		if (onChange)
+			sc->Bind(wxEVT_SPINCTRL, [cb = std::move(onChange)](wxSpinEvent& evt) { cb(evt.GetInt()); });
+		m_nativeWidget = sc;
+	}
+	else
+	{
+		auto* sc = new wxSpinCtrlDouble(parent->nativeHandle(), wxID_ANY, wxEmptyString,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
+			range.min, range.max, static_cast<double>(initialValue), range.step);
+		if (onChange)
+			sc->Bind(wxEVT_SPINCTRLDOUBLE, [cb = std::move(onChange)](wxSpinDoubleEvent& evt) {
+				cb(static_cast<T>(evt.GetValue()));
+			});
 		m_nativeWidget = sc;
 	}
 }
@@ -262,7 +433,8 @@ template class SpinBoxWrapper<float>;
 
 template <RadioButtonValue T>
 RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
-	T& value, const Position& pos, const Size& size, long style)
+	T& value, const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::RadioButtonWrapper()\t-> new wxRadioButton()\n");
@@ -272,7 +444,10 @@ RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::str
 		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 		rb->SetValue(value);
-		rb->Bind(wxEVT_RADIOBUTTON, [&value](wxCommandEvent&) { value = true; });
+		rb->Bind(wxEVT_RADIOBUTTON, [&value, cb = std::move(onChange)](wxCommandEvent&) {
+			value = true;
+			if (cb) cb(value);
+		});
 		m_nativeWidget = rb;
 	}
 	else
@@ -287,7 +462,42 @@ RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::str
 		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
 			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | groupStyle);
 		rb->SetValue(value == index);
-		rb->Bind(wxEVT_RADIOBUTTON, [&value, index](wxCommandEvent&) { value = index; });
+		rb->Bind(wxEVT_RADIOBUTTON, [&value, index, cb = std::move(onChange)](wxCommandEvent&) {
+			value = index;
+			if (cb) cb(value);
+		});
+		m_nativeWidget = rb;
+	}
+}
+
+template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const T& initialValue, const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::RadioButtonWrapper(unbound)\t-> new wxRadioButton()\n");
+#endif
+	if constexpr (std::is_same_v<T, bool>)
+	{
+		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+		rb->SetValue(initialValue);
+		if (onChange)
+			rb->Bind(wxEVT_RADIOBUTTON, [cb = std::move(onChange)](wxCommandEvent&) { cb(true); });
+		m_nativeWidget = rb;
+	}
+	else
+	{
+		// Unbound int RadioButton: standalone (each is its own group)
+		s_radioButtonId = 0;
+		s_lastGroup = nullptr;
+		int index = s_radioButtonId++;
+		auto* rb = new wxRadioButton(parent->nativeHandle(), wxID_ANY, label,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxRB_GROUP);
+		rb->SetValue(static_cast<int>(initialValue) == index);
+		if (onChange)
+			rb->Bind(wxEVT_RADIOBUTTON, [index, cb = std::move(onChange)](wxCommandEvent&) { cb(static_cast<T>(index)); });
 		m_nativeWidget = rb;
 	}
 }
@@ -299,7 +509,7 @@ template class RadioButtonWrapper<int>;
 
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
-	bool& checked)
+	bool& checked, std::function<void(bool)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::CheckBoxWrapper()\t-> new wxCheckBox()\n");
@@ -307,7 +517,27 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 	auto* cb = new wxCheckBox(parent->nativeHandle(), wxID_ANY, label,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
 	cb->SetValue(checked);
-	cb->Bind(wxEVT_CHECKBOX, [&checked](wxCommandEvent& evt) { checked = evt.IsChecked(); });
+	cb->Bind(wxEVT_CHECKBOX, [&checked, cbk = std::move(onChange)](wxCommandEvent& evt) {
+		checked = evt.IsChecked();
+		if (cbk) cbk(checked);
+	});
+	m_nativeWidget = cb;
+}
+
+CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	const bool& initialChecked, std::function<void(bool)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::CheckBoxWrapper(unbound)\t-> new wxCheckBox()\n");
+#endif
+	auto* cb = new wxCheckBox(parent->nativeHandle(), wxID_ANY, label,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	cb->SetValue(initialChecked);
+	if (onChange)
+		cb->Bind(wxEVT_CHECKBOX, [cbk = std::move(onChange)](wxCommandEvent& evt) {
+			cbk(evt.IsChecked());
+		});
 	m_nativeWidget = cb;
 }
 
@@ -315,7 +545,8 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 
 template <ComboBoxValue T>
 ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
-	T& selected, const Position& pos, const Size& size, long style)
+	T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&)> onChange)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::ComboBoxWrapper()\t-> new wxComboBox()\n");
@@ -329,12 +560,52 @@ ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::str
 	if constexpr (std::is_same_v<T, std::string>)
 	{
 		combo->SetValue(selected);
-		combo->Bind(wxEVT_COMBOBOX, [&selected](wxCommandEvent& evt) { selected = evt.GetString().ToStdString(); });
+		combo->Bind(wxEVT_COMBOBOX, [&selected, cb = std::move(onChange)](wxCommandEvent& evt) {
+			selected = evt.GetString().ToStdString();
+			if (cb) cb(selected);
+		});
 	}
 	else
 	{
 		combo->SetSelection(selected);
-		combo->Bind(wxEVT_COMBOBOX, [&selected](wxCommandEvent& evt) { selected = evt.GetSelection(); });
+		combo->Bind(wxEVT_COMBOBOX, [&selected, cb = std::move(onChange)](wxCommandEvent& evt) {
+			selected = evt.GetSelection();
+			if (cb) cb(selected);
+		});
+	}
+	m_nativeWidget = combo;
+}
+
+template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	const T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::ComboBoxWrapper(unbound)\t-> new wxComboBox()\n");
+#endif
+	wxArrayString items;
+	for (const auto& c : choices)
+		items.Add(c);
+	auto* combo = new wxComboBox(parent->nativeHandle(), wxID_ANY, "",
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), items, style);
+
+	if constexpr (std::is_same_v<T, std::string>)
+	{
+		combo->SetValue(selected);
+		if (onChange)
+			combo->Bind(wxEVT_COMBOBOX, [cb = std::move(onChange)](wxCommandEvent& evt) {
+				cb(evt.GetString().ToStdString());
+			});
+	}
+	else
+	{
+		combo->SetSelection(selected);
+		if (onChange)
+			combo->Bind(wxEVT_COMBOBOX, [cb = std::move(onChange)](wxCommandEvent& evt) {
+				T val = static_cast<T>(evt.GetSelection());
+				cb(val);
+			});
 	}
 	m_nativeWidget = combo;
 }
@@ -415,8 +686,19 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 // PasswordInputWrapper -----------------------------------------------------------
 
 PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
-	: m_value(value)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -426,17 +708,36 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::createAndAdd()\t-> ImGui::InputText(Password)\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
 	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
-		m_value = buf;
+	{
+		m_ownedValue = buf;
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
+	}
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
 MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
-	const Position& pos, const Size& size, long style)
-	: m_value(value)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -446,10 +747,18 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::createAndAdd()\t-> ImGui::InputTextMultiline()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
 	char buf[4096] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
 	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf)))
-		m_value = buf;
+	{
+		m_ownedValue = buf;
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
+	}
 }
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
@@ -537,8 +846,19 @@ void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 // DatePickerWrapper -----------------------------------------------------------
 
 DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
-	const Position& pos, const Size& size, long style)
-	: m_value(value)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, const Date& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&)> onChange)
+	: m_ownedValue(value)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -548,26 +868,44 @@ void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [date]\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+
 	bool changed = false;
 	ImGui::PushItemWidth(70);
-	changed |= ImGui::InputInt("##dp_year",  &m_value.year,  1, 10);
+	changed |= ImGui::InputInt("##dp_year",  &m_ownedValue.year,  1, 10);
 	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##dp_month", &m_value.month, 1, 0);
+	changed |= ImGui::InputInt("##dp_month", &m_ownedValue.month, 1, 0);
 	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##dp_day",   &m_value.day,   1, 0);
+	changed |= ImGui::InputInt("##dp_day",   &m_ownedValue.day,   1, 0);
 	ImGui::PopItemWidth();
 	if (changed)
 	{
-		m_value.month = std::clamp(m_value.month, 1, 12);
-		m_value.day   = std::clamp(m_value.day,   1, 31);
+		m_ownedValue.month = std::clamp(m_ownedValue.month, 1, 12);
+		m_ownedValue.day   = std::clamp(m_ownedValue.day,   1, 31);
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
 	}
 }
 
 // TimePickerWrapper -----------------------------------------------------------
 
 TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
-	const Position& pos, const Size& size, long style)
-	: m_value(value)
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, const Time& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&)> onChange)
+	: m_ownedValue(value)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -577,19 +915,26 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [time]\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+
 	bool changed = false;
 	ImGui::PushItemWidth(60);
-	changed |= ImGui::InputInt("##tp_hour",   &m_value.hour,   1, 0);
+	changed |= ImGui::InputInt("##tp_hour",   &m_ownedValue.hour,   1, 0);
 	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##tp_minute", &m_value.minute, 1, 0);
+	changed |= ImGui::InputInt("##tp_minute", &m_ownedValue.minute, 1, 0);
 	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##tp_second", &m_value.second, 1, 0);
+	changed |= ImGui::InputInt("##tp_second", &m_ownedValue.second, 1, 0);
 	ImGui::PopItemWidth();
 	if (changed)
 	{
-		m_value.hour   = std::clamp(m_value.hour,   0, 23);
-		m_value.minute = std::clamp(m_value.minute, 0, 59);
-		m_value.second = std::clamp(m_value.second, 0, 59);
+		m_ownedValue.hour   = std::clamp(m_ownedValue.hour,   0, 23);
+		m_ownedValue.minute = std::clamp(m_ownedValue.minute, 0, 59);
+		m_ownedValue.second = std::clamp(m_ownedValue.second, 0, 59);
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
 	}
 }
 
@@ -597,9 +942,22 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 
 template <SliderValue T>
 SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 	: m_range(range)
-	, m_value(value)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -607,19 +965,31 @@ template <SliderValue T>
 void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+
+	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderInt()\n");
 #endif
-		ImGui::SliderInt("##slider", &m_value, m_range.min, m_range.max);
+		changed = ImGui::SliderInt("##slider", &m_ownedValue, m_range.min, m_range.max);
 	}
 	else
 	{
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderFloat()\n");
 #endif
-		ImGui::SliderFloat("##slider", &m_value, m_range.min, m_range.max);
+		changed = ImGui::SliderFloat("##slider", &m_ownedValue, m_range.min, m_range.max);
+	}
+
+	if (changed)
+	{
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
 	}
 }
 
@@ -630,9 +1000,22 @@ template class SliderWrapper<float>;
 
 template <SpinBoxValue T>
 SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
-	const Position& pos, const Size& size, long style)
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 	: m_range(range)
-	, m_value(value)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
+{
+}
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -640,21 +1023,35 @@ template <SpinBoxValue T>
 void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+
+	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputInt()\n");
 #endif
-		if (ImGui::InputInt("##spinbox", &m_value, static_cast<int>(m_range.step)))
-			m_value = std::clamp(m_value, m_range.min, m_range.max);
+		changed = ImGui::InputInt("##spinbox", &m_ownedValue, static_cast<int>(m_range.step));
+		if (changed)
+			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
 	}
 	else
 	{
 #ifdef USE_LOGGER
 		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputFloat()\n");
 #endif
-		if (ImGui::InputFloat("##spinbox", &m_value, m_range.step))
-			m_value = std::clamp(m_value, m_range.min, m_range.max);
+		changed = ImGui::InputFloat("##spinbox", &m_ownedValue, m_range.step);
+		if (changed)
+			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
+	}
+
+	if (changed)
+	{
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
 	}
 }
 
@@ -665,9 +1062,12 @@ template class SpinBoxWrapper<float>;
 
 template <RadioButtonValue T>
 RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
-	T& value, const Position& pos, const Size& size, long style)
+	T& value, const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
 	: m_label(label.empty() ? "##radio" : label)
-	, m_value(value)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChange(std::move(onChange))
 {
 	if constexpr (std::is_same_v<T, int>)
 	{
@@ -681,20 +1081,53 @@ RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::str
 }
 
 template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const T& initialValue, const Position& pos, const Size& size, long style,
+	std::function<void(T)> onChange)
+	: m_label(label.empty() ? "##radio" : label)
+	, m_ownedValue(initialValue)
+	, m_onChange(std::move(onChange))
+{
+	if constexpr (std::is_same_v<T, int>)
+	{
+		if (&m_ownedValue != s_lastGroup)
+		{
+			s_radioButtonId = 0;
+			s_lastGroup = &m_ownedValue;
+		}
+		m_index = s_radioButtonId++;
+	}
+}
+
+template <RadioButtonValue T>
 void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> ImGui::RadioButton()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
 	if constexpr (std::is_same_v<T, bool>)
 	{
-		if (ImGui::RadioButton(m_label.c_str(), m_value))
-			m_value = !m_value;
+		if (ImGui::RadioButton(m_label.c_str(), m_ownedValue))
+		{
+			m_ownedValue = !m_ownedValue;
+			if (m_externalRef)
+				m_externalRef->get() = m_ownedValue;
+			if (m_onChange)
+				m_onChange(m_ownedValue);
+		}
 	}
 	else
 	{
-		ImGui::RadioButton(m_label.c_str(), &m_value, m_index);
+		if (ImGui::RadioButton(m_label.c_str(), &m_ownedValue, m_index))
+		{
+			if (m_externalRef)
+				m_externalRef->get() = m_ownedValue;
+			if (m_onChange)
+				m_onChange(m_ownedValue);
+		}
 	}
 }
 
@@ -705,9 +1138,20 @@ template class RadioButtonWrapper<int>;
 
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
-	bool& checked)
+	bool& checked, std::function<void(bool)> onChange)
 	: m_label(label.empty() ? "##checkbox" : label)
-	, m_checked(checked)
+	, m_ownedValue(checked)
+	, m_externalRef(checked)
+	, m_onChange(std::move(onChange))
+{
+}
+
+CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	const bool& initialChecked, std::function<void(bool)> onChange)
+	: m_label(label.empty() ? "##checkbox" : label)
+	, m_ownedValue(initialChecked)
+	, m_onChange(std::move(onChange))
 {
 }
 
@@ -717,16 +1161,58 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::createAndAdd()\t-> ImGui::Checkbox()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
-	ImGui::Checkbox(m_label.c_str(), &m_checked);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+	if (ImGui::Checkbox(m_label.c_str(), &m_ownedValue))
+	{
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
+	}
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
 ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
-	T& selected, const Position& pos, const Size& size, long style)
+	T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&)> onChange)
 	: m_choices(std::move(choices))
-	, m_selected(selected)
+	, m_ownedSelected(selected)
+	, m_externalRef(selected)
+	, m_onChange(std::move(onChange))
+{
+	for (const auto& c : m_choices)
+	{
+		m_items += c;
+		m_items += '\0';
+	}
+
+	if constexpr (std::is_same_v<T, int>)
+	{
+		m_currentItem = selected;
+	}
+	else
+	{
+		for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+		{
+			if (m_choices[i] == selected)
+			{
+				m_currentItem = i;
+				break;
+			}
+		}
+	}
+}
+
+template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	const T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&)> onChange)
+	: m_choices(std::move(choices))
+	, m_ownedSelected(selected)
+	, m_onChange(std::move(onChange))
 {
 	for (const auto& c : m_choices)
 	{
@@ -758,15 +1244,36 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> ImGui::Combo()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
-	if constexpr (std::is_same_v<T, int>)
-		m_currentItem = m_selected;
+	if (m_externalRef)
+	{
+		if constexpr (std::is_same_v<T, int>)
+		{
+			m_currentItem = m_externalRef->get();
+		}
+		else
+		{
+			for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+			{
+				if (m_choices[i] == m_externalRef->get())
+				{
+					m_currentItem = i;
+					break;
+				}
+			}
+		}
+	}
 
 	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
 	{
 		if constexpr (std::is_same_v<T, int>)
-			m_selected = m_currentItem;
+			m_ownedSelected = m_currentItem;
 		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.size()))
-			m_selected = m_choices[m_currentItem];
+			m_ownedSelected = m_choices[m_currentItem];
+
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedSelected;
+		if (m_onChange)
+			m_onChange(m_ownedSelected);
 	}
 }
 
