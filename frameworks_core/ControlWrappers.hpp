@@ -126,6 +126,34 @@ private:
 #endif
 };
 
+// DatePickerWrapper -----------------------------------------------------------
+class DatePickerWrapper : public ControlWrapper
+{
+public:
+	DatePickerWrapper(ControlWrapper* parent, Date& value,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	Date& m_value;
+#endif
+};
+
+// TimePickerWrapper -----------------------------------------------------------
+class TimePickerWrapper : public ControlWrapper
+{
+public:
+	TimePickerWrapper(ControlWrapper* parent, Time& value,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	Time& m_value;
+#endif
+};
+
 // SliderWrapper -----------------------------------------------------------
 template <SliderValue T>
 class SliderWrapper : public ControlWrapper

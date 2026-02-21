@@ -433,3 +433,53 @@ private:
 
 template <SpinBoxValue T>
 SpinBox(Range<T>, T&) -> SpinBox<T>;
+
+// DatePicker -----------------------------------------------------------
+struct DatePicker : Widget<DatePicker>
+{
+	using super = Widget<DatePicker>;
+
+	explicit DatePicker(Date& value)
+		: super()
+		, m_value(value)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<DatePickerWrapper>(parent, m_value, pos, size, style);
+	}
+
+private:
+	Date& m_value;
+};
+
+// TimePicker -----------------------------------------------------------
+struct TimePicker : Widget<TimePicker>
+{
+	using super = Widget<TimePicker>;
+
+	explicit TimePicker(Time& value)
+		: super()
+		, m_value(value)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<TimePickerWrapper>(parent, m_value, pos, size, style);
+	}
+
+private:
+	Time& m_value;
+};

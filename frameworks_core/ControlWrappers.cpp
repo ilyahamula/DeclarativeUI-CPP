@@ -9,6 +9,9 @@
 #include <wx/wx.h>
 #include <wx/hyperlink.h>
 #include <wx/spinctrl.h>
+#include <wx/datectrl.h>
+#include <wx/timectrl.h>
+#include <wx/dateevt.h>
 
 // ButtonWrapper -----------------------------------------------------------
 
@@ -110,6 +113,52 @@ LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text
 	if (onClick)
 		hl->Bind(wxEVT_HYPERLINK, [cb = std::move(onClick)](wxHyperlinkEvent& evt) { cb(); });
 	m_nativeWidget = hl;
+}
+
+// DatePickerWrapper -----------------------------------------------------------
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::DatePickerWrapper()\t-> new wxDatePickerCtrl()\n");
+#endif
+	wxDateTime dt;
+	dt.Set(static_cast<wxDateTime::wxDateTime_t>(value.day),
+		static_cast<wxDateTime::Month>(value.month - 1),
+		value.year);
+	auto* dp = new wxDatePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	dp->Bind(wxEVT_DATE_CHANGED, [&value](wxDateEvent& evt) {
+		const wxDateTime& d = evt.GetDate();
+		value.year  = d.GetYear();
+		value.month = static_cast<int>(d.GetMonth()) + 1;
+		value.day   = d.GetDay();
+	});
+	m_nativeWidget = dp;
+}
+
+// TimePickerWrapper -----------------------------------------------------------
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::TimePickerWrapper()\t-> new wxTimePickerCtrl()\n");
+#endif
+	wxDateTime dt = wxDateTime::Now();
+	dt.SetHour(value.hour);
+	dt.SetMinute(value.minute);
+	dt.SetSecond(value.second);
+	auto* tp = new wxTimePickerCtrl(parent->nativeHandle(), wxID_ANY, dt,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	tp->Bind(wxEVT_TIME_CHANGED, [&value](wxDateEvent& evt) {
+		const wxDateTime& d = evt.GetDate();
+		value.hour   = d.GetHour();
+		value.minute = d.GetMinute();
+		value.second = d.GetSecond();
+	});
+	m_nativeWidget = tp;
 }
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -444,6 +493,65 @@ void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
 	ImGui::TextUnformatted(m_text.c_str());
+}
+
+// DatePickerWrapper -----------------------------------------------------------
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
+	const Position& pos, const Size& size, long style)
+	: m_value(value)
+{
+}
+
+void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [date]\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	bool changed = false;
+	ImGui::PushItemWidth(70);
+	changed |= ImGui::InputInt("##dp_year",  &m_value.year,  1, 10);
+	ImGui::SameLine(0, 4);
+	changed |= ImGui::InputInt("##dp_month", &m_value.month, 1, 0);
+	ImGui::SameLine(0, 4);
+	changed |= ImGui::InputInt("##dp_day",   &m_value.day,   1, 0);
+	ImGui::PopItemWidth();
+	if (changed)
+	{
+		m_value.month = std::clamp(m_value.month, 1, 12);
+		m_value.day   = std::clamp(m_value.day,   1, 31);
+	}
+}
+
+// TimePickerWrapper -----------------------------------------------------------
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
+	const Position& pos, const Size& size, long style)
+	: m_value(value)
+{
+}
+
+void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [time]\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	bool changed = false;
+	ImGui::PushItemWidth(60);
+	changed |= ImGui::InputInt("##tp_hour",   &m_value.hour,   1, 0);
+	ImGui::SameLine(0, 4);
+	changed |= ImGui::InputInt("##tp_minute", &m_value.minute, 1, 0);
+	ImGui::SameLine(0, 4);
+	changed |= ImGui::InputInt("##tp_second", &m_value.second, 1, 0);
+	ImGui::PopItemWidth();
+	if (changed)
+	{
+		m_value.hour   = std::clamp(m_value.hour,   0, 23);
+		m_value.minute = std::clamp(m_value.minute, 0, 59);
+		m_value.second = std::clamp(m_value.second, 0, 59);
+	}
 }
 
 // SliderWrapper -----------------------------------------------------------
