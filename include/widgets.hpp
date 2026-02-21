@@ -109,6 +109,31 @@ private:
 	std::string& m_text;
 };
 
+// ReadonlyTextCtrl -----------------------------------------------------------
+struct ReadonlyTextCtrl : Widget<ReadonlyTextCtrl>
+{
+	using super = Widget<ReadonlyTextCtrl>;
+
+	explicit ReadonlyTextCtrl(const std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<ReadonlyTextCtrlWrapper>(parent, m_text, pos, size, style);
+	}
+
+private:
+	const std::string& m_text;
+};
+
 // Button -----------------------------------------------------------
 struct Button : Widget<Button>
 {

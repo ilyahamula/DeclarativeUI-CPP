@@ -38,6 +38,18 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	m_nativeWidget = tc;
 }
 
+// ReadonlyTextCtrlWrapper -----------------------------------------------------------
+
+ReadonlyTextCtrlWrapper::ReadonlyTextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ReadonlyTextCtrlWrapper::ReadonlyTextCtrlWrapper()\t-> new wxTextCtrl(wxTE_READONLY)\n");
+#endif
+	m_nativeWidget = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_READONLY);
+}
+
 // StaticTextWrapper -----------------------------------------------------------
 
 StaticTextWrapper::StaticTextWrapper(ControlWrapper* parent, const std::string& text,
@@ -217,6 +229,25 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
 		m_value = buf;
+}
+
+// ReadonlyTextCtrlWrapper -----------------------------------------------------------
+
+ReadonlyTextCtrlWrapper::ReadonlyTextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+	: m_value(value)
+{
+}
+
+void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ReadonlyTextCtrlWrapper::createAndAdd()\t-> ImGui::InputText(ReadOnly)\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	char buf[256] = {};
+	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
 }
 
 // StaticTextWrapper -----------------------------------------------------------
