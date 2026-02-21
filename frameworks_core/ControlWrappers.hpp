@@ -52,6 +52,38 @@ private:
 #endif
 };
 
+// ClickableTextWrapper -----------------------------------------------------------
+class ClickableTextWrapper : public ControlWrapper
+{
+public:
+	ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+		const Position& pos, const Size& size, long style,
+		std::function<void()> onClick = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	std::string m_text;
+	std::function<void()> m_onClick;
+#endif
+};
+
+// LinkTextWrapper -----------------------------------------------------------
+class LinkTextWrapper : public ControlWrapper
+{
+public:
+	LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+		const Position& pos, const Size& size, long style,
+		std::function<void()> onClick = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	std::string m_text;
+	std::function<void()> m_onClick;
+#endif
+};
+
 // StaticTextWrapper -----------------------------------------------------------
 class StaticTextWrapper : public ControlWrapper
 {

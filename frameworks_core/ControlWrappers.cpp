@@ -7,6 +7,7 @@
 
 #ifdef USE_WX
 #include <wx/wx.h>
+#include <wx/hyperlink.h>
 
 // ButtonWrapper -----------------------------------------------------------
 
@@ -48,6 +49,38 @@ ReadonlyTextCtrlWrapper::ReadonlyTextCtrlWrapper(ControlWrapper* parent, const s
 #endif
 	m_nativeWidget = new wxTextCtrl(parent->nativeHandle(), wxID_ANY, value,
 		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxTE_READONLY);
+}
+
+// ClickableTextWrapper -----------------------------------------------------------
+
+ClickableTextWrapper::ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::ClickableTextWrapper()\t-> new wxStaticText()\n");
+#endif
+	auto* st = new wxStaticText(parent->nativeHandle(), wxID_ANY, text,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onClick)
+		st->Bind(wxEVT_LEFT_DOWN, [cb = std::move(onClick)](wxMouseEvent&) { cb(); });
+	m_nativeWidget = st;
+}
+
+// LinkTextWrapper -----------------------------------------------------------
+
+LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::LinkTextWrapper()\t-> new wxHyperlinkCtrl()\n");
+#endif
+	auto* hl = new wxHyperlinkCtrl(parent->nativeHandle(), wxID_ANY, text, wxEmptyString,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onClick)
+		hl->Bind(wxEVT_HYPERLINK, [cb = std::move(onClick)](wxHyperlinkEvent& evt) { cb(); });
+	m_nativeWidget = hl;
 }
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -248,6 +281,52 @@ void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
 	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
+}
+
+// ClickableTextWrapper -----------------------------------------------------------
+
+ClickableTextWrapper::ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick)
+	: m_text(text.empty() ? "##clickable" : text)
+	, m_onClick(std::move(onClick))
+{
+}
+
+void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::createAndAdd()\t-> ImGui::Selectable()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (ImGui::Selectable(m_text.c_str()))
+	{
+		if (m_onClick)
+			m_onClick();
+	}
+}
+
+// LinkTextWrapper -----------------------------------------------------------
+
+LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick)
+	: m_text(text.empty() ? "##link" : text)
+	, m_onClick(std::move(onClick))
+{
+}
+
+void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::createAndAdd()\t-> ImGui::Selectable() [link style]\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.26f, 0.59f, 0.98f, 1.00f));
+	bool clicked = ImGui::Selectable(m_text.c_str());
+	ImGui::PopStyleColor();
+	if (clicked && m_onClick)
+		m_onClick();
 }
 
 // StaticTextWrapper -----------------------------------------------------------

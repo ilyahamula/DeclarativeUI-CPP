@@ -134,6 +134,70 @@ private:
 	const std::string& m_text;
 };
 
+// ClickableText -----------------------------------------------------------
+struct ClickableText : Widget<ClickableText>
+{
+	using super = Widget<ClickableText>;
+
+	explicit ClickableText(const std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+	ClickableText& onClick(std::function<void()> callback)
+	{
+		m_onClick = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<ClickableTextWrapper>(parent, m_text, pos, size, style, m_onClick);
+	}
+
+private:
+	std::function<void()> m_onClick;
+	std::string m_text;
+};
+
+// LinkText -----------------------------------------------------------
+struct LinkText : Widget<LinkText>
+{
+	using super = Widget<LinkText>;
+
+	explicit LinkText(const std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+	LinkText& onClick(std::function<void()> callback)
+	{
+		m_onClick = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<LinkTextWrapper>(parent, m_text, pos, size, style, m_onClick);
+	}
+
+private:
+	std::function<void()> m_onClick;
+	std::string m_text;
+};
+
 // Button -----------------------------------------------------------
 struct Button : Widget<Button>
 {
