@@ -8,6 +8,7 @@
 #ifdef USE_WX
 #include <wx/wx.h>
 #include <wx/hyperlink.h>
+#include <wx/spinctrl.h>
 
 // ButtonWrapper -----------------------------------------------------------
 
@@ -158,6 +159,36 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value
 template class SliderWrapper<int>;
 template class SliderWrapper<float>;
 
+// SpinBoxWrapper -----------------------------------------------------------
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::SpinBoxWrapper()\t-> new wxSpinCtrl[Double]()\n");
+#endif
+	if constexpr (std::is_same_v<T, int>)
+	{
+		auto* sc = new wxSpinCtrl(parent->nativeHandle(), wxID_ANY, wxEmptyString,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
+			range.min, range.max, value);
+		sc->Bind(wxEVT_SPINCTRL, [&value](wxSpinEvent& evt) { value = evt.GetInt(); });
+		m_nativeWidget = sc;
+	}
+	else
+	{
+		auto* sc = new wxSpinCtrlDouble(parent->nativeHandle(), wxID_ANY, wxEmptyString,
+			wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style,
+			range.min, range.max, value, range.step);
+		sc->Bind(wxEVT_SPINCTRLDOUBLE, [&value](wxSpinDoubleEvent& evt) { value = static_cast<T>(evt.GetValue()); });
+		m_nativeWidget = sc;
+	}
+}
+
+template class SpinBoxWrapper<int>;
+template class SpinBoxWrapper<float>;
+
 // RadioButtonWrapper -----------------------------------------------------------
 
 template <RadioButtonValue T>
@@ -246,6 +277,7 @@ template class ComboBoxWrapper<int>;
 // Implementations for Qt would go here, following a similar pattern to the wxWidgets implementations but using Qt's widget classes and signal/slot mechanism.
 #elif defined(USE_IMGUI) // ----------------IMGUI IMPLEMENTATIONS----------------
 #include "imgui.h"
+#include <algorithm>
 
 // pos, size, style: not directly applicable in ImGui immediate mode
 
@@ -446,6 +478,41 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 
 template class SliderWrapper<int>;
 template class SliderWrapper<float>;
+
+// SpinBoxWrapper -----------------------------------------------------------
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	const Position& pos, const Size& size, long style)
+	: m_range(range)
+	, m_value(value)
+{
+}
+
+template <SpinBoxValue T>
+void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if constexpr (std::is_same_v<T, int>)
+	{
+#ifdef USE_LOGGER
+		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputInt()\n");
+#endif
+		if (ImGui::InputInt("##spinbox", &m_value, static_cast<int>(m_range.step)))
+			m_value = std::clamp(m_value, m_range.min, m_range.max);
+	}
+	else
+	{
+#ifdef USE_LOGGER
+		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputFloat()\n");
+#endif
+		if (ImGui::InputFloat("##spinbox", &m_value, m_range.step))
+			m_value = std::clamp(m_value, m_range.min, m_range.max);
+	}
+}
+
+template class SpinBoxWrapper<int>;
+template class SpinBoxWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
 

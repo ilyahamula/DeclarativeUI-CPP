@@ -402,3 +402,34 @@ private:
 
 template <SliderValue T>
 Slider(Range<T>, T) -> Slider<T>;
+
+// SpinBox -----------------------------------------------------------
+template <SpinBoxValue T>
+struct SpinBox : Widget<SpinBox<T>>
+{
+	using super = Widget<SpinBox<T>>;
+
+	SpinBox(Range<T> range, T& value)
+		: super()
+		, m_range(range)
+		, m_value(value)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<SpinBoxWrapper<T>>(parent, m_range, m_value, pos, size, style);
+	}
+
+private:
+	Range<T> m_range;
+	T& m_value;
+};
+
+template <SpinBoxValue T>
+SpinBox(Range<T>, T&) -> SpinBox<T>;

@@ -145,6 +145,25 @@ private:
 extern template class SliderWrapper<int>;
 extern template class SliderWrapper<float>;
 
+// SpinBoxWrapper -----------------------------------------------------------
+template <SpinBoxValue T>
+class SpinBoxWrapper : public ControlWrapper
+{
+public:
+	SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	Range<T> m_range;
+	T& m_value;
+#endif
+};
+
+extern template class SpinBoxWrapper<int>;
+extern template class SpinBoxWrapper<float>;
+
 // RadioButtonWrapper -----------------------------------------------------------
 template <RadioButtonValue T>
 class RadioButtonWrapper : public ControlWrapper
