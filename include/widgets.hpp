@@ -109,6 +109,31 @@ private:
 	std::string& m_text;
 };
 
+// MultiLineTextCtrl -----------------------------------------------------------
+struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
+{
+	using super = Widget<MultiLineTextCtrl>;
+
+	explicit MultiLineTextCtrl(std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<MultiLineTextCtrlWrapper>(parent, m_text, pos, size, style);
+	}
+
+private:
+	std::string& m_text;
+};
+
 // ReadonlyTextCtrl -----------------------------------------------------------
 struct ReadonlyTextCtrl : Widget<ReadonlyTextCtrl>
 {

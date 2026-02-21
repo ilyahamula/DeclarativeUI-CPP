@@ -38,6 +38,20 @@ private:
 #endif
 };
 
+// MultiLineTextCtrlWrapper -----------------------------------------------------------
+class MultiLineTextCtrlWrapper : public ControlWrapper
+{
+public:
+	MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	std::string& m_value;
+#endif
+};
+
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
 class ReadonlyTextCtrlWrapper : public ControlWrapper
 {
