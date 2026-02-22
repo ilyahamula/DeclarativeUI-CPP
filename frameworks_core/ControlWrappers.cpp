@@ -617,6 +617,7 @@ template class ComboBoxWrapper<int>;
 // Implementations for Qt would go here, following a similar pattern to the wxWidgets implementations but using Qt's widget classes and signal/slot mechanism.
 #elif defined(USE_IMGUI) // ----------------IMGUI IMPLEMENTATIONS----------------
 #include "imgui.h"
+#include "frameworks_core/ImGuiWidgetIdManager.hpp"
 #include <algorithm>
 
 // pos, size, style: not directly applicable in ImGui immediate mode
@@ -637,11 +638,13 @@ void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, 
 	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::createAndAdd()\t-> ImGui::Button()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::Button(m_label.c_str()))
 	{
 		if (m_onClick)
 			m_onClick();
 	}
+	ImGui::PopID();
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
@@ -673,6 +676,7 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
 	{
 		m_ownedValue = buf;
@@ -681,6 +685,7 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 		if (m_onChange)
 			m_onChange(m_ownedValue);
 	}
+	ImGui::PopID();
 }
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -712,6 +717,7 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
 	{
 		m_ownedValue = buf;
@@ -720,6 +726,7 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 		if (m_onChange)
 			m_onChange(m_ownedValue);
 	}
+	ImGui::PopID();
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -751,6 +758,7 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 		m_ownedValue = m_externalRef->get();
 	char buf[4096] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf)))
 	{
 		m_ownedValue = buf;
@@ -759,6 +767,7 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 		if (m_onChange)
 			m_onChange(m_ownedValue);
 	}
+	ImGui::PopID();
 }
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
@@ -777,7 +786,9 @@ void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper
 	ControlWrapper::createAndAdd(parent, layout, flags);
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
+	ImGui::PopID();
 }
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -796,11 +807,13 @@ void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::createAndAdd()\t-> ImGui::Selectable()\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::Selectable(m_text.c_str()))
 	{
 		if (m_onClick)
 			m_onClick();
 	}
+	ImGui::PopID();
 }
 
 // LinkTextWrapper -----------------------------------------------------------
@@ -819,9 +832,11 @@ void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::createAndAdd()\t-> ImGui::Selectable() [link style]\n");
 #endif
 	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.26f, 0.59f, 0.98f, 1.00f));
 	bool clicked = ImGui::Selectable(m_text.c_str());
 	ImGui::PopStyleColor();
+	ImGui::PopID();
 	if (clicked && m_onClick)
 		m_onClick();
 }
@@ -872,13 +887,21 @@ void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 		m_ownedValue = m_externalRef->get();
 
 	bool changed = false;
-	ImGui::PushItemWidth(70);
-	changed |= ImGui::InputInt("##dp_year",  &m_ownedValue.year,  1, 10);
-	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##dp_month", &m_ownedValue.month, 1, 0);
-	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##dp_day",   &m_ownedValue.day,   1, 0);
-	ImGui::PopItemWidth();
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	{
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
+		const float padW = style.FramePadding.x * 2.0f;
+		ImGui::SetNextItemWidth(ImGui::CalcTextSize("9999").x + padW + btnW);
+		changed |= ImGui::InputInt("##dp_year",  &m_ownedValue.year,  1, 10);
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(ImGui::CalcTextSize("12").x + padW + btnW);
+		changed |= ImGui::InputInt("##dp_month", &m_ownedValue.month, 1, 0);
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(ImGui::CalcTextSize("31").x + padW + btnW);
+		changed |= ImGui::InputInt("##dp_day",   &m_ownedValue.day,   1, 0);
+	}
+	ImGui::PopID();
 	if (changed)
 	{
 		m_ownedValue.month = std::clamp(m_ownedValue.month, 1, 12);
@@ -919,13 +942,22 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 		m_ownedValue = m_externalRef->get();
 
 	bool changed = false;
-	ImGui::PushItemWidth(60);
-	changed |= ImGui::InputInt("##tp_hour",   &m_ownedValue.hour,   1, 0);
-	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##tp_minute", &m_ownedValue.minute, 1, 0);
-	ImGui::SameLine(0, 4);
-	changed |= ImGui::InputInt("##tp_second", &m_ownedValue.second, 1, 0);
-	ImGui::PopItemWidth();
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	{
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float btnW  = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
+		const float padW  = style.FramePadding.x * 2.0f;
+		const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
+		ImGui::SetNextItemWidth(ImGui::CalcTextSize("23").x + padW + btnW);
+		changed |= ImGui::InputInt("##tp_hour",   &m_ownedValue.hour,   1, 0);
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(twoDigitW);
+		changed |= ImGui::InputInt("##tp_minute", &m_ownedValue.minute, 1, 0);
+		ImGui::SameLine(0, 4);
+		ImGui::SetNextItemWidth(twoDigitW);
+		changed |= ImGui::InputInt("##tp_second", &m_ownedValue.second, 1, 0);
+	}
+	ImGui::PopID();
 	if (changed)
 	{
 		m_ownedValue.hour   = std::clamp(m_ownedValue.hour,   0, 23);
@@ -968,6 +1000,7 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
@@ -983,6 +1016,7 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 #endif
 		changed = ImGui::SliderFloat("##slider", &m_ownedValue, m_range.min, m_range.max);
 	}
+	ImGui::PopID();
 
 	if (changed)
 	{
@@ -1026,6 +1060,33 @@ void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
+	// InputInt/InputFloat default to the full content-region width via CalcItemWidth().
+	// Without an explicit Expand or Proportion hint the layout won't constrain the width,
+	// so we compute a minimum width that fits the formatted min/max values plus the
+	// step buttons (+/-) and frame padding.
+	if (!flags.expand() && flags.proportion() == 0)
+	{
+		char bufMin[32], bufMax[32];
+		if constexpr (std::is_same_v<T, int>)
+		{
+			snprintf(bufMin, sizeof(bufMin), "%d", m_range.min);
+			snprintf(bufMax, sizeof(bufMax), "%d", m_range.max);
+		}
+		else
+		{
+			snprintf(bufMin, sizeof(bufMin), "%.3f", m_range.min);
+			snprintf(bufMax, sizeof(bufMax), "%.3f", m_range.max);
+		}
+		float textW = std::max(ImGui::CalcTextSize(bufMin).x, ImGui::CalcTextSize(bufMax).x);
+		const ImGuiStyle& style = ImGui::GetStyle();
+		// ImGui internally reserves (frameHeight + ItemInnerSpacing.x) * 2 for the step buttons,
+		// then FramePadding.x * 2 for the text inside the field.
+		float stepBtnW = (m_range.step != 0) ? (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f : 0.0f;
+		float minWidth = textW + style.FramePadding.x * 2.0f + stepBtnW;
+		ImGui::SetNextItemWidth(std::max(minWidth, 60.0f));
+	}
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
@@ -1045,6 +1106,7 @@ void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 		if (changed)
 			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
 	}
+	ImGui::PopID();
 
 	if (changed)
 	{
@@ -1108,6 +1170,7 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 	ControlWrapper::createAndAdd(parent, layout, flags);
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if constexpr (std::is_same_v<T, bool>)
 	{
 		if (ImGui::RadioButton(m_label.c_str(), m_ownedValue))
@@ -1129,6 +1192,7 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 				m_onChange(m_ownedValue);
 		}
 	}
+	ImGui::PopID();
 }
 
 template class RadioButtonWrapper<bool>;
@@ -1163,6 +1227,7 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	ControlWrapper::createAndAdd(parent, layout, flags);
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::Checkbox(m_label.c_str(), &m_ownedValue))
 	{
 		if (m_externalRef)
@@ -1170,6 +1235,7 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 		if (m_onChange)
 			m_onChange(m_ownedValue);
 	}
+	ImGui::PopID();
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -1263,6 +1329,7 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 		}
 	}
 
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
 	{
 		if constexpr (std::is_same_v<T, int>)
@@ -1275,6 +1342,7 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 		if (m_onChange)
 			m_onChange(m_ownedSelected);
 	}
+	ImGui::PopID();
 }
 
 template class ComboBoxWrapper<std::string>;

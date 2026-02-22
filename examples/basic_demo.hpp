@@ -35,25 +35,25 @@ inline auto drawControlsUI(
                     .onClick([]() {})
             },
             HGroupBox { "Numeric Values",
-                VGroupBox { "Integer",
-                    StaticText{"Count:"},
+                LayoutFlags().Border(Side::All, 5),
+                VStack {
+                    StaticText{"Integer"},
                     SpinBox { { .min = 0, .max = 100 }, spinInt }
-                        .withFlags(LayoutFlags().Expand())
                 },
-                VGroupBox { "Float",
-                    StaticText{"Factor:"},
+                VStack {
+                    StaticText{"Float"},
                     SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
-                        .withFlags(LayoutFlags().Expand())
                 }
             },
             HGroupBox { "Date & Time",
-                VGroupBox { "Date",
+                LayoutFlags().Border(Side::All, 5),
+                VStack {
+                    StaticText{"Date"},
                     DatePicker{date}
-                        .withFlags(LayoutFlags().Expand())
                 },
-                VGroupBox { "Time",
+                VStack {
+                    StaticText{"Time"},
                     TimePicker{time}
-                        .withFlags(LayoutFlags().Expand())
                 }
             },
             HStack {
