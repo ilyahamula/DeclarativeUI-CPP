@@ -8,6 +8,65 @@
 #include <functional>
 #include <string>
 
+inline auto drawControlsUI(
+    std::string& multilineText,
+    std::string& password,
+    int& spinInt,
+    float& spinFloat,
+    Date& date,
+    Time& time,
+    std::function<void()> onCheckClick = []() {})
+{
+    return Dialog {
+        "Controls Demo",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 10),
+            VGroupBox { "Text Input",
+                MultiLineTextCtrl{multilineText}
+                    .withFlags(LayoutFlags().Expand()),
+                HStack {
+                    StaticText{"Password:"}
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
+                    PasswordInput{password}
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                },
+                LinkText{"Visit documentation"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 5))
+                    .onClick([]() {})
+            },
+            HGroupBox { "Numeric Values",
+                VGroupBox { "Integer",
+                    StaticText{"Count:"},
+                    SpinBox { { .min = 0, .max = 100 }, spinInt }
+                        .withFlags(LayoutFlags().Expand())
+                },
+                VGroupBox { "Float",
+                    StaticText{"Factor:"},
+                    SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
+                        .withFlags(LayoutFlags().Expand())
+                }
+            },
+            HGroupBox { "Date & Time",
+                VGroupBox { "Date",
+                    DatePicker{date}
+                        .withFlags(LayoutFlags().Expand())
+                },
+                VGroupBox { "Time",
+                    TimePicker{time}
+                        .withFlags(LayoutFlags().Expand())
+                }
+            },
+            HStack {
+                StaticText{""}
+                    .withFlags(LayoutFlags().Proportion(1)),
+                Button{"Check"}
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .onClick(std::move(onCheckClick))
+            }
+        }
+    };
+}
+
 inline auto drawUI(std::string& text,
     float& sliderValue,
     int& sliderValue1,
