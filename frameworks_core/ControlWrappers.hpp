@@ -287,6 +287,27 @@ private:
 #endif
 };
 
+// ToggleButtonWrapper -----------------------------------------------------------
+class ToggleButtonWrapper : public ControlWrapper
+{
+public:
+	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+		bool& toggled, const Position& pos, const Size& size, long style,
+		std::function<void(bool)> onChange = {});
+	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+		const bool& initialToggled, const Position& pos, const Size& size, long style,
+		std::function<void(bool)> onChange = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	std::string m_label;
+	bool m_ownedValue;
+	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	std::function<void(bool)> m_onChange;
+#endif
+};
+
 // ComboBoxWrapper -----------------------------------------------------------
 template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper

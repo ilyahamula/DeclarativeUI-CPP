@@ -15,6 +15,7 @@ inline auto drawControlsUI(
     float& spinFloat,
     Date& date,
     Time& time,
+    bool& toggle,
     std::function<void()> onCheckClick = []() {})
 {
     return Dialog {
@@ -61,7 +62,12 @@ inline auto drawControlsUI(
                     .withFlags(LayoutFlags().Proportion(1)),
                 Button{"Check"}
                     .withFlags(LayoutFlags().CenterVertical())
-                    .onClick(std::move(onCheckClick))
+                    .onClick(std::move(onCheckClick)),
+                ToggleButton{toggle, "Toggle me!"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 5))
+                    .onChange([](bool newValue) {
+
+                })
             }
         }
     };

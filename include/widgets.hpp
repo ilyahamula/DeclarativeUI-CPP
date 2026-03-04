@@ -419,7 +419,7 @@ struct CheckBox : Widget<CheckBox>
 	{
 	}
 
-	explicit CheckBox(const std::string& label = "", bool initialChecked = false)
+	CheckBox(const bool& initialChecked, const std::string& label = "")
 		: super()
 		, m_ownedValue(initialChecked)
 		, m_label(label)
@@ -688,6 +688,56 @@ private:
 	Date m_ownedValue{};
 	std::optional<std::reference_wrapper<Date>> m_externalRef;
 	std::function<void(const Date&)> m_onChange;
+};
+
+// ToggleButton -----------------------------------------------------------
+struct ToggleButton : Widget<ToggleButton>
+{
+	using super = Widget<ToggleButton>;
+
+	ToggleButton()
+		: super()
+	{
+	}
+
+	ToggleButton(const bool& initialToggled, const std::string& label = "")
+		: super()
+		, m_ownedValue(initialToggled)
+		, m_label(label)
+	{
+	}
+
+	ToggleButton(bool& toggled, const std::string& label = "")
+		: super()
+		, m_ownedValue(toggled)
+		, m_externalRef(toggled)
+		, m_label(label)
+	{
+	}
+
+	ToggleButton& onChange(std::function<void(bool)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		if (m_externalRef)
+			return std::make_unique<ToggleButtonWrapper>(parent, m_label, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<ToggleButtonWrapper>(parent, m_label, m_ownedValue, pos, size, style, m_onChange);
+	}
+
+private:
+	std::string m_label;
+	bool m_ownedValue = false;
+	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	std::function<void(bool)> m_onChange;
 };
 
 // TimePicker -----------------------------------------------------------

@@ -30,6 +30,7 @@ int main(int argc, char** argv)
     int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
+    bool m_toggle = false;
     bool showPopup = false;
 
     std::string m_multilineText = "Type something here...";
@@ -83,7 +84,7 @@ int main(int argc, char** argv)
 //             }
 //         }
 
-        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time,
+        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle,
             [&showControlsPopup]() {
                 showControlsPopup = true;
             }).show();

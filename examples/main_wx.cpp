@@ -10,6 +10,7 @@ class DeclarativeApp : public wxApp
     int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
+    bool m_toggle = false;
 
     std::string m_multilineText = "Type something here...";
     std::string m_password;
@@ -37,7 +38,8 @@ public:
 // #endif
 //         }).show();
 
-        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, [this]() {
+        drawControlsUI(m_multilineText, m_password, m_spinInt,
+            m_spinFloat, m_date, m_time, m_toggle, [this]() {
             wxMessageBox(
                 "multilineText: " + m_multilineText + "\n"
                 "password: " + m_password + "\n"

@@ -12,6 +12,7 @@
 #include <wx/datectrl.h>
 #include <wx/timectrl.h>
 #include <wx/dateevt.h>
+#include <wx/tglbtn.h>
 
 // ButtonWrapper -----------------------------------------------------------
 
@@ -539,6 +540,42 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 			cbk(evt.IsChecked());
 		});
 	m_nativeWidget = cb;
+}
+
+// ToggleButtonWrapper -----------------------------------------------------------
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	bool& toggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::ToggleButtonWrapper()\t-> new wxToggleButton()\n");
+#endif
+	auto* btn = new wxToggleButton(parent->nativeHandle(), wxID_ANY, label,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	btn->SetValue(toggled);
+	btn->Bind(wxEVT_TOGGLEBUTTON, [&toggled, cb = std::move(onChange)](wxCommandEvent& evt) {
+		toggled = evt.IsChecked();
+		if (cb) cb(toggled);
+	});
+	m_nativeWidget = btn;
+}
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const bool& initialToggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool)> onChange)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::ToggleButtonWrapper(unbound)\t-> new wxToggleButton()\n");
+#endif
+	auto* btn = new wxToggleButton(parent->nativeHandle(), wxID_ANY, label,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	btn->SetValue(initialToggled);
+	if (onChange)
+		btn->Bind(wxEVT_TOGGLEBUTTON, [cb = std::move(onChange)](wxCommandEvent& evt) {
+			cb(evt.IsChecked());
+		});
+	m_nativeWidget = btn;
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -1235,6 +1272,55 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 		if (m_onChange)
 			m_onChange(m_ownedValue);
 	}
+	ImGui::PopID();
+}
+
+// ToggleButtonWrapper -----------------------------------------------------------
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	bool& toggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool)> onChange)
+	: m_label(label.empty() ? "##toggle" : label)
+	, m_ownedValue(toggled)
+	, m_externalRef(toggled)
+	, m_onChange(std::move(onChange))
+{
+}
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const bool& initialToggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool)> onChange)
+	: m_label(label.empty() ? "##toggle" : label)
+	, m_ownedValue(initialToggled)
+	, m_onChange(std::move(onChange))
+{
+}
+
+void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::createAndAdd()\t-> ImGui::Button() [toggle]\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	if (m_externalRef)
+		m_ownedValue = m_externalRef->get();
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	const bool wasToggled = m_ownedValue;
+	if (wasToggled)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+	}
+	if (ImGui::Button(m_label.c_str()))
+	{
+		m_ownedValue = !m_ownedValue;
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedValue;
+		if (m_onChange)
+			m_onChange(m_ownedValue);
+	}
+	if (wasToggled)
+		ImGui::PopStyleColor(2);
 	ImGui::PopID();
 }
 
