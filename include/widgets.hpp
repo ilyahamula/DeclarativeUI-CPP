@@ -740,6 +740,45 @@ private:
 	std::function<void(bool)> m_onChange;
 };
 
+// Image -----------------------------------------------------------
+struct Image : Widget<Image>
+{
+	using super = Widget<Image>;
+
+	explicit Image(const std::string& filePath)
+		: super()
+		, m_filePath(filePath)
+	{
+	}
+
+	Image& onClick(std::function<void()> callback)
+	{
+		m_onClick = std::move(callback);
+		return *this;
+	}
+
+	Image& onHover(std::function<void()> callback)
+	{
+		m_onHover = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<ImageWrapper>(parent, m_filePath, pos, size, style, m_onClick, m_onHover);
+	}
+
+private:
+	std::string m_filePath;
+	std::function<void()> m_onClick;
+	std::function<void()> m_onHover;
+};
+
 // TimePicker -----------------------------------------------------------
 struct TimePicker : Widget<TimePicker>
 {

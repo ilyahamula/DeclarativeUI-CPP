@@ -308,6 +308,29 @@ private:
 #endif
 };
 
+// ImageWrapper -----------------------------------------------------------
+class ImageWrapper : public ControlWrapper
+{
+public:
+	ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+		const Position& pos, const Size& size, long style,
+		std::function<void()> onClick = {},
+		std::function<void()> onHover = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	std::string m_filePath;
+	void* m_textureId = nullptr; // ImTextureID (void*) holding the GL texture handle
+	int m_imgWidth = 0;
+	int m_imgHeight = 0;
+	int m_displayWidth = -1;
+	int m_displayHeight = -1;
+	std::function<void()> m_onClick;
+	std::function<void()> m_onHover;
+#endif
+};
+
 // ComboBoxWrapper -----------------------------------------------------------
 template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper

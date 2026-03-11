@@ -57,6 +57,13 @@ inline auto drawControlsUI(
                     TimePicker{time}
                 }
             },
+            VGroupBox { "Preview",
+                Image{"images/h-9pCvkilUc.jpg"}
+                    .withSize({260, 160})
+                    .withFlags(LayoutFlags().Expand())
+                    .onClick([]() {})
+                    .onHover([]() {})
+            },
             HStack {
                 StaticText{""}
                     .withFlags(LayoutFlags().Proportion(1)),

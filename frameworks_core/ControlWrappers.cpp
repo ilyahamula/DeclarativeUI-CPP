@@ -578,6 +578,35 @@ ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::stri
 	m_nativeWidget = btn;
 }
 
+// ImageWrapper -----------------------------------------------------------
+
+ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick,
+	std::function<void()> onHover)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ImageWrapper::ImageWrapper()\t-> new wxStaticBitmap()\n");
+#endif
+	static bool s_handlersInit = false;
+	if (!s_handlersInit)
+	{
+		wxInitAllImageHandlers();
+		s_handlersInit = true;
+	}
+	wxImage wxImg(filePath, wxBITMAP_TYPE_ANY);
+	if (wxImg.IsOk() && size.width > 0 && size.height > 0)
+		wxImg = wxImg.Scale(size.width, size.height, wxIMAGE_QUALITY_HIGH);
+	wxBitmap bmp(wxImg.IsOk() ? wxImg : wxImage(16, 16));
+	auto* bmpCtrl = new wxStaticBitmap(parent->nativeHandle(), wxID_ANY, bmp,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style);
+	if (onClick)
+		bmpCtrl->Bind(wxEVT_LEFT_DOWN, [cb = std::move(onClick)](wxMouseEvent&) { cb(); });
+	if (onHover)
+		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(onHover)](wxMouseEvent&) { cb(); });
+	m_nativeWidget = bmpCtrl;
+}
+
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
@@ -656,6 +685,19 @@ template class ComboBoxWrapper<int>;
 #include "imgui.h"
 #include "frameworks_core/ImGuiWidgetIdManager.hpp"
 #include <algorithm>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <GL/gl.h>
+#elif defined(__APPLE__)
+#define GL_SILENCE_DEPRECATION
+#include <OpenGL/gl3.h>
+#else
+#include <GL/gl.h>
+#endif
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 // pos, size, style: not directly applicable in ImGui immediate mode
 
@@ -1321,6 +1363,63 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 	}
 	if (wasToggled)
 		ImGui::PopStyleColor(2);
+	ImGui::PopID();
+}
+
+// ImageWrapper -----------------------------------------------------------
+
+ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+	const Position& pos, const Size& size, long style,
+	std::function<void()> onClick,
+	std::function<void()> onHover)
+	: m_filePath(filePath)
+	, m_displayWidth(size.width)
+	, m_displayHeight(size.height)
+	, m_onClick(std::move(onClick))
+	, m_onHover(std::move(onHover))
+{
+}
+
+void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ImageWrapper::createAndAdd()\t-> ImGui::Image()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+
+	// Lazy texture load on the first frame (OpenGL context is guaranteed to be active here)
+	if (m_textureId == nullptr && !m_filePath.empty())
+	{
+		stbi_set_flip_vertically_on_load(0);
+		unsigned char* data = stbi_load(m_filePath.c_str(), &m_imgWidth, &m_imgHeight, nullptr, 4);
+		if (data)
+		{
+			GLuint texId = 0;
+			glGenTextures(1, &texId);
+			glBindTexture(GL_TEXTURE_2D, texId);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_imgWidth, m_imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			stbi_image_free(data);
+			m_textureId = reinterpret_cast<void*>(static_cast<uintptr_t>(texId));
+		}
+	}
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	if (m_textureId != nullptr)
+	{
+		const float w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
+		const float h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
+		ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)), ImVec2(w, h));
+		if (m_onHover && ImGui::IsItemHovered())
+			m_onHover();
+		if (m_onClick && ImGui::IsItemClicked())
+			m_onClick();
+	}
+	else
+	{
+		ImGui::TextUnformatted("[Image: failed to load]");
+	}
 	ImGui::PopID();
 }
 
