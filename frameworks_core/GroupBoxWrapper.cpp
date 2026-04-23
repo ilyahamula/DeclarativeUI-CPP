@@ -32,6 +32,7 @@ void GroupBoxWrapper::finilizeLayout()
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
 #include "imgui.h"
+#include "frameworks_core/ImGuiWidgetIdManager.hpp"
 
 GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, const std::string& label)
 	: LayoutWrapper(orient)
@@ -41,7 +42,7 @@ GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, con
 		? "GroupBoxWrapper::GroupBoxWrapper() Horizontal\t-> ImGui::BeginChild()\n"
 		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\t-> ImGui::BeginChild()\n"));
 #endif
-	std::string childId = "##groupbox_" + std::to_string(s_groupBoxId++);
+	std::string childId = "##groupbox_" + std::to_string(WidgetIdManager::nextGroupBoxId());
 	ImGui::BeginChild(childId.c_str(), ImVec2(-FLT_MIN, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
 	if (!label.empty())
 	{

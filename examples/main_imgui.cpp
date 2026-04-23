@@ -30,7 +30,16 @@ int main(int argc, char** argv)
     int m_radioChoice = 0;
     std::string m_selectedCombo = "Goodbye";
     bool m_checked = false;
+    bool m_toggle = false;
     bool showPopup = false;
+
+    std::string m_multilineText = "Type something here...";
+    std::string m_password;
+    int m_spinInt = 42;
+    float m_spinFloat = 1.5f;
+    Date m_date { .year = 2026, .month = 2, .day = 22 };
+    Time m_time { .hour = 9, .minute = 30, .second = 0 };
+    bool showControlsPopup = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -40,35 +49,65 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        drawUI(m_text, m_sliderValue, m_sliderValue1, m_radioChoice, m_radioChoice1, m_selectedCombo, m_checked,
-            [&showPopup]() {
-                showPopup = true;
+//         drawUI(m_text, m_sliderValue, m_sliderValue1, m_radioChoice, m_radioChoice1, m_selectedCombo, m_checked,
+//             [&showPopup]() {
+//                 showPopup = true;
+//             }).show();
+
+//         if (showPopup)
+//         {
+//             ImGui::OpenPopup("Message");
+
+//             ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(FLT_MAX, FLT_MAX));
+//             if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+//             {
+// #ifdef USE_LOGGER
+//                 ImGui::TextUnformatted(Logger::instance().getAll().c_str());
+// #else
+//                 ImGui::Text("text: %s", m_text.c_str());
+//                 ImGui::Text("sliderValue: %.2f", m_sliderValue);
+//                 ImGui::Text("sliderValue1: %d", m_sliderValue1);
+//                 ImGui::Text("radioChoice: %d", m_radioChoice);
+//                 ImGui::Text("radioChoice1: %d", m_radioChoice1);
+//                 ImGui::Text("selectedCombo: %s", m_selectedCombo.c_str());
+//                 ImGui::Text("checked: %s", m_checked ? "true" : "false");
+// #endif
+//                 ImGui::Separator();
+
+//                 if (ImGui::Button("OK", ImVec2(120, 0)))
+//                 {
+//                     ImGui::CloseCurrentPopup();
+//                     showPopup = false;
+//                 }
+
+//                 ImGui::EndPopup();
+//             }
+//         }
+
+        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle,
+            [&showControlsPopup]() {
+                showControlsPopup = true;
             }).show();
 
-        if (showPopup)
+        if (showControlsPopup)
         {
-            ImGui::OpenPopup("Message");
+            ImGui::OpenPopup("Controls State");
 
-            ImGui::SetNextWindowSizeConstraints(ImVec2(600, 0), ImVec2(FLT_MAX, FLT_MAX));
-            if (ImGui::BeginPopupModal("Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(FLT_MAX, FLT_MAX));
+            if (ImGui::BeginPopupModal("Controls State", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
-#ifdef USE_LOGGER
-                ImGui::TextUnformatted(Logger::instance().getAll().c_str());
-#else
-                ImGui::Text("text: %s", m_text.c_str());
-                ImGui::Text("sliderValue: %.2f", m_sliderValue);
-                ImGui::Text("sliderValue1: %d", m_sliderValue1);
-                ImGui::Text("radioChoice: %d", m_radioChoice);
-                ImGui::Text("radioChoice1: %d", m_radioChoice1);
-                ImGui::Text("selectedCombo: %s", m_selectedCombo.c_str());
-                ImGui::Text("checked: %s", m_checked ? "true" : "false");
-#endif
+                ImGui::Text("multilineText: %s", m_multilineText.c_str());
+                ImGui::Text("password: %s", m_password.c_str());
+                ImGui::Text("spinInt: %d", m_spinInt);
+                ImGui::Text("spinFloat: %.2f", m_spinFloat);
+                ImGui::Text("date: %04d-%02d-%02d", m_date.year, m_date.month, m_date.day);
+                ImGui::Text("time: %02d:%02d:%02d", m_time.hour, m_time.minute, m_time.second);
                 ImGui::Separator();
 
                 if (ImGui::Button("OK", ImVec2(120, 0)))
                 {
                     ImGui::CloseCurrentPopup();
-                    showPopup = false;
+                    showControlsPopup = false;
                 }
 
                 ImGui::EndPopup();

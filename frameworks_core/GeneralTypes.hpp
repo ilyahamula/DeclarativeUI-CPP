@@ -28,6 +28,20 @@ struct Range
 	T step = T(1);
 };
 
+struct Date
+{
+	int year  = 2000;
+	int month = 1;    // 1-12
+	int day   = 1;    // 1-31
+};
+
+struct Time
+{
+	int hour   = 0;   // 0-23
+	int minute = 0;   // 0-59
+	int second = 0;   // 0-59
+};
+
 enum class Side : int
 {
 	Left   = 1 << 0,

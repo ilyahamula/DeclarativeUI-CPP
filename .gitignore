@@ -56,6 +56,9 @@ vgcore.*
 # ImGui
 imgui.ini
 
+# User images
+images/
+
 # Claude
 .claude/settings.json
 
