@@ -60,7 +60,7 @@ imgui.ini
 images/
 
 # Claude
-.claude/settings.json
+.claude/
 
 # Logs/temp
 *.log
