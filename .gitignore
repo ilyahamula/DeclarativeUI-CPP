@@ -61,6 +61,7 @@ images/
 
 # Claude
 .claude/
+.agents/
 
 # Logs/temp
 *.log

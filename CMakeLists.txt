@@ -10,6 +10,14 @@ project(DeclarativeUI VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Keep the root-level compile_commands.json symlink pointing at the active
+# backend build so VSCode IntelliSense highlights the correct #ifdef blocks.
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        "${CMAKE_BINARY_DIR}/compile_commands.json"
+        "${CMAKE_SOURCE_DIR}/compile_commands.json"
+)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -104,7 +112,18 @@ elseif(UI_FRAMEWORK STREQUAL "IMGUI")
     )
     target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
 
+    FetchContent_Declare(
+        stb
+        GIT_REPOSITORY https://github.com/nothings/stb.git
+        GIT_TAG master
+    )
+    FetchContent_GetProperties(stb)
+    if(NOT stb_POPULATED)
+        FetchContent_Populate(stb)
+    endif()
+
     target_link_libraries(DeclarativeUI PUBLIC imgui_lib)
+    target_include_directories(DeclarativeUI PRIVATE ${stb_SOURCE_DIR})
     target_compile_definitions(DeclarativeUI PUBLIC USE_IMGUI)
 
 else()
