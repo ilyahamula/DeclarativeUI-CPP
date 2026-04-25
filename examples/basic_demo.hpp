@@ -16,6 +16,7 @@ inline auto drawControlsUI(
     Date& date,
     Time& time,
     bool& toggle,
+    float& progress,
     std::function<void()> onCheckClick = []() {})
 {
     return Dialog {
@@ -46,6 +47,8 @@ inline auto drawControlsUI(
                     SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
                 }
             },
+            Separator{}
+                .withFlags(LayoutFlags().Expand()),
             HGroupBox { "Date & Time",
                 LayoutFlags().Border(Side::All, 5),
                 VStack {
@@ -58,11 +61,28 @@ inline auto drawControlsUI(
                 }
             },
             VGroupBox { "Preview",
-                Image{"images/h-9pCvkilUc.jpg"}
+                Image{"images/Cat03.jpg"}
                     .withSize({260, 160})
                     .withFlags(LayoutFlags().Expand())
                     .onClick([]() {})
                     .onHover([]() {})
+            },
+            VGroupBox { "Progress",
+                LayoutFlags().Border(Side::All, 5),
+                Separator{}
+                    .withFlags(LayoutFlags().Expand()),
+                HStack {
+                    StaticText{"Loading:"}
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    ProgressBar{progress}
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                },
+                HStack {
+                    StaticText{"Fixed 60%:"}
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    ProgressBar{0.6f}
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                }
             },
             HStack {
                 StaticText{""}

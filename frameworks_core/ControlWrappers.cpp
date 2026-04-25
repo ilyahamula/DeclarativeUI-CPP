@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/LayoutWrapper.hpp"
+#include <algorithm>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -13,6 +14,8 @@
 #include <wx/timectrl.h>
 #include <wx/dateevt.h>
 #include <wx/tglbtn.h>
+#include <wx/gauge.h>
+#include <wx/statline.h>
 
 // ButtonWrapper -----------------------------------------------------------
 
@@ -607,6 +610,45 @@ ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
 	m_nativeWidget = bmpCtrl;
 }
 
+// SeparatorWrapper -----------------------------------------------------------
+
+SeparatorWrapper::SeparatorWrapper(ControlWrapper* parent,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "SeparatorWrapper::SeparatorWrapper()\t-> new wxStaticLine()\n");
+#endif
+	auto* line = new wxStaticLine(parent->nativeHandle(), wxID_ANY,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxLI_HORIZONTAL);
+	m_nativeWidget = line;
+}
+
+// ProgressBarWrapper -----------------------------------------------------------
+
+ProgressBarWrapper::ProgressBarWrapper(ControlWrapper* parent, const float& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::ProgressBarWrapper()\t-> new wxGauge()\n");
+#endif
+	auto* gauge = new wxGauge(parent->nativeHandle(), wxID_ANY, 100,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxGA_HORIZONTAL | wxGA_SMOOTH);
+	gauge->SetValue(static_cast<int>(std::clamp(value, 0.0f, 1.0f) * 100));
+	m_nativeWidget = gauge;
+}
+
+ProgressBarWrapper::ProgressBarWrapper(ControlWrapper* parent, float& value,
+	const Position& pos, const Size& size, long style)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::ProgressBarWrapper()\t-> new wxGauge()\n");
+#endif
+	auto* gauge = new wxGauge(parent->nativeHandle(), wxID_ANY, 100,
+		wxPoint(pos.x, pos.y), wxSize(size.width, size.height), style | wxGA_HORIZONTAL | wxGA_SMOOTH);
+	gauge->SetValue(static_cast<int>(std::clamp(value, 0.0f, 1.0f) * 100));
+	m_nativeWidget = gauge;
+}
+
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
@@ -684,7 +726,6 @@ template class ComboBoxWrapper<int>;
 #elif defined(USE_IMGUI) // ----------------IMGUI IMPLEMENTATIONS----------------
 #include "imgui.h"
 #include "frameworks_core/ImGuiWidgetIdManager.hpp"
-#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1532,4 +1573,48 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// SeparatorWrapper -----------------------------------------------------------
+
+SeparatorWrapper::SeparatorWrapper(ControlWrapper* parent,
+	const Position& pos, const Size& size, long style)
+{
+}
+
+void SeparatorWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "SeparatorWrapper::createAndAdd()\t-> ImGui::Separator()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	ImGui::Separator();
+}
+
+// ProgressBarWrapper -----------------------------------------------------------
+
+ProgressBarWrapper::ProgressBarWrapper(ControlWrapper* parent, const float& value,
+	const Position& pos, const Size& size, long style)
+	: m_ownedValue(value)
+{
+}
+
+ProgressBarWrapper::ProgressBarWrapper(ControlWrapper* parent, float& value,
+	const Position& pos, const Size& size, long style)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+{
+}
+
+void ProgressBarWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::createAndAdd()\t-> ImGui::ProgressBar()\n");
+#endif
+	ControlWrapper::createAndAdd(parent, layout, flags);
+	float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	float width = flags.expand() ? -FLT_MIN : 0.0f;
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	ImGui::ProgressBar(std::clamp(value, 0.0f, 1.0f), ImVec2(width, 0.0f));
+	ImGui::PopID();
+}
 #endif

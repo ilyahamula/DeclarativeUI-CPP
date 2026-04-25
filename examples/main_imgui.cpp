@@ -40,6 +40,7 @@ int main(int argc, char** argv)
     Date m_date { .year = 2026, .month = 2, .day = 22 };
     Time m_time { .hour = 9, .minute = 30, .second = 0 };
     bool showControlsPopup = false;
+    float m_progress = 0.35f;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -84,7 +85,7 @@ int main(int argc, char** argv)
 //             }
 //         }
 
-        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle,
+        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle, m_progress,
             [&showControlsPopup]() {
                 showControlsPopup = true;
             }).show();

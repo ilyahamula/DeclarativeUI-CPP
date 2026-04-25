@@ -63,6 +63,9 @@ images/
 .claude/
 .agents/
 
+# Local docs
+docs/
+
 # Logs/temp
 *.log
 *.swp

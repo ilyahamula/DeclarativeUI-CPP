@@ -740,6 +740,59 @@ private:
 	std::function<void(bool)> m_onChange;
 };
 
+// Separator -----------------------------------------------------------
+struct Separator : Widget<Separator>
+{
+	using super = Widget<Separator>;
+
+	Separator() : super() {}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<SeparatorWrapper>(parent, pos, size, style);
+	}
+};
+
+// ProgressBar -----------------------------------------------------------
+struct ProgressBar : Widget<ProgressBar>
+{
+	using super = Widget<ProgressBar>;
+
+	explicit ProgressBar(const float& value)
+		: super()
+		, m_ownedValue(value)
+	{
+	}
+
+	explicit ProgressBar(float& value)
+		: super()
+		, m_ownedValue(value)
+		, m_externalRef(value)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		if (m_externalRef)
+			return std::make_unique<ProgressBarWrapper>(parent, m_externalRef->get(), pos, size, style);
+		return std::make_unique<ProgressBarWrapper>(parent, std::as_const(m_ownedValue), pos, size, style);
+	}
+
+private:
+	float m_ownedValue = 0.0f;
+	std::optional<std::reference_wrapper<float>> m_externalRef;
+};
+
 // Image -----------------------------------------------------------
 struct Image : Widget<Image>
 {
