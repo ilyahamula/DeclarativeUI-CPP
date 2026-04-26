@@ -17,6 +17,8 @@ inline auto drawControlsUI(
     Time& time,
     bool& toggle,
     float& progress,
+    std::string& tabNote,
+    bool& tabLogging,
     std::function<void()> onCheckClick = []() {})
 {
     return Dialog {
@@ -82,6 +84,30 @@ inline auto drawControlsUI(
                         .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
                     ProgressBar{0.6f}
                         .withFlags(LayoutFlags().Proportion(1).Expand())
+                }
+            },
+            TabPanel {
+                Tab { "Notes",
+                    VStack {
+                        LayoutFlags().Expand().Border(Side::All, 5),
+                        MultiLineTextCtrl{tabNote}
+                            .withFlags(LayoutFlags().Expand())
+                    }
+                },
+                Tab { "Settings",
+                    VStack {
+                        LayoutFlags().Border(Side::All, 5),
+                        CheckBox{tabLogging, "Enable logging"},
+                        Separator{}.withFlags(LayoutFlags().Expand()),
+                        StaticText{"More settings coming soon..."}
+                    }
+                },
+                Tab { "About",
+                    VStack {
+                        LayoutFlags().Border(Side::All, 5),
+                        StaticText{"DeclarativeUI-CPP"},
+                        StaticText{"A backend-agnostic declarative UI framework"}
+                    }
                 }
             },
             HStack {
