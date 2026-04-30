@@ -14,7 +14,7 @@
 #include <wx/panel.h>
 #elif defined(USE_IMGUI)
 #include "imgui.h"
-#include "frameworks_core/ImGuiWidgetIdManager.hpp"
+#include "frameworks_core/ImGuiHelpers/ImGuiWidgetIdManager.hpp"
 #endif
 
 template<typename T>

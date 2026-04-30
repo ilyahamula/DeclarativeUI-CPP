@@ -32,7 +32,7 @@ void GroupBoxWrapper::finilizeLayout()
 #elif defined(USE_QT)
 #elif defined(USE_IMGUI)
 #include "imgui.h"
-#include "frameworks_core/ImGuiWidgetIdManager.hpp"
+#include "frameworks_core/ImGuiHelpers/ImGuiWidgetIdManager.hpp"
 
 GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, const std::string& label)
 	: LayoutWrapper(orient)
