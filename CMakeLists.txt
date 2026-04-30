@@ -37,6 +37,7 @@ add_library(DeclarativeUI STATIC
     frameworks_core/GroupBoxWrapper.cpp
     frameworks_core/DialogWrapper.cpp
     frameworks_core/LayoutWrapper.cpp
+    frameworks_core/TabPanelWrapper.cpp
     logger/Logger.cpp
 )
 
