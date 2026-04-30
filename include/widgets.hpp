@@ -740,6 +740,48 @@ private:
 	std::function<void(bool)> m_onChange;
 };
 
+// ColorPicker -----------------------------------------------------------
+struct ColorPicker : Widget<ColorPicker>
+{
+	using super = Widget<ColorPicker>;
+
+	explicit ColorPicker(Color& value)
+		: super()
+		, m_ownedValue(value)
+		, m_externalRef(value)
+	{
+	}
+
+	explicit ColorPicker(const Color& value)
+		: super()
+		, m_ownedValue(value)
+	{
+	}
+
+	ColorPicker& onChange(std::function<void(const Color&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		ControlWrapper* parent,
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		if (m_externalRef)
+			return std::make_unique<ColorPickerWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<ColorPickerWrapper>(parent, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+	}
+
+private:
+	Color m_ownedValue;
+	std::optional<std::reference_wrapper<Color>> m_externalRef;
+	std::function<void(const Color&)> m_onChange;
+};
+
 // Separator -----------------------------------------------------------
 struct Separator : Widget<Separator>
 {

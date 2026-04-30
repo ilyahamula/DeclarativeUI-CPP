@@ -331,6 +331,26 @@ private:
 #endif
 };
 
+// ColorPickerWrapper -----------------------------------------------------------
+class ColorPickerWrapper : public ControlWrapper
+{
+public:
+	ColorPickerWrapper(ControlWrapper* parent, Color& value,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const Color&)> onChange = {});
+	ColorPickerWrapper(ControlWrapper* parent, const Color& value,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const Color&)> onChange = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	Color m_ownedValue;
+	std::optional<std::reference_wrapper<Color>> m_externalRef;
+	std::function<void(const Color&)> m_onChange;
+#endif
+};
+
 // SeparatorWrapper -----------------------------------------------------------
 class SeparatorWrapper : public ControlWrapper
 {
