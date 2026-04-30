@@ -16,53 +16,110 @@ inline auto drawControlsUI(
     Date& date,
     Time& time,
     bool& toggle,
+    float& progress,
+    std::string& tabNote,
+    bool& tabLogging,
+    Color& themeColor,
     std::function<void()> onCheckClick = []() {})
 {
     return Dialog {
         "Controls Demo",
         VStack {
             LayoutFlags().Expand().Border(Side::All, 10),
-            VGroupBox { "Text Input",
-                MultiLineTextCtrl{multilineText}
-                    .withFlags(LayoutFlags().Expand()),
-                HStack {
-                    StaticText{"Password:"}
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
-                    PasswordInput{password}
-                        .withFlags(LayoutFlags().Proportion(1).Expand())
-                },
-                LinkText{"Visit documentation"}
-                    .withFlags(LayoutFlags().Border(Side::Top, 5))
-                    .onClick([]() {})
-            },
-            HGroupBox { "Numeric Values",
-                LayoutFlags().Border(Side::All, 5),
+            HStack {
+                // Left column
                 VStack {
-                    StaticText{"Integer"},
-                    SpinBox { { .min = 0, .max = 100 }, spinInt }
+                    VGroupBox { "Text Input",
+                        MultiLineTextCtrl{multilineText}
+                            .withFlags(LayoutFlags().Expand()),
+                        HStack {
+                            StaticText{"Password:"}
+                                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
+                            PasswordInput{password}
+                                .withFlags(LayoutFlags().Proportion(1).Expand())
+                        },
+                        LinkText{"Visit documentation"}
+                            .withFlags(LayoutFlags().Border(Side::Top, 5))
+                            .onClick([]() {})
+                    },
+                    HGroupBox { "Numeric Values",
+                        LayoutFlags().Border(Side::Top, 8),
+                        VStack {
+                            StaticText{"Integer"},
+                            SpinBox { { .min = 0, .max = 100 }, spinInt }
+                        },
+                        VStack {
+                            StaticText{"Float"},
+                            SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
+                        }
+                    },
+                    HGroupBox { "Date & Time",
+                        LayoutFlags().Border(Side::Top, 8),
+                        VStack {
+                            StaticText{"Date"},
+                            DatePicker{date}
+                        },
+                        VStack {
+                            StaticText{"Time"},
+                            TimePicker{time}
+                        }
+                    }
                 },
+                // Right column
                 VStack {
-                    StaticText{"Float"},
-                    SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
+                    LayoutFlags().Border(Side::Left, 12),
+                    VGroupBox { "Preview",
+                        Image{"images/Cat03.jpg"}
+                            .withSize({260, 160})
+                            .withFlags(LayoutFlags().Expand())
+                            .onClick([]() {})
+                            .onHover([]() {})
+                    },
+                    VGroupBox { "Progress",
+                        LayoutFlags().Border(Side::Top, 8),
+                        HStack {
+                            StaticText{"Loading:"}
+                                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                            ProgressBar{progress}
+                                .withFlags(LayoutFlags().Proportion(1).Expand())
+                        },
+                        HStack {
+                            StaticText{"Fixed 60%:"}
+                                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                            ProgressBar{0.6f}
+                                .withFlags(LayoutFlags().Proportion(1).Expand())
+                        }
+                    },
+                    TabPanel {
+                        Tab { "Notes",
+                            VStack {
+                                LayoutFlags().Expand().Border(Side::All, 5),
+                                MultiLineTextCtrl{tabNote}
+                                    .withFlags(LayoutFlags().Expand())
+                            }
+                        },
+                        Tab { "Settings",
+                            VStack {
+                                LayoutFlags().Border(Side::All, 5),
+                                CheckBox{tabLogging, "Enable logging"},
+                                Separator{}.withFlags(LayoutFlags().Expand()),
+                                HStack {
+                                    StaticText{"Theme color:"}
+                                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                                    ColorPicker{themeColor}
+                                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                                }
+                            }
+                        },
+                        Tab { "About",
+                            VStack {
+                                LayoutFlags().Border(Side::All, 5),
+                                StaticText{"DeclarativeUI-CPP"},
+                                StaticText{"A backend-agnostic declarative UI framework"}
+                            }
+                        }
+                    }
                 }
-            },
-            HGroupBox { "Date & Time",
-                LayoutFlags().Border(Side::All, 5),
-                VStack {
-                    StaticText{"Date"},
-                    DatePicker{date}
-                },
-                VStack {
-                    StaticText{"Time"},
-                    TimePicker{time}
-                }
-            },
-            VGroupBox { "Preview",
-                Image{"images/h-9pCvkilUc.jpg"}
-                    .withSize({260, 160})
-                    .withFlags(LayoutFlags().Expand())
-                    .onClick([]() {})
-                    .onHover([]() {})
             },
             HStack {
                 StaticText{""}
@@ -71,7 +128,7 @@ inline auto drawControlsUI(
                     .withFlags(LayoutFlags().CenterVertical())
                     .onClick(std::move(onCheckClick)),
                 ToggleButton{toggle, "Toggle me!"}
-                    .withFlags(LayoutFlags().Border(Side::Top, 5))
+                    .withFlags(LayoutFlags().Border(Side::Left, 8).CenterVertical())
                     .onChange([](bool newValue) {
 
                 })

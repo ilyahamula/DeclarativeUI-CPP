@@ -18,6 +18,10 @@ class DeclarativeApp : public wxApp
     float m_spinFloat = 1.5f;
     Date m_date { .year = 2026, .month = 2, .day = 22 };
     Time m_time { .hour = 9, .minute = 30, .second = 0 };
+    float m_progress = 0.35f;
+    std::string m_tabNote = "Add notes here...";
+    bool m_tabLogging = false;
+    Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
 public:
     bool OnInit() override
@@ -39,7 +43,7 @@ public:
 //         }).show();
 
         drawControlsUI(m_multilineText, m_password, m_spinInt,
-            m_spinFloat, m_date, m_time, m_toggle, [this]() {
+            m_spinFloat, m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging, m_themeColor, [this]() {
             wxMessageBox(
                 "multilineText: " + m_multilineText + "\n"
                 "password: " + m_password + "\n"

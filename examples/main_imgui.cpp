@@ -40,6 +40,10 @@ int main(int argc, char** argv)
     Date m_date { .year = 2026, .month = 2, .day = 22 };
     Time m_time { .hour = 9, .minute = 30, .second = 0 };
     bool showControlsPopup = false;
+    float m_progress = 0.35f;
+    std::string m_tabNote = "Add notes here...";
+    bool m_tabLogging = false;
+    Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
     while (!glfwWindowShouldClose(window))
     {
@@ -84,7 +88,7 @@ int main(int argc, char** argv)
 //             }
 //         }
 
-        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle,
+        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging, m_themeColor,
             [&showControlsPopup]() {
                 showControlsPopup = true;
             }).show();

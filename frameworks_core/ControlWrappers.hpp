@@ -331,6 +331,55 @@ private:
 #endif
 };
 
+// ColorPickerWrapper -----------------------------------------------------------
+class ColorPickerWrapper : public ControlWrapper
+{
+public:
+	ColorPickerWrapper(ControlWrapper* parent, Color& value,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const Color&)> onChange = {});
+	ColorPickerWrapper(ControlWrapper* parent, const Color& value,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const Color&)> onChange = {});
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	Color m_ownedValue;
+	std::optional<std::reference_wrapper<Color>> m_externalRef;
+	std::function<void(const Color&)> m_onChange;
+#endif
+};
+
+// SeparatorWrapper -----------------------------------------------------------
+class SeparatorWrapper : public ControlWrapper
+{
+public:
+	SeparatorWrapper(ControlWrapper* parent,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#endif
+};
+
+// ProgressBarWrapper -----------------------------------------------------------
+class ProgressBarWrapper : public ControlWrapper
+{
+public:
+	ProgressBarWrapper(ControlWrapper* parent, const float& value,
+		const Position& pos, const Size& size, long style);
+	ProgressBarWrapper(ControlWrapper* parent, float& value,
+		const Position& pos, const Size& size, long style);
+
+#ifdef USE_IMGUI
+	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+private:
+	float m_ownedValue;
+	std::optional<std::reference_wrapper<float>> m_externalRef;
+#endif
+};
+
 // ComboBoxWrapper -----------------------------------------------------------
 template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper

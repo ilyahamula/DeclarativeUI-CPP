@@ -42,6 +42,14 @@ struct Time
 	int second = 0;   // 0-59
 };
 
+struct Color
+{
+	float r = 0.0f;   // 0.0–1.0
+	float g = 0.0f;
+	float b = 0.0f;
+	float a = 1.0f;
+};
+
 enum class Side : int
 {
 	Left   = 1 << 0,

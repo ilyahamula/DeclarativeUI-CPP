@@ -61,6 +61,10 @@ images/
 
 # Claude
 .claude/
+.agents/
+
+# Local docs
+docs/
 
 # Logs/temp
 *.log
