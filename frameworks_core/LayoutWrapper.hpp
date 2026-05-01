@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GeneralTypes.hpp"
+#include "frameworks_core/CoreTypes/GeneralTypes.hpp"
 
 #include <string>
 #include <vector>

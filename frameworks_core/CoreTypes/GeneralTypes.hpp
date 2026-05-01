@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Concepts.hpp"
+#include "frameworks_core/CoreTypes/Concepts.hpp"
 
 enum class Orientation
 {
