@@ -30,15 +30,9 @@ option(BUILD_EXAMPLES "Build examples" ON)
 
 # ── Core library ─────────────────────────────────────────────────────────────
 
-add_library(DeclarativeUI STATIC
-    frameworks_core/LayoutFlags.cpp
-    frameworks_core/ControlWrapper.cpp
-    frameworks_core/ControlWrappers.cpp
-    frameworks_core/GroupBoxWrapper.cpp
-    frameworks_core/DialogWrapper.cpp
-    frameworks_core/LayoutWrapper.cpp
-    logger/Logger.cpp
-)
+add_library(DeclarativeUI STATIC)
+add_subdirectory(frameworks_core)
+add_subdirectory(logger)
 
 # include/ holds the public API headers; root exposes frameworks_core/ and logger/
 target_include_directories(DeclarativeUI PUBLIC

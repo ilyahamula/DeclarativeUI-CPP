@@ -770,7 +770,7 @@ template class ComboBoxWrapper<int>;
 // Implementations for Qt would go here, following a similar pattern to the wxWidgets implementations but using Qt's widget classes and signal/slot mechanism.
 #elif defined(USE_IMGUI) // ----------------IMGUI IMPLEMENTATIONS----------------
 #include "imgui.h"
-#include "frameworks_core/ImGuiWidgetIdManager.hpp"
+#include "frameworks_core/ImGuiHelpers/ImGuiWidgetIdManager.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
