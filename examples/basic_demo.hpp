@@ -20,7 +20,8 @@ inline auto drawControlsUI(
     std::string& tabNote,
     bool& tabLogging,
     Color& themeColor,
-    std::function<void()> onCheckClick = []() {})
+    std::function<void()> onCheckClick = []() {},
+    std::function<void()> onMessageBoxClick = []() {})
 {
     return Dialog {
         "Controls Demo",
@@ -127,6 +128,9 @@ inline auto drawControlsUI(
                 Button{"Check"}
                     .withFlags(LayoutFlags().CenterVertical())
                     .onClick(std::move(onCheckClick)),
+                Button{"MessageBox"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 8).CenterVertical())
+                    .onClick(std::move(onMessageBoxClick)),
                 ToggleButton{toggle, "Toggle me!"}
                     .withFlags(LayoutFlags().Border(Side::Left, 8).CenterVertical())
                     .onChange([](bool newValue) {

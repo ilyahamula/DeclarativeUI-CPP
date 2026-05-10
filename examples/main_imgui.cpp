@@ -40,6 +40,7 @@ int main(int argc, char** argv)
     Date m_date { .year = 2026, .month = 2, .day = 22 };
     Time m_time { .hour = 9, .minute = 30, .second = 0 };
     bool showControlsPopup = false;
+    bool showMessageBoxPopup = false;
     float m_progress = 0.35f;
     std::string m_tabNote = "Add notes here...";
     bool m_tabLogging = false;
@@ -91,32 +92,29 @@ int main(int argc, char** argv)
         drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat, m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging, m_themeColor,
             [&showControlsPopup]() {
                 showControlsPopup = true;
+            },
+            [&showMessageBoxPopup]() {
+                showMessageBoxPopup = true;
             }).show();
 
-        if (showControlsPopup)
         {
-            ImGui::OpenPopup("Controls State");
-
-            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(FLT_MAX, FLT_MAX));
-            if (ImGui::BeginPopupModal("Controls State", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-            {
-                ImGui::Text("multilineText: %s", m_multilineText.c_str());
-                ImGui::Text("password: %s", m_password.c_str());
-                ImGui::Text("spinInt: %d", m_spinInt);
-                ImGui::Text("spinFloat: %.2f", m_spinFloat);
-                ImGui::Text("date: %04d-%02d-%02d", m_date.year, m_date.month, m_date.day);
-                ImGui::Text("time: %02d:%02d:%02d", m_time.hour, m_time.minute, m_time.second);
-                ImGui::Separator();
-
-                if (ImGui::Button("OK", ImVec2(120, 0)))
-                {
-                    ImGui::CloseCurrentPopup();
-                    showControlsPopup = false;
-                }
-
-                ImGui::EndPopup();
-            }
+            char msgBuf[512];
+            std::snprintf(msgBuf, sizeof(msgBuf),
+                "multilineText: %s\npassword: %s\nspinInt: %d\nspinFloat: %.2f\n"
+                "date: %04d-%02d-%02d\ntime: %02d:%02d:%02d",
+                m_multilineText.c_str(), m_password.c_str(), m_spinInt, m_spinFloat,
+                m_date.year, m_date.month, m_date.day,
+                m_time.hour, m_time.minute, m_time.second);
+            MessageBox("Controls State", msgBuf)
+                .withStyle(MessageBoxStyle::Info)
+                .withButtons(MessageBoxButtons::OK)
+                .show(showControlsPopup);
         }
+
+        MessageBox("Question", "Do you like this framework?")
+            .withStyle(MessageBoxStyle::Question)
+            .withButtons(MessageBoxButtons::YesNo)
+            .show(showMessageBoxPopup);
 
         ImGui::Render();
         int display_w, display_h;

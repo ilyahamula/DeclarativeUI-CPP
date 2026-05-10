@@ -68,3 +68,9 @@ constexpr bool operator&(Side lhs, Side rhs)
 {
 	return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
 }
+
+enum class MessageBoxStyle { Info, Warning, Error, Question };
+
+enum class MessageBoxButtons { OK, OKCancel, YesNo, YesNoCancel };
+
+enum class MessageBoxResult { OK, Cancel, Yes, No };

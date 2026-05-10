@@ -6,4 +6,5 @@ target_sources(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/DialogWrapper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LayoutWrapper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TabPanelWrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MessageBoxWrapper.cpp
 )
