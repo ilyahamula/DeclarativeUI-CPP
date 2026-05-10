@@ -44,7 +44,7 @@ public:
 
         drawControlsUI(m_multilineText, m_password, m_spinInt,
             m_spinFloat, m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging, m_themeColor, [this]() {
-            wxMessageBox(
+            MessageBox("Controls State",
                 "multilineText: " + m_multilineText + "\n"
                 "password: " + m_password + "\n"
                 "spinInt: " + std::to_string(m_spinInt) + "\n"
@@ -54,8 +54,16 @@ public:
                          + std::to_string(m_date.day) + "\n"
                 "time: " + std::to_string(m_time.hour) + ":"
                          + std::to_string(m_time.minute) + ":"
-                         + std::to_string(m_time.second),
-                "Controls State", wxOK | wxICON_INFORMATION);
+                         + std::to_string(m_time.second))
+                .withStyle(MessageBoxStyle::Info)
+                .withButtons(MessageBoxButtons::OK)
+                .show();
+        },
+        [this]() {
+            MessageBox("Question", "Do you like this framework?")
+                .withStyle(MessageBoxStyle::Question)
+                .withButtons(MessageBoxButtons::YesNo)
+                .show();
         }).show();
 
         return true;

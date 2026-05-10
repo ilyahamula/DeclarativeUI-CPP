@@ -5,6 +5,7 @@
 #include "groupboxes.hpp"
 #include "dialog.hpp"
 #include "tabpanel.hpp"
+#include "messagebox.hpp"
 
 static_assert(CreateAndAddable<Button>);
 static_assert(CreateAndAddable<TextCtrl>);
