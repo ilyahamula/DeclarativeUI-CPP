@@ -25,7 +25,7 @@ public:
 
 protected:
 	wxWindow* m_nativeWidget = nullptr;
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
+//#elif defined(USE_QT)
+//#elif defined(USE_IMGUI)
 #endif
 };
