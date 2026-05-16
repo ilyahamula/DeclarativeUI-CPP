@@ -12,3 +12,8 @@ static_assert(CreateAndAddable<TextCtrl>);
 static_assert(CreateAndAddable<StaticText>);
 static_assert(CreateAndAddable<HStack<Button, TextCtrl>>);
 static_assert(CreateAndAddable<VStack<StaticText, Button>>);
+
+static_assert(TabContent<VStack<Button>>);
+static_assert(IsTab<Tab<VStack<Button>>>);
+static_assert(CreateAndAddable<TabPanel<Tab<VStack<Button>>>>);
+static_assert(FittableLayout<TabPanel<Tab<VStack<Button>>>>);

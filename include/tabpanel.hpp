@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <tuple>
+#include <type_traits>
 
 #include "create_and_add.hpp"
 #include "fittable_layout.hpp"
@@ -16,34 +18,53 @@ concept TabContent = CreateAndAddable<T> && FittableLayout<T>;
 template<TabContent W>
 struct Tab
 {
-	std::string m_label;
-	W m_content;
-
 	Tab(const std::string& label, W content)
 		: m_label(label)
 		, m_content(std::move(content))
 	{}
+
+	const std::string& label() const { return m_label; }
+	W& content() { return m_content; }
+
+private:
+	std::string m_label;
+	W m_content;
 };
 
 template<TabContent W>
 Tab(const std::string&, W) -> Tab<W>;
 
 // ---------------------------------------------------------------------------
+// IsTab concept
+// ---------------------------------------------------------------------------
+template<typename T>
+struct is_tab : std::false_type {};
+
+template<TabContent W>
+struct is_tab<Tab<W>> : std::true_type {};
+
+template<typename T>
+concept IsTab = is_tab<T>::value;
+
+// ---------------------------------------------------------------------------
 // TabPanel — holds a set of Tab<W> instances
 // ---------------------------------------------------------------------------
-template<typename... Tabs>
+template<IsTab... Tabs>
 struct TabPanel
 {
-	std::tuple<Tabs...> m_tabs;
-
 	explicit TabPanel(Tabs... tabs)
 		: m_tabs(std::make_tuple(std::move(tabs)...))
+	{}
+
+	TabPanel(LayoutFlags flags, Tabs... tabs)
+		: m_flags(flags)
+		, m_tabs(std::make_tuple(std::move(tabs)...))
 	{}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags flags)
 	{
 		TabPanelWrapper wrapper(parent);
-		wrapper.addToLayout(parentLayout, flags);
+		wrapper.addToLayout(parentLayout, m_flags.value_or(flags));
 		addTabs(wrapper);
 		wrapper.finalize();
 	}
@@ -57,13 +78,16 @@ struct TabPanel
 	}
 
 private:
+	std::optional<LayoutFlags> m_flags;
+	std::tuple<Tabs...> m_tabs;
+
 	void addTabs(TabPanelWrapper& wrapper)
 	{
 		std::apply([&](auto&... tab) {
 			([&] {
-				if (wrapper.beginTab(tab.m_label))
+				if (wrapper.beginTab(tab.label()))
 				{
-					tab.m_content.fitTo(wrapper.tabPageParent());
+					tab.content().fitTo(wrapper.tabPageParent());
 					wrapper.endTab();
 				}
 			}(), ...);
