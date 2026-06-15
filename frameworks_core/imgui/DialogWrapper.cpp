@@ -14,7 +14,12 @@ DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 #ifdef USE_LOGGER
 	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
 #endif
-	ImGui::Begin(title.c_str());
+	ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+	if (size.width > 0 && size.height > 0)
+		ImGui::SetNextWindowSize(ImVec2((float)size.width, (float)size.height), ImGuiCond_FirstUseEver);
+	else
+		flags |= ImGuiWindowFlags_AlwaysAutoResize;
+	ImGui::Begin(title.c_str(), nullptr, flags);
 }
 
 void DialogWrapper::show()
