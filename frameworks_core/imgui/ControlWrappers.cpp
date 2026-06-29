@@ -26,11 +26,24 @@
 
 // ButtonWrapper -----------------------------------------------------------
 
+void ButtonWrapper::createNativeObject(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style)
+{
+}
+
 ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
 	: m_label(label.empty() ? "##button" : label)
 	, m_onClick(std::move(onClick))
+{
+}
+
+ButtonWrapper::ButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	std::function<void(void*)> onClick)
+	: m_label(label.empty() ? "##button" : label)
+	, m_onClickWithWidget(std::move(onClick))
 {
 }
 
@@ -45,11 +58,18 @@ void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, 
 	{
 		if (m_onClick)
 			m_onClick();
+		else if (m_onClickWithWidget)
+			m_onClickWithWidget(m_nativeWidget);
 	}
 	ImGui::PopID();
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
+
+void TextCtrlWrapper::createNativeObject(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style,
@@ -65,6 +85,23 @@ TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& init
 	std::function<void(const std::string&)> onChange)
 	: m_ownedValue(initialValue)
 	, m_onChange(std::move(onChange))
+{
+}
+
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+TextCtrlWrapper::TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -86,11 +123,18 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
 
 // PasswordInputWrapper -----------------------------------------------------------
+
+void PasswordInputWrapper::createNativeObject(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style,
@@ -106,6 +150,23 @@ PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, const std::st
 	std::function<void(const std::string&)> onChange)
 	: m_ownedValue(initialValue)
 	, m_onChange(std::move(onChange))
+{
+}
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, std::string& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+PasswordInputWrapper::PasswordInputWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -127,11 +188,18 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
+
+void MultiLineTextCtrlWrapper::createNativeObject(ControlWrapper* parent, const std::string& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
 	const Position& pos, const Size& size, long style,
@@ -147,6 +215,23 @@ MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, const
 	std::function<void(const std::string&)> onChange)
 	: m_ownedValue(initialValue)
 	, m_onChange(std::move(onChange))
+{
+}
+
+MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+MultiLineTextCtrlWrapper::MultiLineTextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const std::string&, void*)> onChange)
+	: m_ownedValue(initialValue)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -168,6 +253,8 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -195,11 +282,24 @@ void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper
 
 // ClickableTextWrapper -----------------------------------------------------------
 
+void ClickableTextWrapper::createNativeObject(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style)
+{
+}
+
 ClickableTextWrapper::ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
 	: m_text(text.empty() ? "##clickable" : text)
 	, m_onClick(std::move(onClick))
+{
+}
+
+ClickableTextWrapper::ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void(void*)> onClick)
+	: m_text(text.empty() ? "##clickable" : text)
+	, m_onClickWithWidget(std::move(onClick))
 {
 }
 
@@ -214,17 +314,32 @@ void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 	{
 		if (m_onClick)
 			m_onClick();
+		else if (m_onClickWithWidget)
+			m_onClickWithWidget(m_nativeWidget);
 	}
 	ImGui::PopID();
 }
 
 // LinkTextWrapper -----------------------------------------------------------
 
+void LinkTextWrapper::createNativeObject(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style)
+{
+}
+
 LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text,
 	const Position& pos, const Size& size, long style,
 	std::function<void()> onClick)
 	: m_text(text.empty() ? "##link" : text)
 	, m_onClick(std::move(onClick))
+{
+}
+
+LinkTextWrapper::LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+	const Position& pos, const Size& size, long style,
+	std::function<void(void*)> onClick)
+	: m_text(text.empty() ? "##link" : text)
+	, m_onClickWithWidget(std::move(onClick))
 {
 }
 
@@ -239,8 +354,13 @@ void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	bool clicked = ImGui::Selectable(m_text.c_str());
 	ImGui::PopStyleColor();
 	ImGui::PopID();
-	if (clicked && m_onClick)
-		m_onClick();
+	if (clicked)
+	{
+		if (m_onClick)
+			m_onClick();
+		else if (m_onClickWithWidget)
+			m_onClickWithWidget(m_nativeWidget);
+	}
 }
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -262,6 +382,11 @@ void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 
 // DatePickerWrapper -----------------------------------------------------------
 
+void DatePickerWrapper::createNativeObject(ControlWrapper* parent, const Date& value,
+	const Position& pos, const Size& size, long style)
+{
+}
+
 DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
 	const Position& pos, const Size& size, long style,
 	std::function<void(const Date&)> onChange)
@@ -276,6 +401,23 @@ DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, const Date& value,
 	std::function<void(const Date&)> onChange)
 	: m_ownedValue(value)
 	, m_onChange(std::move(onChange))
+{
+}
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, Date& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+DatePickerWrapper::DatePickerWrapper(ControlWrapper* parent, const Date& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Date&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -312,10 +454,17 @@ void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 }
 
 // TimePickerWrapper -----------------------------------------------------------
+
+void TimePickerWrapper::createNativeObject(ControlWrapper* parent, const Time& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
 	const Position& pos, const Size& size, long style,
@@ -331,6 +480,23 @@ TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, const Time& value,
 	std::function<void(const Time&)> onChange)
 	: m_ownedValue(value)
 	, m_onChange(std::move(onChange))
+{
+}
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, Time& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+TimePickerWrapper::TimePickerWrapper(ControlWrapper* parent, const Time& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Time&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -369,10 +535,18 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 }
 
 // SliderWrapper -----------------------------------------------------------
+
+template <SliderValue T>
+void SliderWrapper<T>::createNativeObject(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 template <SliderValue T>
 SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
@@ -392,6 +566,27 @@ SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, const T&
 	: m_range(range)
 	, m_ownedValue(value)
 	, m_onChange(std::move(onChange))
+{
+}
+
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+template <SliderValue T>
+SliderWrapper<T>::SliderWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -426,6 +621,8 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 }
 
@@ -433,6 +630,12 @@ template class SliderWrapper<int>;
 template class SliderWrapper<float>;
 
 // SpinBoxWrapper -----------------------------------------------------------
+
+template <SpinBoxValue T>
+void SpinBoxWrapper<T>::createNativeObject(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 template <SpinBoxValue T>
 SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
@@ -452,6 +655,27 @@ SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const 
 	: m_range(range)
 	, m_ownedValue(value)
 	, m_onChange(std::move(onChange))
+{
+}
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+template <SpinBoxValue T>
+SpinBoxWrapper<T>::SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_range(range)
+	, m_ownedValue(value)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -510,6 +734,8 @@ void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 }
 
@@ -517,6 +743,13 @@ template class SpinBoxWrapper<int>;
 template class SpinBoxWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
+
+template <RadioButtonValue T>
+int RadioButtonWrapper<T>::createNativeObject(ControlWrapper* parent, const std::string& label,
+	const T& value, const Position& pos, const Size& size, long style, bool standalone)
+{
+	return 0;
+}
 
 template <RadioButtonValue T>
 RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
@@ -558,6 +791,45 @@ RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::str
 }
 
 template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	T& value, const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_label(label.empty() ? "##radio" : label)
+	, m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+	if constexpr (std::is_same_v<T, int>)
+	{
+		if (&value != s_lastGroup)
+		{
+			s_radioButtonId = 0;
+			s_lastGroup = &value;
+		}
+		m_index = s_radioButtonId++;
+	}
+}
+
+template <RadioButtonValue T>
+RadioButtonWrapper<T>::RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const T& initialValue, const Position& pos, const Size& size, long style,
+	std::function<void(T, void*)> onChange)
+	: m_label(label.empty() ? "##radio" : label)
+	, m_ownedValue(initialValue)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+	if constexpr (std::is_same_v<T, int>)
+	{
+		if (&m_ownedValue != s_lastGroup)
+		{
+			s_radioButtonId = 0;
+			s_lastGroup = &m_ownedValue;
+		}
+		m_index = s_radioButtonId++;
+	}
+}
+
+template <RadioButtonValue T>
 void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
@@ -576,6 +848,8 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 				m_externalRef->get() = m_ownedValue;
 			if (m_onChange)
 				m_onChange(m_ownedValue);
+			else if (m_onChangeWithWidget)
+				m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 		}
 	}
 	else
@@ -586,6 +860,8 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 				m_externalRef->get() = m_ownedValue;
 			if (m_onChange)
 				m_onChange(m_ownedValue);
+			else if (m_onChangeWithWidget)
+				m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 		}
 	}
 	ImGui::PopID();
@@ -595,6 +871,11 @@ template class RadioButtonWrapper<bool>;
 template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
+
+void CheckBoxWrapper::createNativeObject(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style, const bool& checked)
+{
+}
 
 CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
 	const Position& pos, const Size& size, long style,
@@ -615,6 +896,25 @@ CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& labe
 {
 }
 
+CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	bool& checked, std::function<void(bool, void*)> onChange)
+	: m_label(label.empty() ? "##checkbox" : label)
+	, m_ownedValue(checked)
+	, m_externalRef(checked)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+CheckBoxWrapper::CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	const Position& pos, const Size& size, long style,
+	const bool& initialChecked, std::function<void(bool, void*)> onChange)
+	: m_label(label.empty() ? "##checkbox" : label)
+	, m_ownedValue(initialChecked)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
 void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
@@ -630,11 +930,18 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
 
 // ToggleButtonWrapper -----------------------------------------------------------
+
+void ToggleButtonWrapper::createNativeObject(ControlWrapper* parent, const std::string& label,
+	const bool& toggled, const Position& pos, const Size& size, long style)
+{
+}
 
 ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
 	bool& toggled, const Position& pos, const Size& size, long style,
@@ -652,6 +959,25 @@ ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::stri
 	: m_label(label.empty() ? "##toggle" : label)
 	, m_ownedValue(initialToggled)
 	, m_onChange(std::move(onChange))
+{
+}
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	bool& toggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool, void*)> onChange)
+	: m_label(label.empty() ? "##toggle" : label)
+	, m_ownedValue(toggled)
+	, m_externalRef(toggled)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+ToggleButtonWrapper::ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	const bool& initialToggled, const Position& pos, const Size& size, long style,
+	std::function<void(bool, void*)> onChange)
+	: m_label(label.empty() ? "##toggle" : label)
+	, m_ownedValue(initialToggled)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -677,6 +1003,8 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	if (wasToggled)
 		ImGui::PopStyleColor(2);
@@ -684,6 +1012,11 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 }
 
 // ImageWrapper -----------------------------------------------------------
+
+void ImageWrapper::createNativeObject(ControlWrapper* parent, const std::string& filePath,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
 	const Position& pos, const Size& size, long style,
@@ -694,6 +1027,18 @@ ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
 	, m_displayHeight(size.height)
 	, m_onClick(std::move(onClick))
 	, m_onHover(std::move(onHover))
+{
+}
+
+ImageWrapper::ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+	const Position& pos, const Size& size, long style,
+	std::function<void(void*)> onClick,
+	std::function<void(void*)> onHover)
+	: m_filePath(filePath)
+	, m_displayWidth(size.width)
+	, m_displayHeight(size.height)
+	, m_onClickWithWidget(std::move(onClick))
+	, m_onHoverWithWidget(std::move(onHover))
 {
 }
 
@@ -727,10 +1072,20 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 		const float w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
 		const float h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
 		ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)), ImVec2(w, h));
-		if (m_onHover && ImGui::IsItemHovered())
-			m_onHover();
-		if (m_onClick && ImGui::IsItemClicked())
-			m_onClick();
+		if (ImGui::IsItemHovered())
+		{
+			if (m_onHover)
+				m_onHover();
+			else if (m_onHoverWithWidget)
+				m_onHoverWithWidget(m_nativeWidget);
+		}
+		if (ImGui::IsItemClicked())
+		{
+			if (m_onClick)
+				m_onClick();
+			else if (m_onClickWithWidget)
+				m_onClickWithWidget(m_nativeWidget);
+		}
 	}
 	else
 	{
@@ -740,6 +1095,12 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
+
+template <ComboBoxValue T>
+void ComboBoxWrapper<T>::createNativeObject(ControlWrapper* parent, const std::vector<std::string>& choices,
+	const T& selected, const Position& pos, const Size& size, long style)
+{
+}
 
 template <ComboBoxValue T>
 ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
@@ -805,6 +1166,69 @@ ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::str
 }
 
 template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&, void*)> onChange)
+	: m_choices(std::move(choices))
+	, m_ownedSelected(selected)
+	, m_externalRef(selected)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+	for (const auto& c : m_choices)
+	{
+		m_items += c;
+		m_items += '\0';
+	}
+
+	if constexpr (std::is_same_v<T, int>)
+	{
+		m_currentItem = selected;
+	}
+	else
+	{
+		for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+		{
+			if (m_choices[i] == selected)
+			{
+				m_currentItem = i;
+				break;
+			}
+		}
+	}
+}
+
+template <ComboBoxValue T>
+ComboBoxWrapper<T>::ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	const T& selected, const Position& pos, const Size& size, long style,
+	std::function<void(const T&, void*)> onChange)
+	: m_choices(std::move(choices))
+	, m_ownedSelected(selected)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+	for (const auto& c : m_choices)
+	{
+		m_items += c;
+		m_items += '\0';
+	}
+
+	if constexpr (std::is_same_v<T, int>)
+	{
+		m_currentItem = selected;
+	}
+	else
+	{
+		for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+		{
+			if (m_choices[i] == selected)
+			{
+				m_currentItem = i;
+				break;
+			}
+		}
+	}
+}
+
+template <ComboBoxValue T>
 void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 #ifdef USE_LOGGER
@@ -842,6 +1266,8 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 			m_externalRef->get() = m_ownedSelected;
 		if (m_onChange)
 			m_onChange(m_ownedSelected);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedSelected, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -850,6 +1276,11 @@ template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
 // ColorPickerWrapper -----------------------------------------------------------
+
+void ColorPickerWrapper::createNativeObject(ControlWrapper* parent, const Color& value,
+	const Position& pos, const Size& size, long style)
+{
+}
 
 ColorPickerWrapper::ColorPickerWrapper(ControlWrapper* parent, Color& value,
 	const Position& pos, const Size& size, long style,
@@ -865,6 +1296,23 @@ ColorPickerWrapper::ColorPickerWrapper(ControlWrapper* parent, const Color& valu
 	std::function<void(const Color&)> onChange)
 	: m_ownedValue(value)
 	, m_onChange(std::move(onChange))
+{
+}
+
+ColorPickerWrapper::ColorPickerWrapper(ControlWrapper* parent, Color& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Color&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_externalRef(value)
+	, m_onChangeWithWidget(std::move(onChange))
+{
+}
+
+ColorPickerWrapper::ColorPickerWrapper(ControlWrapper* parent, const Color& value,
+	const Position& pos, const Size& size, long style,
+	std::function<void(const Color&, void*)> onChange)
+	: m_ownedValue(value)
+	, m_onChangeWithWidget(std::move(onChange))
 {
 }
 
@@ -886,6 +1334,8 @@ void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
 			m_onChange(m_ownedValue);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
 }
