@@ -2,7 +2,7 @@
 
 TabPanelWrapper::TabPanelWrapper(ControlWrapper* parent)
 {
-	m_notebook = new wxNotebook(parent->nativeHandle(), wxID_ANY);
+	m_notebook = new wxNotebook(reinterpret_cast<wxWindow*>(parent->nativeHandle()), wxID_ANY);
 }
 
 void TabPanelWrapper::addToLayout(LayoutWrapper* parentLayout, LayoutFlags flags)

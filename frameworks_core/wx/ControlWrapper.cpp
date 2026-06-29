@@ -5,17 +5,17 @@ ControlWrapper::ControlWrapper() = default;
 
 ControlWrapper::~ControlWrapper() = default;
 
+ControlWrapper::ControlWrapper(void* widget)
+	: m_nativeWidget(widget)
+{
+}
+
 void ControlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 {
 	layout->add(this, flags);
 }
 
-ControlWrapper::ControlWrapper(wxWindow* window)
-	: m_nativeWidget(window)
-{
-}
-
-wxWindow* ControlWrapper::nativeHandle() const
+void* ControlWrapper::nativeHandle() const
 {
 	return m_nativeWidget;
 }
@@ -23,5 +23,5 @@ wxWindow* ControlWrapper::nativeHandle() const
 void ControlWrapper::setLayout(LayoutWrapper* layout)
 {
 	if (m_nativeWidget)
-		m_nativeWidget->SetSizerAndFit(layout->nativeHandle());
+		reinterpret_cast<wxWindow*>(m_nativeWidget)->SetSizerAndFit(layout->nativeHandle());
 }

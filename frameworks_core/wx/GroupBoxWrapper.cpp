@@ -15,7 +15,7 @@ GroupBoxWrapper::GroupBoxWrapper(ControlWrapper* parent, Orientation orient, con
 		: "GroupBoxWrapper::GroupBoxWrapper() Vertical\t-> new wxStaticBoxSizer()\n"));
 #endif
 	m_nativeSizer = new wxStaticBoxSizer(
-		(orient == Orientation::Horizontal) ? wxHORIZONTAL : wxVERTICAL, parent->nativeHandle(), label);
+		(orient == Orientation::Horizontal) ? wxHORIZONTAL : wxVERTICAL, reinterpret_cast<wxWindow*>(parent->nativeHandle()), label);
 	m_staticBox = ControlWrapper(static_cast<wxStaticBoxSizer*>(m_nativeSizer)->GetStaticBox());
 }
 

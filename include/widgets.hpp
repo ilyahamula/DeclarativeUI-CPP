@@ -11,14 +11,46 @@
 template <typename W>
 struct Widget
 {
+private: // callbacks
+	std::function<void()> m_preCreateCallback;
+	std::function<void()> m_postCreateCallback;
+	std::function<void(void*)> m_postCreateWithWidgetCallback;
+
+public:
 	Widget() = default;
 
 	virtual ~Widget() = default;
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
 	{
+		if (m_preCreateCallback)
+			m_preCreateCallback();
+
 		auto control = createWrapper(parent, m_position, m_size, m_style);
 		control->createAndAdd(parent, layout, m_flags.value_or(flags));
+
+		if (m_postCreateCallback)
+			m_postCreateCallback();
+		if (m_postCreateWithWidgetCallback)
+			m_postCreateWithWidgetCallback(control->nativeHandle());
+	}
+
+	W& preCreate(std::function<void()> preCreateCallback)
+	{
+		m_preCreateCallback = std::move(preCreateCallback);
+		return static_cast<W&>(*this);
+	}
+
+	W& postCreate(std::function<void()> postCreateCallback)
+	{
+		m_postCreateCallback = std::move(postCreateCallback);
+		return static_cast<W&>(*this);
+	}
+
+	W& postCreate(std::function<void(void*)> postCreateCallback)
+	{
+		m_postCreateWithWidgetCallback = std::move(postCreateCallback);
+		return static_cast<W&>(*this);
 	}
 
 	W& withFlags(LayoutFlags flags)

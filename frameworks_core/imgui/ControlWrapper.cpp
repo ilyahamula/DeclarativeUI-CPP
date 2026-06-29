@@ -10,6 +10,11 @@ void ControlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout,
 	layout->add(this, flags);
 }
 
+void* ControlWrapper::nativeHandle() const
+{
+	return m_nativeWidget;
+}
+
 void ControlWrapper::setLayout(LayoutWrapper* layout)
 {
 }
