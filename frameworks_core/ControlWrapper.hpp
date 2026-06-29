@@ -14,18 +14,13 @@ class ControlWrapper
 {
 public:
 	ControlWrapper();
+	ControlWrapper(void* nativeWidget);
 	virtual ~ControlWrapper();
 
 	virtual void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags);
 	void setLayout(LayoutWrapper* layout);
-
-#ifdef USE_WX
-	ControlWrapper(wxWindow* nativeWidget);
-	wxWindow* nativeHandle() const;
+	void* nativeHandle() const;
 
 protected:
-	wxWindow* m_nativeWidget = nullptr;
-//#elif defined(USE_QT)
-//#elif defined(USE_IMGUI)
-#endif
+	void* m_nativeWidget = nullptr;
 };

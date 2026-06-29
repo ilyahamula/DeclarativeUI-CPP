@@ -46,7 +46,7 @@ void LayoutWrapper::add(LayoutWrapper* stack, LayoutFlags& flags)
 
 void LayoutWrapper::add(ControlWrapper* widget, LayoutFlags& flags)
 {
-	m_nativeSizer->Add(widget->nativeHandle(), flags.wx());
+	m_nativeSizer->Add(reinterpret_cast<wxWindow*>(widget->nativeHandle()), flags.wx());
 }
 
 void LayoutWrapper::finilizeLayout()
