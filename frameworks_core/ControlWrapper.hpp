@@ -7,14 +7,32 @@
 class ControlWrapper
 {
 public:
-	ControlWrapper();
-	ControlWrapper(void* nativeWidget);
-	ControlWrapper(const Position& pos, const Size& size, long style);
-	virtual ~ControlWrapper();
+	ControlWrapper() = default;
+	virtual ~ControlWrapper() = default;
 
-	virtual void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags);
+	ControlWrapper(void* nativeWidget)
+		: m_nativeWidget(nativeWidget)
+	{
+	}
+
+	ControlWrapper(const Position& pos, const Size& size, long style)
+		: m_pos(pos)
+		, m_size(size)
+		, m_style(style)
+	{
+	}
+
+	virtual void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+	{
+		layout->add(this, flags);
+	}
+
+	void* nativeHandle() const
+	{
+		return m_nativeWidget;
+	}
+
 	void setLayout(LayoutWrapper* layout);
-	void* nativeHandle() const;
 
 protected:
 	void* m_nativeWidget = nullptr;

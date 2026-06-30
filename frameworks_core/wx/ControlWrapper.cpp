@@ -1,32 +1,6 @@
 #include "frameworks_core/ControlWrapper.hpp"
 #include <wx/wx.h>
 
-ControlWrapper::ControlWrapper() = default;
-
-ControlWrapper::~ControlWrapper() = default;
-
-ControlWrapper::ControlWrapper(void* widget)
-	: m_nativeWidget(widget)
-{
-}
-
-ControlWrapper::ControlWrapper(const Position& pos, const Size& size, long style)
-	: m_pos(pos)
-	, m_size(size)
-	, m_style(style)
-{
-}
-
-void ControlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-	layout->add(this, flags);
-}
-
-void* ControlWrapper::nativeHandle() const
-{
-	return m_nativeWidget;
-}
-
 void ControlWrapper::setLayout(LayoutWrapper* layout)
 {
 	if (m_nativeWidget)
