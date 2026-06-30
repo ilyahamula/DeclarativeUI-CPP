@@ -23,7 +23,7 @@
 class ButtonWrapper : public ControlWrapper
 {
 public:
-	ButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -31,7 +31,7 @@ public:
 		, m_onClick(std::move(onClick))
 	{
 	}
-	ButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		std::function<void(void*)> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -52,7 +52,7 @@ private:
 class TextCtrlWrapper : public ControlWrapper
 {
 public:
-	TextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	TextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -61,7 +61,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	TextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -69,7 +69,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	TextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	TextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -78,7 +78,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	TextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	TextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -100,7 +100,7 @@ private:
 class PasswordInputWrapper : public ControlWrapper
 {
 public:
-	PasswordInputWrapper(ControlWrapper* parent, std::string& value,
+	PasswordInputWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -109,7 +109,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	PasswordInputWrapper(ControlWrapper* parent, const std::string& initialValue,
+	PasswordInputWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -117,7 +117,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	PasswordInputWrapper(ControlWrapper* parent, std::string& value,
+	PasswordInputWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -126,7 +126,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	PasswordInputWrapper(ControlWrapper* parent, const std::string& initialValue,
+	PasswordInputWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -148,7 +148,7 @@ private:
 class MultiLineTextCtrlWrapper : public ControlWrapper
 {
 public:
-	MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	MultiLineTextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -157,7 +157,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	MultiLineTextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	MultiLineTextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -165,7 +165,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	MultiLineTextCtrlWrapper(ControlWrapper* parent, std::string& value,
+	MultiLineTextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -174,7 +174,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	MultiLineTextCtrlWrapper(ControlWrapper* parent, const std::string& initialValue,
+	MultiLineTextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -196,7 +196,7 @@ private:
 class ReadonlyTextCtrlWrapper : public ControlWrapper
 {
 public:
-	ReadonlyTextCtrlWrapper(ControlWrapper* parent, const std::string& value,
+	ReadonlyTextCtrlWrapper(const std::string& value,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_value(value)
@@ -213,7 +213,7 @@ private:
 class ClickableTextWrapper : public ControlWrapper
 {
 public:
-	ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+	ClickableTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -221,7 +221,7 @@ public:
 		, m_onClick(std::move(onClick))
 	{
 	}
-	ClickableTextWrapper(ControlWrapper* parent, const std::string& text,
+	ClickableTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
 		std::function<void(void*)> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -242,7 +242,7 @@ private:
 class LinkTextWrapper : public ControlWrapper
 {
 public:
-	LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+	LinkTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -250,7 +250,7 @@ public:
 		, m_onClick(std::move(onClick))
 	{
 	}
-	LinkTextWrapper(ControlWrapper* parent, const std::string& text,
+	LinkTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
 		std::function<void(void*)> onClick = {})
 		: ControlWrapper(pos, size, style)
@@ -271,7 +271,7 @@ private:
 class StaticTextWrapper : public ControlWrapper
 {
 public:
-	StaticTextWrapper(ControlWrapper* parent, const std::string& text,
+	StaticTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
@@ -288,7 +288,7 @@ private:
 class DatePickerWrapper : public ControlWrapper
 {
 public:
-	DatePickerWrapper(ControlWrapper* parent, Date& value,
+	DatePickerWrapper(Date& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Date&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -297,7 +297,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	DatePickerWrapper(ControlWrapper* parent, const Date& value,
+	DatePickerWrapper(const Date& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Date&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -305,7 +305,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	DatePickerWrapper(ControlWrapper* parent, Date& value,
+	DatePickerWrapper(Date& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Date&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -314,7 +314,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	DatePickerWrapper(ControlWrapper* parent, const Date& value,
+	DatePickerWrapper(const Date& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Date&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -336,7 +336,7 @@ private:
 class TimePickerWrapper : public ControlWrapper
 {
 public:
-	TimePickerWrapper(ControlWrapper* parent, Time& value,
+	TimePickerWrapper(Time& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Time&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -345,7 +345,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	TimePickerWrapper(ControlWrapper* parent, const Time& value,
+	TimePickerWrapper(const Time& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Time&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -353,7 +353,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	TimePickerWrapper(ControlWrapper* parent, Time& value,
+	TimePickerWrapper(Time& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Time&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -362,7 +362,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	TimePickerWrapper(ControlWrapper* parent, const Time& value,
+	TimePickerWrapper(const Time& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Time&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -385,7 +385,7 @@ template <SliderValue T>
 class SliderWrapper : public ControlWrapper
 {
 public:
-	SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	SliderWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -395,7 +395,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	SliderWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	SliderWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -404,7 +404,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	SliderWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	SliderWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -414,7 +414,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	SliderWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	SliderWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -442,7 +442,7 @@ template <SpinBoxValue T>
 class SpinBoxWrapper : public ControlWrapper
 {
 public:
-	SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	SpinBoxWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -452,7 +452,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	SpinBoxWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -461,7 +461,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	SpinBoxWrapper(ControlWrapper* parent, Range<T> range, T& value,
+	SpinBoxWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -471,7 +471,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	SpinBoxWrapper(ControlWrapper* parent, Range<T> range, const T& value,
+	SpinBoxWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -499,7 +499,7 @@ template <RadioButtonValue T>
 class RadioButtonWrapper : public ControlWrapper
 {
 public:
-	RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	RadioButtonWrapper(const std::string& label,
 		T& value, const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -510,7 +510,7 @@ public:
 	{
 		assignGroupIndex(&value);
 	}
-	RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	RadioButtonWrapper(const std::string& label,
 		const T& initialValue, const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -520,7 +520,7 @@ public:
 	{
 		assignGroupIndex(&m_ownedValue);
 	}
-	RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	RadioButtonWrapper(const std::string& label,
 		T& value, const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -531,7 +531,7 @@ public:
 	{
 		assignGroupIndex(&value);
 	}
-	RadioButtonWrapper(ControlWrapper* parent, const std::string& label,
+	RadioButtonWrapper(const std::string& label,
 		const T& initialValue, const Position& pos, const Size& size, long style,
 		std::function<void(T, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -581,7 +581,7 @@ extern template class RadioButtonWrapper<int>;
 class CheckBoxWrapper : public ControlWrapper
 {
 public:
-	CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		bool& checked, std::function<void(bool)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -591,7 +591,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		const bool& initialChecked, std::function<void(bool)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -600,7 +600,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		bool& checked, std::function<void(bool, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -610,7 +610,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	CheckBoxWrapper(ControlWrapper* parent, const std::string& label,
+	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		const bool& initialChecked, std::function<void(bool, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -634,7 +634,7 @@ private:
 class ToggleButtonWrapper : public ControlWrapper
 {
 public:
-	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ToggleButtonWrapper(const std::string& label,
 		bool& toggled, const Position& pos, const Size& size, long style,
 		std::function<void(bool)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -644,7 +644,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ToggleButtonWrapper(const std::string& label,
 		const bool& initialToggled, const Position& pos, const Size& size, long style,
 		std::function<void(bool)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -653,7 +653,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ToggleButtonWrapper(const std::string& label,
 		bool& toggled, const Position& pos, const Size& size, long style,
 		std::function<void(bool, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -663,7 +663,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	ToggleButtonWrapper(ControlWrapper* parent, const std::string& label,
+	ToggleButtonWrapper(const std::string& label,
 		const bool& initialToggled, const Position& pos, const Size& size, long style,
 		std::function<void(bool, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -687,7 +687,7 @@ private:
 class ImageWrapper : public ControlWrapper
 {
 public:
-	ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+	ImageWrapper(const std::string& filePath,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {},
 		std::function<void()> onHover = {})
@@ -699,7 +699,7 @@ public:
 		, m_onHover(std::move(onHover))
 	{
 	}
-	ImageWrapper(ControlWrapper* parent, const std::string& filePath,
+	ImageWrapper(const std::string& filePath,
 		const Position& pos, const Size& size, long style,
 		std::function<void(void*)> onClick,
 		std::function<void(void*)> onHover = {})
@@ -731,7 +731,7 @@ private:
 class ColorPickerWrapper : public ControlWrapper
 {
 public:
-	ColorPickerWrapper(ControlWrapper* parent, Color& value,
+	ColorPickerWrapper(Color& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Color&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -740,7 +740,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	ColorPickerWrapper(ControlWrapper* parent, const Color& value,
+	ColorPickerWrapper(const Color& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Color&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -748,7 +748,7 @@ public:
 		, m_onChange(std::move(onChange))
 	{
 	}
-	ColorPickerWrapper(ControlWrapper* parent, Color& value,
+	ColorPickerWrapper(Color& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Color&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -757,7 +757,7 @@ public:
 		, m_onChangeWithWidget(std::move(onChange))
 	{
 	}
-	ColorPickerWrapper(ControlWrapper* parent, const Color& value,
+	ColorPickerWrapper(const Color& value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Color&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -779,7 +779,7 @@ private:
 class SeparatorWrapper : public ControlWrapper
 {
 public:
-	SeparatorWrapper(ControlWrapper* parent,
+	SeparatorWrapper(
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 	{
@@ -792,13 +792,13 @@ public:
 class ProgressBarWrapper : public ControlWrapper
 {
 public:
-	ProgressBarWrapper(ControlWrapper* parent, const float& value,
+	ProgressBarWrapper(const float& value,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 	{
 	}
-	ProgressBarWrapper(ControlWrapper* parent, float& value,
+	ProgressBarWrapper(float& value,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
@@ -818,7 +818,7 @@ template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper
 {
 public:
-	ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	ComboBoxWrapper(std::vector<std::string> choices,
 		T& selected, const Position& pos, const Size& size, long style,
 		std::function<void(const T&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -829,7 +829,7 @@ public:
 	{
 		buildItems();
 	}
-	ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	ComboBoxWrapper(std::vector<std::string> choices,
 		const T& selected, const Position& pos, const Size& size, long style,
 		std::function<void(const T&)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -839,7 +839,7 @@ public:
 	{
 		buildItems();
 	}
-	ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	ComboBoxWrapper(std::vector<std::string> choices,
 		T& selected, const Position& pos, const Size& size, long style,
 		std::function<void(const T&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -850,7 +850,7 @@ public:
 	{
 		buildItems();
 	}
-	ComboBoxWrapper(ControlWrapper* parent, std::vector<std::string> choices,
+	ComboBoxWrapper(std::vector<std::string> choices,
 		const T& selected, const Position& pos, const Size& size, long style,
 		std::function<void(const T&, void*)> onChange = {})
 		: ControlWrapper(pos, size, style)

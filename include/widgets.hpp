@@ -26,7 +26,7 @@ public:
 		if (m_preCreateCallback)
 			m_preCreateCallback();
 
-		auto control = createWrapper(parent, m_position, m_size, m_style);
+		auto control = createWrapper(m_position, m_size, m_style);
 		control->createAndAdd(parent, layout, m_flags.value_or(flags));
 
 		if (m_postCreateCallback)
@@ -79,7 +79,6 @@ public:
 
 private:
 	virtual std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) = 0;
@@ -104,12 +103,11 @@ struct StaticText : Widget<StaticText>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<StaticTextWrapper>(parent, m_text, pos, size, style);
+		return std::make_unique<StaticTextWrapper>(m_text, pos, size, style);
 	}
 
 private:
@@ -147,14 +145,13 @@ struct TextCtrl : Widget<TextCtrl>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<TextCtrlWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<TextCtrlWrapper>(parent, m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<TextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<TextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange);
 	}
 
 private:
@@ -194,14 +191,13 @@ struct PasswordInput : Widget<PasswordInput>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<PasswordInputWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<PasswordInputWrapper>(parent, m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<PasswordInputWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<PasswordInputWrapper>(m_ownedText, pos, size, style, m_onChange);
 	}
 
 private:
@@ -241,14 +237,13 @@ struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<MultiLineTextCtrlWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<MultiLineTextCtrlWrapper>(parent, m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<MultiLineTextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<MultiLineTextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange);
 	}
 
 private:
@@ -270,12 +265,11 @@ struct ReadonlyTextCtrl : Widget<ReadonlyTextCtrl>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ReadonlyTextCtrlWrapper>(parent, m_text, pos, size, style);
+		return std::make_unique<ReadonlyTextCtrlWrapper>(m_text, pos, size, style);
 	}
 
 private:
@@ -301,12 +295,11 @@ struct ClickableText : Widget<ClickableText>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ClickableTextWrapper>(parent, m_text, pos, size, style, m_onClick);
+		return std::make_unique<ClickableTextWrapper>(m_text, pos, size, style, m_onClick);
 	}
 
 private:
@@ -333,12 +326,11 @@ struct LinkText : Widget<LinkText>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<LinkTextWrapper>(parent, m_text, pos, size, style, m_onClick);
+		return std::make_unique<LinkTextWrapper>(m_text, pos, size, style, m_onClick);
 	}
 
 private:
@@ -365,12 +357,11 @@ struct Button : Widget<Button>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ButtonWrapper>(parent, m_btnTitle, pos, size, style, m_onClick);
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, m_onClick);
 	}
 
 private:
@@ -412,14 +403,13 @@ struct RadioButton : Widget<RadioButton<T>>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<RadioButtonWrapper<T>>(parent, m_label, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<RadioButtonWrapper<T>>(parent, m_label, m_ownedValue, pos, size, style, m_onChange);
+			return std::make_unique<RadioButtonWrapper<T>>(m_label, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_ownedValue, pos, size, style, m_onChange);
 	}
 
 private:
@@ -474,14 +464,13 @@ struct CheckBox : Widget<CheckBox>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<CheckBoxWrapper>(parent, m_label, pos, size, style, m_externalRef->get(), m_onChange);
-		return std::make_unique<CheckBoxWrapper>(parent, m_label, pos, size, style, std::as_const(m_ownedValue), m_onChange);
+			return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_externalRef->get(), m_onChange);
+		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, std::as_const(m_ownedValue), m_onChange);
 	}
 
 private:
@@ -528,14 +517,13 @@ struct ComboBox : Widget<ComboBox<T>>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ComboBoxWrapper<T>>(parent, m_choices, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ComboBoxWrapper<T>>(parent, m_choices, std::as_const(m_ownedSelected), pos, size, style, m_onChange);
+			return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<ComboBoxWrapper<T>>(m_choices, std::as_const(m_ownedSelected), pos, size, style, m_onChange);
 	}
 
 private:
@@ -587,14 +575,13 @@ struct Slider : Widget<Slider<T>>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<SliderWrapper<T>>(parent, m_range, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<SliderWrapper<T>>(parent, m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<SliderWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<SliderWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
 	}
 
 private:
@@ -649,14 +636,13 @@ struct SpinBox : Widget<SpinBox<T>>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<SpinBoxWrapper<T>>(parent, m_range, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<SpinBoxWrapper<T>>(parent, m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<SpinBoxWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<SpinBoxWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
 	}
 
 private:
@@ -706,14 +692,13 @@ struct DatePicker : Widget<DatePicker>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<DatePickerWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<DatePickerWrapper>(parent, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<DatePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<DatePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
 	}
 
 private:
@@ -755,14 +740,13 @@ struct ToggleButton : Widget<ToggleButton>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ToggleButtonWrapper>(parent, m_label, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ToggleButtonWrapper>(parent, m_label, m_ownedValue, pos, size, style, m_onChange);
+			return std::make_unique<ToggleButtonWrapper>(m_label, m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<ToggleButtonWrapper>(m_label, m_ownedValue, pos, size, style, m_onChange);
 	}
 
 private:
@@ -798,14 +782,13 @@ struct ColorPicker : Widget<ColorPicker>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ColorPickerWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ColorPickerWrapper>(parent, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<ColorPickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<ColorPickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
 	}
 
 private:
@@ -823,12 +806,11 @@ struct Separator : Widget<Separator>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SeparatorWrapper>(parent, pos, size, style);
+		return std::make_unique<SeparatorWrapper>(pos, size, style);
 	}
 };
 
@@ -852,14 +834,13 @@ struct ProgressBar : Widget<ProgressBar>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ProgressBarWrapper>(parent, m_externalRef->get(), pos, size, style);
-		return std::make_unique<ProgressBarWrapper>(parent, std::as_const(m_ownedValue), pos, size, style);
+			return std::make_unique<ProgressBarWrapper>(m_externalRef->get(), pos, size, style);
+		return std::make_unique<ProgressBarWrapper>(std::as_const(m_ownedValue), pos, size, style);
 	}
 
 private:
@@ -892,12 +873,11 @@ struct Image : Widget<Image>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ImageWrapper>(parent, m_filePath, pos, size, style, m_onClick, m_onHover);
+		return std::make_unique<ImageWrapper>(m_filePath, pos, size, style, m_onClick, m_onHover);
 	}
 
 private:
@@ -937,14 +917,13 @@ struct TimePicker : Widget<TimePicker>
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
-		ControlWrapper* parent,
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<TimePickerWrapper>(parent, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<TimePickerWrapper>(parent, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<TimePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
+		return std::make_unique<TimePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
 	}
 
 private:

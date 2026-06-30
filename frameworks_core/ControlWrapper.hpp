@@ -4,12 +4,6 @@
 #include "LayoutFlags.hpp"
 #include "LayoutWrapper.hpp"
 
-#ifdef USE_WX
-#include <wx/window.h>
-#elif defined(USE_QT)
-#elif defined(USE_IMGUI)
-#endif
-
 class ControlWrapper
 {
 public:
