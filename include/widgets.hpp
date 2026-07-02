@@ -11,12 +11,6 @@
 template <typename W>
 struct Widget
 {
-private: // callbacks
-	std::function<void()> m_preCreateCallback;
-	std::function<void()> m_postCreateCallback;
-	std::function<void(void*)> m_postCreateWithWidgetCallback;
-
-public:
 	Widget() = default;
 
 	virtual ~Widget() = default;
@@ -82,6 +76,11 @@ private:
 		const Position& pos,
 		const Size& size,
 		long style) = 0;
+
+private: // callbacks
+	std::function<void()> m_preCreateCallback;
+	std::function<void()> m_postCreateCallback;
+	std::function<void(void*)> m_postCreateWithWidgetCallback;
 
 private:
 	std::optional<LayoutFlags> m_flags;
