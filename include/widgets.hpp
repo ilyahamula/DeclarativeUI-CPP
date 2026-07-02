@@ -143,6 +143,12 @@ struct TextCtrl : Widget<TextCtrl>
 		return *this;
 	}
 
+	TextCtrl& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -150,14 +156,15 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<TextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<TextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<TextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::string m_ownedText;
 	std::optional<std::reference_wrapper<std::string>> m_externalRef;
 	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
 
 // PasswordInput -----------------------------------------------------------
@@ -189,6 +196,12 @@ struct PasswordInput : Widget<PasswordInput>
 		return *this;
 	}
 
+	PasswordInput& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -196,14 +209,15 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<PasswordInputWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<PasswordInputWrapper>(m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<PasswordInputWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<PasswordInputWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::string m_ownedText;
 	std::optional<std::reference_wrapper<std::string>> m_externalRef;
 	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
 
 // MultiLineTextCtrl -----------------------------------------------------------
@@ -235,6 +249,12 @@ struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
 		return *this;
 	}
 
+	MultiLineTextCtrl& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -242,14 +262,15 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<MultiLineTextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<MultiLineTextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange);
+			return std::make_unique<MultiLineTextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<MultiLineTextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::string m_ownedText;
 	std::optional<std::reference_wrapper<std::string>> m_externalRef;
 	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
 
 // ReadonlyTextCtrl -----------------------------------------------------------
@@ -293,17 +314,24 @@ struct ClickableText : Widget<ClickableText>
 		return *this;
 	}
 
+	ClickableText& onClick(std::function<void(void*)> callback)
+	{
+		m_onClickWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ClickableTextWrapper>(m_text, pos, size, style, m_onClick);
+		return std::make_unique<ClickableTextWrapper>(m_text, pos, size, style, m_onClick, m_onClickWithWidget);
 	}
 
 private:
 	std::function<void()> m_onClick;
+	std::function<void(void*)> m_onClickWithWidget;
 	std::string m_text;
 };
 
@@ -324,17 +352,24 @@ struct LinkText : Widget<LinkText>
 		return *this;
 	}
 
+	LinkText& onClick(std::function<void(void*)> callback)
+	{
+		m_onClickWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<LinkTextWrapper>(m_text, pos, size, style, m_onClick);
+		return std::make_unique<LinkTextWrapper>(m_text, pos, size, style, m_onClick, m_onClickWithWidget);
 	}
 
 private:
 	std::function<void()> m_onClick;
+	std::function<void(void*)> m_onClickWithWidget;
 	std::string m_text;
 };
 
@@ -355,17 +390,24 @@ struct Button : Widget<Button>
 		return *this;
 	}
 
+	Button& onClick(std::function<void(void*)> callback)
+	{
+		m_onClickWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, m_onClick);
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, m_onClick, m_onClickWithWidget);
 	}
 
 private:
 	std::function<void()> m_onClick;
+	std::function<void(void*)> m_onClickWithWidget;
 	std::string m_btnTitle;
 };
 
@@ -401,6 +443,12 @@ struct RadioButton : Widget<RadioButton<T>>
 		return *this;
 	}
 
+	RadioButton& onChange(std::function<void(T, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -408,8 +456,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<RadioButtonWrapper<T>>(m_label, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_ownedValue, pos, size, style, m_onChange);
+			return std::make_unique<RadioButtonWrapper<T>>(m_label, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_ownedValue, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -417,6 +465,7 @@ private:
 	std::optional<std::reference_wrapper<T>> m_externalRef;
 	std::string m_label;
 	std::function<void(T)> m_onChange;
+	std::function<void(T, void*)> m_onChangeWithWidget;
 };
 
 template <RadioButtonValue T>
@@ -462,6 +511,12 @@ struct CheckBox : Widget<CheckBox>
 		return *this;
 	}
 
+	CheckBox& onChange(std::function<void(bool, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -469,8 +524,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_externalRef->get(), m_onChange);
-		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, std::as_const(m_ownedValue), m_onChange);
+			return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_externalRef->get(), m_onChange, m_onChangeWithWidget);
+		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, std::as_const(m_ownedValue), m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -478,6 +533,7 @@ private:
 	std::optional<std::reference_wrapper<bool>> m_externalRef;
 	std::string m_label;
 	std::function<void(bool)> m_onChange;
+	std::function<void(bool, void*)> m_onChangeWithWidget;
 };
 
 // ComboBox -----------------------------------------------------------
@@ -515,6 +571,12 @@ struct ComboBox : Widget<ComboBox<T>>
 		return *this;
 	}
 
+	ComboBox& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -522,8 +584,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ComboBoxWrapper<T>>(m_choices, std::as_const(m_ownedSelected), pos, size, style, m_onChange);
+			return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ComboBoxWrapper<T>>(m_choices, std::as_const(m_ownedSelected), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -531,6 +593,7 @@ private:
 	T m_ownedSelected{};
 	std::optional<std::reference_wrapper<T>> m_externalRef;
 	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
 };
 
 template <ComboBoxValue T>
@@ -573,6 +636,12 @@ struct Slider : Widget<Slider<T>>
 		return *this;
 	}
 
+	Slider& onChange(std::function<void(T, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -580,8 +649,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<SliderWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<SliderWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<SliderWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SliderWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -589,6 +658,7 @@ private:
 	T m_ownedValue{};
 	std::optional<std::reference_wrapper<T>> m_externalRef;
 	std::function<void(T)> m_onChange;
+	std::function<void(T, void*)> m_onChangeWithWidget;
 };
 
 template <SliderValue T>
@@ -634,6 +704,12 @@ struct SpinBox : Widget<SpinBox<T>>
 		return *this;
 	}
 
+	SpinBox& onChange(std::function<void(T, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -641,8 +717,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<SpinBoxWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<SpinBoxWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<SpinBoxWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SpinBoxWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -650,6 +726,7 @@ private:
 	T m_ownedValue{};
 	std::optional<std::reference_wrapper<T>> m_externalRef;
 	std::function<void(T)> m_onChange;
+	std::function<void(T, void*)> m_onChangeWithWidget;
 };
 
 template <SpinBoxValue T>
@@ -690,6 +767,12 @@ struct DatePicker : Widget<DatePicker>
 		return *this;
 	}
 
+	DatePicker& onChange(std::function<void(const Date&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -697,14 +780,15 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<DatePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<DatePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<DatePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<DatePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	Date m_ownedValue{};
 	std::optional<std::reference_wrapper<Date>> m_externalRef;
 	std::function<void(const Date&)> m_onChange;
+	std::function<void(const Date&, void*)> m_onChangeWithWidget;
 };
 
 // ToggleButton -----------------------------------------------------------
@@ -738,6 +822,12 @@ struct ToggleButton : Widget<ToggleButton>
 		return *this;
 	}
 
+	ToggleButton& onChange(std::function<void(bool, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -745,8 +835,8 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ToggleButtonWrapper>(m_label, m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ToggleButtonWrapper>(m_label, m_ownedValue, pos, size, style, m_onChange);
+			return std::make_unique<ToggleButtonWrapper>(m_label, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ToggleButtonWrapper>(m_label, m_ownedValue, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
@@ -754,6 +844,7 @@ private:
 	bool m_ownedValue = false;
 	std::optional<std::reference_wrapper<bool>> m_externalRef;
 	std::function<void(bool)> m_onChange;
+	std::function<void(bool, void*)> m_onChangeWithWidget;
 };
 
 // ColorPicker -----------------------------------------------------------
@@ -780,6 +871,12 @@ struct ColorPicker : Widget<ColorPicker>
 		return *this;
 	}
 
+	ColorPicker& onChange(std::function<void(const Color&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -787,14 +884,15 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<ColorPickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<ColorPickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<ColorPickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ColorPickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	Color m_ownedValue;
 	std::optional<std::reference_wrapper<Color>> m_externalRef;
 	std::function<void(const Color&)> m_onChange;
+	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
 
 // Separator -----------------------------------------------------------
@@ -865,9 +963,21 @@ struct Image : Widget<Image>
 		return *this;
 	}
 
+	Image& onClick(std::function<void(void*)> callback)
+	{
+		m_onClickWithWidget = std::move(callback);
+		return *this;
+	}
+
 	Image& onHover(std::function<void()> callback)
 	{
 		m_onHover = std::move(callback);
+		return *this;
+	}
+
+	Image& onHover(std::function<void(void*)> callback)
+	{
+		m_onHoverWithWidget = std::move(callback);
 		return *this;
 	}
 
@@ -877,13 +987,15 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ImageWrapper>(m_filePath, pos, size, style, m_onClick, m_onHover);
+		return std::make_unique<ImageWrapper>(m_filePath, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
 	}
 
 private:
 	std::string m_filePath;
 	std::function<void()> m_onClick;
 	std::function<void()> m_onHover;
+	std::function<void(void*)> m_onClickWithWidget;
+	std::function<void(void*)> m_onHoverWithWidget;
 };
 
 // TimePicker -----------------------------------------------------------
@@ -915,6 +1027,12 @@ struct TimePicker : Widget<TimePicker>
 		return *this;
 	}
 
+	TimePicker& onChange(std::function<void(const Time&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -922,12 +1040,13 @@ private:
 		long style) override
 	{
 		if (m_externalRef)
-			return std::make_unique<TimePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange);
-		return std::make_unique<TimePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange);
+			return std::make_unique<TimePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TimePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	Time m_ownedValue{};
 	std::optional<std::reference_wrapper<Time>> m_externalRef;
 	std::function<void(const Time&)> m_onChange;
+	std::function<void(const Time&, void*)> m_onChangeWithWidget;
 };

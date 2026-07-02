@@ -25,18 +25,12 @@ class ButtonWrapper : public ControlWrapper
 public:
 	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {})
+		std::function<void()> onClick = {},
+		std::function<void(void*)> onClickWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_onClick(std::move(onClick))
-	{
-	}
-	ButtonWrapper(const std::string& label,
-		const Position& pos, const Size& size, long style,
-		std::function<void(void*)> onClick = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_onClickWithWidget(std::move(onClick))
+		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -54,36 +48,23 @@ class TextCtrlWrapper : public ControlWrapper
 public:
 	TextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	TextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(initialValue)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	TextCtrlWrapper(std::string& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	TextCtrlWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -102,36 +83,23 @@ class PasswordInputWrapper : public ControlWrapper
 public:
 	PasswordInputWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	PasswordInputWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(initialValue)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	PasswordInputWrapper(std::string& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	PasswordInputWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -150,36 +118,23 @@ class MultiLineTextCtrlWrapper : public ControlWrapper
 public:
 	MultiLineTextCtrlWrapper(std::string& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	MultiLineTextCtrlWrapper(const std::string& initialValue,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {})
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(initialValue)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	MultiLineTextCtrlWrapper(std::string& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	MultiLineTextCtrlWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -215,18 +170,12 @@ class ClickableTextWrapper : public ControlWrapper
 public:
 	ClickableTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {})
+		std::function<void()> onClick = {},
+		std::function<void(void*)> onClickWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-	{
-	}
-	ClickableTextWrapper(const std::string& text,
-		const Position& pos, const Size& size, long style,
-		std::function<void(void*)> onClick = {})
-		: ControlWrapper(pos, size, style)
-		, m_text(text)
-		, m_onClickWithWidget(std::move(onClick))
+		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -244,18 +193,12 @@ class LinkTextWrapper : public ControlWrapper
 public:
 	LinkTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {})
+		std::function<void()> onClick = {},
+		std::function<void(void*)> onClickWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-	{
-	}
-	LinkTextWrapper(const std::string& text,
-		const Position& pos, const Size& size, long style,
-		std::function<void(void*)> onClick = {})
-		: ControlWrapper(pos, size, style)
-		, m_text(text)
-		, m_onClickWithWidget(std::move(onClick))
+		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -290,36 +233,23 @@ class DatePickerWrapper : public ControlWrapper
 public:
 	DatePickerWrapper(Date& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&)> onChange = {})
+		std::function<void(const Date&)> onChange = {},
+		std::function<void(const Date&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	DatePickerWrapper(const Date& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&)> onChange = {})
+		std::function<void(const Date&)> onChange = {},
+		std::function<void(const Date&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	DatePickerWrapper(Date& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	DatePickerWrapper(const Date& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -338,36 +268,23 @@ class TimePickerWrapper : public ControlWrapper
 public:
 	TimePickerWrapper(Time& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&)> onChange = {})
+		std::function<void(const Time&)> onChange = {},
+		std::function<void(const Time&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	TimePickerWrapper(const Time& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&)> onChange = {})
+		std::function<void(const Time&)> onChange = {},
+		std::function<void(const Time&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	TimePickerWrapper(Time& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	TimePickerWrapper(const Time& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -387,40 +304,25 @@ class SliderWrapper : public ControlWrapper
 public:
 	SliderWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	SliderWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_ownedValue(value)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	SliderWrapper(Range<T> range, T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	SliderWrapper(Range<T> range, const T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -444,40 +346,25 @@ class SpinBoxWrapper : public ControlWrapper
 public:
 	SpinBoxWrapper(Range<T> range, T& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	SpinBoxWrapper(Range<T> range, const T& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_ownedValue(value)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	SpinBoxWrapper(Range<T> range, T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	SpinBoxWrapper(Range<T> range, const T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -501,43 +388,26 @@ class RadioButtonWrapper : public ControlWrapper
 public:
 	RadioButtonWrapper(const std::string& label,
 		T& value, const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		assignGroupIndex(&value);
 	}
 	RadioButtonWrapper(const std::string& label,
 		const T& initialValue, const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {})
+		std::function<void(T)> onChange = {},
+		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(initialValue)
 		, m_onChange(std::move(onChange))
-	{
-		assignGroupIndex(&m_ownedValue);
-	}
-	RadioButtonWrapper(const std::string& label,
-		T& value, const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-		assignGroupIndex(&value);
-	}
-	RadioButtonWrapper(const std::string& label,
-		const T& initialValue, const Position& pos, const Size& size, long style,
-		std::function<void(T, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialValue)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		assignGroupIndex(&m_ownedValue);
 	}
@@ -583,40 +453,27 @@ class CheckBoxWrapper : public ControlWrapper
 public:
 	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		bool& checked, std::function<void(bool)> onChange = {})
+		bool& checked,
+		std::function<void(bool)> onChange = {},
+		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(checked)
 		, m_externalRef(checked)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		const bool& initialChecked, std::function<void(bool)> onChange = {})
+		const bool& initialChecked,
+		std::function<void(bool)> onChange = {},
+		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(initialChecked)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	CheckBoxWrapper(const std::string& label,
-		const Position& pos, const Size& size, long style,
-		bool& checked, std::function<void(bool, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(checked)
-		, m_externalRef(checked)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	CheckBoxWrapper(const std::string& label,
-		const Position& pos, const Size& size, long style,
-		const bool& initialChecked, std::function<void(bool, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialChecked)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -636,40 +493,25 @@ class ToggleButtonWrapper : public ControlWrapper
 public:
 	ToggleButtonWrapper(const std::string& label,
 		bool& toggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool)> onChange = {})
+		std::function<void(bool)> onChange = {},
+		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(toggled)
 		, m_externalRef(toggled)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	ToggleButtonWrapper(const std::string& label,
 		const bool& initialToggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool)> onChange = {})
+		std::function<void(bool)> onChange = {},
+		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_ownedValue(initialToggled)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	ToggleButtonWrapper(const std::string& label,
-		bool& toggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(toggled)
-		, m_externalRef(toggled)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	ToggleButtonWrapper(const std::string& label,
-		const bool& initialToggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialToggled)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -690,25 +532,17 @@ public:
 	ImageWrapper(const std::string& filePath,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {},
-		std::function<void()> onHover = {})
+		std::function<void(void*)> onClickWithWidget = {},
+		std::function<void()> onHover = {},
+		std::function<void(void*)> onHoverWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_filePath(filePath)
 		, m_displayWidth(size.width)
 		, m_displayHeight(size.height)
 		, m_onClick(std::move(onClick))
+		, m_onClickWithWidget(std::move(onClickWithWidget))
 		, m_onHover(std::move(onHover))
-	{
-	}
-	ImageWrapper(const std::string& filePath,
-		const Position& pos, const Size& size, long style,
-		std::function<void(void*)> onClick,
-		std::function<void(void*)> onHover = {})
-		: ControlWrapper(pos, size, style)
-		, m_filePath(filePath)
-		, m_displayWidth(size.width)
-		, m_displayHeight(size.height)
-		, m_onClickWithWidget(std::move(onClick))
-		, m_onHoverWithWidget(std::move(onHover))
+		, m_onHoverWithWidget(std::move(onHoverWithWidget))
 	{
 	}
 
@@ -733,36 +567,23 @@ class ColorPickerWrapper : public ControlWrapper
 public:
 	ColorPickerWrapper(Color& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&)> onChange = {})
+		std::function<void(const Color&)> onChange = {},
+		std::function<void(const Color&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_externalRef(value)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 	ColorPickerWrapper(const Color& value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&)> onChange = {})
+		std::function<void(const Color&)> onChange = {},
+		std::function<void(const Color&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_ownedValue(value)
 		, m_onChange(std::move(onChange))
-	{
-	}
-	ColorPickerWrapper(Color& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-	}
-	ColorPickerWrapper(const Color& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -820,43 +641,26 @@ class ComboBoxWrapper : public ControlWrapper
 public:
 	ComboBoxWrapper(std::vector<std::string> choices,
 		T& selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {})
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_choices(std::move(choices))
 		, m_ownedSelected(selected)
 		, m_externalRef(selected)
 		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		buildItems();
 	}
 	ComboBoxWrapper(std::vector<std::string> choices,
 		const T& selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {})
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_choices(std::move(choices))
 		, m_ownedSelected(selected)
 		, m_onChange(std::move(onChange))
-	{
-		buildItems();
-	}
-	ComboBoxWrapper(std::vector<std::string> choices,
-		T& selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
-		, m_externalRef(selected)
-		, m_onChangeWithWidget(std::move(onChange))
-	{
-		buildItems();
-	}
-	ComboBoxWrapper(std::vector<std::string> choices,
-		const T& selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&, void*)> onChange = {})
-		: ControlWrapper(pos, size, style)
-		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
-		, m_onChangeWithWidget(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		buildItems();
 	}
