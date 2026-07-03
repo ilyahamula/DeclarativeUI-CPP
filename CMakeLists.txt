@@ -27,6 +27,7 @@ set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 
 option(USE_LOGGER "Enable logging" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
+option(BUILD_TESTS "Build unit tests" ON)
 
 # ── Core library ─────────────────────────────────────────────────────────────
 
@@ -128,4 +129,11 @@ endif()
 
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
