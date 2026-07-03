@@ -19,3 +19,17 @@ TEST(core_types_are_backend_free)
 	CHECK(Side::All & Side::Left);
 	CHECK(!(Side::Top & Side::Bottom));
 }
+
+TEST(layout_engine_types)
+{
+	CHECK(Rect{} == (Rect { 0, 0, 0, 0 }));
+	CHECK((Rect { 1, 2, 3, 4 }) == (Rect { 1, 2, 3, 4 }));
+	CHECK(!(Rect { 1, 2, 3, 4 } == Rect { 1, 2, 3, 5 }));
+
+	CHECK(EdgeInsets{} == (EdgeInsets { 0, 0, 0, 0 }));
+	CHECK((Constraints { 640, 480 }) == (Constraints { 640, 480 }));
+	CHECK((Size { 10, 20 }) == (Size { 10, 20 }));
+
+	CHECK(NodeKind::Leaf != NodeKind::Box);
+	CHECK(Align::Start != Align::Stretch);
+}
