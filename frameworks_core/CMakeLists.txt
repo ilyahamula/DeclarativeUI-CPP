@@ -1,6 +1,7 @@
 # Backend-agnostic sources (compiled for every backend)
 target_sources(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/LayoutFlags.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LayoutEngine.cpp
 )
 
 if(UI_FRAMEWORK STREQUAL "WX")

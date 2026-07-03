@@ -7,6 +7,10 @@
 #include "frameworks_core/GroupBoxWrapper.hpp"
 #include "create_and_add.hpp"
 
+#ifdef USE_LAYOUT_ENGINE
+#include "frameworks_core/LayoutNode.hpp"
+#endif
+
 template<CreateAndAddable... W>
 struct GroupBox
 {
@@ -47,6 +51,17 @@ struct GroupBox
 		parent->setLayout(box.get());
 		return box;
 	}
+
+#ifdef USE_LAYOUT_ENGINE
+	std::unique_ptr<LayoutNode> buildNode()
+	{
+		auto node = makeGroupBox(m_orient, m_label, m_flags.value_or(LayoutFlags{}));
+		std::apply([&](auto&... widget) {
+			(node->add(widget.buildNode()), ...);
+		}, m_widgets);
+		return node;
+	}
+#endif
 
 private:
 	Orientation m_orient;

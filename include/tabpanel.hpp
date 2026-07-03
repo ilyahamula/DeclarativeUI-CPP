@@ -9,6 +9,10 @@
 #include "fittable_layout.hpp"
 #include "frameworks_core/TabPanelWrapper.hpp"
 
+#ifdef USE_LAYOUT_ENGINE
+#include "frameworks_core/LayoutNode.hpp"
+#endif
+
 template<typename T>
 concept TabContent = CreateAndAddable<T> && FittableLayout<T>;
 
@@ -76,6 +80,20 @@ struct TabPanel
 		addTabs(wrapper);
 		wrapper.finalize();
 	}
+
+#ifdef USE_LAYOUT_ENGINE
+	std::unique_ptr<LayoutNode> buildNode()
+	{
+		auto node = makeTabPanel(m_flags.value_or(LayoutFlags{}));
+		std::apply([&](auto&... tab) {
+			([&] {
+				auto& page = node->add(tab.content().buildNode());
+				page.label = tab.label();
+			}(), ...);
+		}, m_tabs);
+		return node;
+	}
+#endif
 
 private:
 	std::optional<LayoutFlags> m_flags;

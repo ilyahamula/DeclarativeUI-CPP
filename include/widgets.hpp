@@ -3,6 +3,10 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "create_and_add.hpp"
 
+#ifdef USE_LAYOUT_ENGINE
+#include "frameworks_core/LayoutNode.hpp"
+#endif
+
 #include <functional>
 #include <memory>
 #include <optional>
@@ -28,6 +32,26 @@ struct Widget
 		if (m_postCreateWithWidgetCallback)
 			m_postCreateWithWidgetCallback(control->nativeHandle());
 	}
+
+#ifdef USE_LAYOUT_ENGINE
+	// Engine path: emit a leaf node owning the wrapper — no rendering here;
+	// the backend draws in place(). pre/postCreate keep their meaning:
+	// they fire around native-wrapper creation during tree build.
+	std::unique_ptr<LayoutNode> buildNode()
+	{
+		if (m_preCreateCallback)
+			m_preCreateCallback();
+
+		auto node = makeLeaf(createWrapper(m_position, m_size, m_style),
+			m_flags.value_or(LayoutFlags{}));
+
+		if (m_postCreateCallback)
+			m_postCreateCallback();
+		if (m_postCreateWithWidgetCallback)
+			m_postCreateWithWidgetCallback(node->widget->nativeHandle());
+		return node;
+	}
+#endif
 
 	W& preCreate(std::function<void()> preCreateCallback)
 	{

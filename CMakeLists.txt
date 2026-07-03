@@ -28,6 +28,10 @@ set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 option(USE_LOGGER "Enable logging" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_TESTS "Build unit tests" ON)
+# Route dialogs through the shared layout engine (ImGui only until Phase 3).
+# Default ON since the T2.8 visual sign-off; OFF falls back to the legacy
+# per-backend layout path (deleted in Phase 4).
+option(USE_LAYOUT_ENGINE "Use the shared layout engine for dialog layout" ON)
 
 # ── Core library ─────────────────────────────────────────────────────────────
 
@@ -120,6 +124,9 @@ elseif(UI_FRAMEWORK STREQUAL "IMGUI")
     target_link_libraries(DeclarativeUI PUBLIC imgui_lib)
     target_include_directories(DeclarativeUI PRIVATE ${stb_SOURCE_DIR})
     target_compile_definitions(DeclarativeUI PUBLIC USE_IMGUI)
+    if(USE_LAYOUT_ENGINE)
+        target_compile_definitions(DeclarativeUI PUBLIC USE_LAYOUT_ENGINE)
+    endif()
 
 else()
     message(FATAL_ERROR "Unknown UI_FRAMEWORK: ${UI_FRAMEWORK}. Use WX, QT, or IMGUI.")

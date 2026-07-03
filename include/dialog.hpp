@@ -24,9 +24,16 @@ struct Dialog
 
 	void show()
 	{
+#ifdef USE_LAYOUT_ENGINE
+		// engine path: build the node tree first (no rendering), then the
+		// backend sizes the window from the engine result and draws
+		auto root = m_content.buildNode();
+		DialogWrapper::runLayoutEngine(m_title, m_size, *root);
+#else
 		DialogWrapper wrapper(m_title, m_size);
 		m_content.fitTo(&wrapper);
 		wrapper.show();
+#endif
 	}
 
 private:

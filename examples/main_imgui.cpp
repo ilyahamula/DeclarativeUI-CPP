@@ -14,7 +14,8 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "DeclarativeUI - ImGui", nullptr, nullptr);
+    // Large enough to host the auto-fit Controls Demo dialog (~832x520)
+    GLFWwindow* window = glfwCreateWindow(1000, 700, "DeclarativeUI - ImGui", nullptr, nullptr);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 

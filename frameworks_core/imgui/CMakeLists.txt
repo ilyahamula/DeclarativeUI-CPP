@@ -1,5 +1,6 @@
 target_sources(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ControlWrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LayoutBackend.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ControlWrappers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GroupBoxWrapper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/DialogWrapper.cpp

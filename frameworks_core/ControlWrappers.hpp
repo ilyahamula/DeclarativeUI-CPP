@@ -35,6 +35,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -69,6 +73,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -104,6 +112,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -139,6 +151,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -159,6 +175,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	const std::string& m_value;
@@ -180,6 +200,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -203,6 +227,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -222,6 +250,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -254,6 +286,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Date m_ownedValue{};
@@ -289,6 +325,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Time m_ownedValue{};
@@ -327,6 +367,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Range<T> m_range;
@@ -369,6 +413,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Range<T> m_range;
@@ -414,6 +462,10 @@ public:
 
 	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	// Assigns the radio's index within its group. Consecutive radios sharing
@@ -478,6 +530,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -516,6 +572,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -547,6 +607,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_filePath;
@@ -588,6 +652,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Color m_ownedValue;
@@ -607,6 +675,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 };
 
 // ProgressBarWrapper -----------------------------------------------------------
@@ -628,6 +700,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	float m_ownedValue;
@@ -666,6 +742,10 @@ public:
 	}
 
 	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	// Builds the '\0'-separated item string and resolves the initial index

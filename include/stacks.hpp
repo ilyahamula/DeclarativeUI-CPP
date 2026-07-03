@@ -6,6 +6,10 @@
 
 #include "create_and_add.hpp"
 
+#ifdef USE_LAYOUT_ENGINE
+#include "frameworks_core/LayoutNode.hpp"
+#endif
+
 template<CreateAndAddable... W>
 struct Stack
 {
@@ -51,6 +55,17 @@ struct Stack
 		parent.setLayout(layout.get());
 		return layout;
 	}
+
+#ifdef USE_LAYOUT_ENGINE
+	std::unique_ptr<LayoutNode> buildNode()
+	{
+		auto node = makeBox(m_orient, m_flags.value_or(LayoutFlags{}));
+		std::apply([&](auto&... widget) {
+			(node->add(widget.buildNode()), ...);
+		}, m_widgets);
+		return node;
+	}
+#endif
 
 private:
 	Orientation m_orient;
