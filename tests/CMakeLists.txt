@@ -5,6 +5,10 @@
 add_executable(layout_tests
     test_main.cpp
     smoke_test.cpp
+    layout_flags_test.cpp
+    # Engine sources under test are compiled directly (not linked from
+    # DeclarativeUI) so they provably build without any backend.
+    ${CMAKE_SOURCE_DIR}/frameworks_core/LayoutFlags.cpp
 )
 
 target_include_directories(layout_tests PRIVATE
