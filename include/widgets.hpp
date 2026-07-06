@@ -1,11 +1,7 @@
 #pragma once
 
 #include "frameworks_core/ControlWrappers.hpp"
-#include "create_and_add.hpp"
-
-#ifdef USE_LAYOUT_ENGINE
 #include "frameworks_core/LayoutNode.hpp"
-#endif
 
 #include <functional>
 #include <memory>
@@ -19,24 +15,9 @@ struct Widget
 
 	virtual ~Widget() = default;
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-	{
-		if (m_preCreateCallback)
-			m_preCreateCallback();
-
-		auto control = createWrapper(m_position, m_size, m_style);
-		control->createAndAdd(parent, layout, m_flags.value_or(flags));
-
-		if (m_postCreateCallback)
-			m_postCreateCallback();
-		if (m_postCreateWithWidgetCallback)
-			m_postCreateWithWidgetCallback(control->nativeHandle());
-	}
-
-#ifdef USE_LAYOUT_ENGINE
-	// Engine path: emit a leaf node owning the wrapper — no rendering here;
-	// the backend draws in place(). pre/postCreate keep their meaning:
-	// they fire around native-wrapper creation during tree build.
+	// Emit a leaf node owning the wrapper — no rendering here; the backend
+	// realizes/draws it during the layout pass. pre/postCreate fire around
+	// wrapper creation during tree build.
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		if (m_preCreateCallback)
@@ -51,7 +32,6 @@ struct Widget
 			m_postCreateWithWidgetCallback(node->widget->nativeHandle());
 		return node;
 	}
-#endif
 
 	W& preCreate(std::function<void()> preCreateCallback)
 	{

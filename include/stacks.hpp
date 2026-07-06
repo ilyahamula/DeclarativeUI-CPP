@@ -4,13 +4,9 @@
 #include <optional>
 #include <tuple>
 
-#include "create_and_add.hpp"
+#include "buildable.hpp"
 
-#ifdef USE_LAYOUT_ENGINE
-#include "frameworks_core/LayoutNode.hpp"
-#endif
-
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct Stack
 {
 	Stack(Orientation orient, W... widgets)
@@ -26,37 +22,6 @@ struct Stack
 	{
 	}
 
-	std::unique_ptr<LayoutWrapper> createAndAdd(ControlWrapper* parent, LayoutFlags parentFlags)
-	{
-		auto layout = std::make_unique<LayoutWrapper>(m_orient);
-		::createAndAdd(parent, layout.get(), m_flags.value_or(parentFlags), m_widgets);
-		layout->finilizeLayout();
-		return layout;
-	}
-
-	std::unique_ptr<LayoutWrapper> createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
-	{
-		parentLayout->add(parentFlags);
-		auto layout = createAndAdd(parent, parentFlags);
-		parentLayout->add(layout.get(), parentFlags);
-		return layout;
-	}
-
-	std::unique_ptr<LayoutWrapper> fitTo(ControlWrapper* parent)
-	{
-		auto layout = createAndAdd(parent, m_flags.value_or(LayoutFlags()));
-		parent->setLayout(layout.get());
-		return layout;
-	}
-
-	std::unique_ptr<LayoutWrapper> fitTo(ControlWrapper&& parent)
-	{
-		auto layout = createAndAdd(&parent, m_flags.value_or(LayoutFlags()));
-		parent.setLayout(layout.get());
-		return layout;
-	}
-
-#ifdef USE_LAYOUT_ENGINE
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeBox(m_orient, m_flags.value_or(LayoutFlags{}));
@@ -65,7 +30,6 @@ struct Stack
 		}, m_widgets);
 		return node;
 	}
-#endif
 
 private:
 	Orientation m_orient;
@@ -73,7 +37,7 @@ private:
 	std::tuple<W...> m_widgets;
 };
 
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct HStack : public Stack<W...>
 {
 	HStack(W... widgets)
@@ -87,7 +51,7 @@ struct HStack : public Stack<W...>
 	}
 };
 
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct VStack : public Stack<W...>
 {
 	VStack(W... widgets)

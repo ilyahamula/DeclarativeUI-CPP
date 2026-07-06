@@ -3,9 +3,7 @@
 #include "frameworks_core/LayoutNode.hpp"
 
 // LayoutNode stores ControlWrapper* as an opaque back-pointer and never
-// dereferences it, so distinct fake addresses are enough for structure tests
-// (instantiating a real ControlWrapper would pull backend LayoutWrapper
-// symbols into this backend-free target).
+// dereferences it, so distinct fake addresses are enough for structure tests.
 static ControlWrapper* fakeWidget(int& tag)
 {
 	return reinterpret_cast<ControlWrapper*>(&tag);

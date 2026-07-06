@@ -1,5 +1,4 @@
 #include "frameworks_core/ControlWrappers.hpp"
-#include "frameworks_core/LayoutWrapper.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -30,9 +29,6 @@
 //
 // Each wrapper implements the engine path (measureIntrinsic + render) per the
 // measurement contract table in docs/specs/custom_layout_system/architecture.md.
-// The legacy path (createAndAdd) positions via LayoutWrapper and then calls
-// render() with kNaturalFrame, so both paths share one draw body.
-//
 // NOTE on editable fields: the declarative tree is rebuilt every frame on
 // ImGui, so "measure initial content" would re-measure the live value each
 // frame and grow the field while typing. ImGui editable fields therefore
@@ -140,15 +136,6 @@ void ButtonWrapper::render(const Rect& frame)
 	}
 }
 
-void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::createAndAdd()\t-> ImGui::Button()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // TextCtrlWrapper -----------------------------------------------------------
 
 Size TextCtrlWrapper::measureIntrinsic(const Constraints&)
@@ -178,15 +165,6 @@ void TextCtrlWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
-void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::createAndAdd()\t-> ImGui::InputText()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // PasswordInputWrapper -----------------------------------------------------------
 
 Size PasswordInputWrapper::measureIntrinsic(const Constraints&)
@@ -214,15 +192,6 @@ void PasswordInputWrapper::render(const Rect& frame)
 			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
-}
-
-void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::createAndAdd()\t-> ImGui::InputText(Password)\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -258,15 +227,6 @@ void MultiLineTextCtrlWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
-void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::createAndAdd()\t-> ImGui::InputTextMultiline()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
 
 Size ReadonlyTextCtrlWrapper::measureIntrinsic(const Constraints&)
@@ -286,15 +246,6 @@ void ReadonlyTextCtrlWrapper::render(const Rect& frame)
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
 	ImGui::PopID();
-}
-
-void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ReadonlyTextCtrlWrapper::createAndAdd()\t-> ImGui::InputText(ReadOnly)\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -319,15 +270,6 @@ void ClickableTextWrapper::render(const Rect& frame)
 		else if (m_onClickWithWidget)
 			m_onClickWithWidget(m_nativeWidget);
 	}
-}
-
-void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::createAndAdd()\t-> ImGui::Selectable()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // LinkTextWrapper -----------------------------------------------------------
@@ -356,15 +298,6 @@ void LinkTextWrapper::render(const Rect& frame)
 	}
 }
 
-void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::createAndAdd()\t-> ImGui::Selectable() [link style]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // StaticTextWrapper -----------------------------------------------------------
 
 Size StaticTextWrapper::measureIntrinsic(const Constraints& c)
@@ -383,15 +316,6 @@ void StaticTextWrapper::render(const Rect& frame)
 	ImGui::TextUnformatted(m_text.c_str());
 	if (wrap)
 		ImGui::PopTextWrapPos();
-}
-
-void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "StaticTextWrapper::createAndAdd()\t-> ImGui::TextUnformatted()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // DatePickerWrapper -----------------------------------------------------------
@@ -440,15 +364,6 @@ void DatePickerWrapper::render(const Rect&)
 		else if (m_onChangeWithWidget)
 			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
-}
-
-void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [date]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // TimePickerWrapper -----------------------------------------------------------
@@ -501,15 +416,6 @@ void TimePickerWrapper::render(const Rect&)
 	}
 }
 
-void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [time]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // SliderWrapper -----------------------------------------------------------
 
 template <SliderValue T>
@@ -543,16 +449,6 @@ void SliderWrapper<T>::render(const Rect& frame)
 		else if (m_onChangeWithWidget)
 			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
-}
-
-template <SliderValue T>
-void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::Slider()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 template class SliderWrapper<int>;
@@ -616,22 +512,6 @@ void SpinBoxWrapper<T>::render(const Rect& frame)
 	}
 }
 
-template <SpinBoxValue T>
-void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::Input()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	// legacy width heuristic: natural width = digits + step buttons
-	if (!flags.expand() && flags.proportion() == 0)
-	{
-		const Size natural = measureIntrinsic(Constraints { 0, 0 });
-		ImGui::SetNextItemWidth((float)natural.width);
-	}
-	render(kNaturalFrame);
-}
-
 template class SpinBoxWrapper<int>;
 template class SpinBoxWrapper<float>;
 
@@ -678,16 +558,6 @@ void RadioButtonWrapper<T>::render(const Rect&)
 	ImGui::PopID();
 }
 
-template <RadioButtonValue T>
-void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> ImGui::RadioButton()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 template class RadioButtonWrapper<bool>;
 template class RadioButtonWrapper<int>;
 
@@ -714,15 +584,6 @@ void CheckBoxWrapper::render(const Rect&)
 			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
 	}
 	ImGui::PopID();
-}
-
-void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::createAndAdd()\t-> ImGui::Checkbox()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // ToggleButtonWrapper -----------------------------------------------------------
@@ -760,15 +621,6 @@ void ToggleButtonWrapper::render(const Rect& frame)
 	if (wasToggled)
 		ImGui::PopStyleColor(2);
 	ImGui::PopID();
-}
-
-void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::createAndAdd()\t-> ImGui::Button() [toggle]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // ImageWrapper -----------------------------------------------------------
@@ -840,15 +692,6 @@ void ImageWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
-void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ImageWrapper::createAndAdd()\t-> ImGui::Image()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
@@ -905,16 +748,6 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 	ImGui::PopID();
 }
 
-template <ComboBoxValue T>
-void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> ImGui::Combo()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
@@ -947,15 +780,6 @@ void ColorPickerWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
-void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ColorPickerWrapper::createAndAdd()\t-> ImGui::ColorEdit4()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
-}
-
 // SeparatorWrapper -----------------------------------------------------------
 
 Size SeparatorWrapper::measureIntrinsic(const Constraints&)
@@ -967,15 +791,6 @@ Size SeparatorWrapper::measureIntrinsic(const Constraints&)
 void SeparatorWrapper::render(const Rect&)
 {
 	ImGui::Separator();
-}
-
-void SeparatorWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SeparatorWrapper::createAndAdd()\t-> ImGui::Separator()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	render(kNaturalFrame);
 }
 
 // ProgressBarWrapper -----------------------------------------------------------
@@ -994,22 +809,4 @@ void ProgressBarWrapper::render(const Rect& frame)
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::ProgressBar(std::clamp(value, 0.0f, 1.0f), size);
 	ImGui::PopID();
-}
-
-void ProgressBarWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::createAndAdd()\t-> ImGui::ProgressBar()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	// legacy expand behavior: fill remaining width
-	if (flags.expand())
-	{
-		ImGui::PushID(WidgetIdManager::nextWidgetId());
-		const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
-		ImGui::ProgressBar(std::clamp(value, 0.0f, 1.0f), ImVec2(-FLT_MIN, 0.0f));
-		ImGui::PopID();
-		return;
-	}
-	render(kNaturalFrame);
 }

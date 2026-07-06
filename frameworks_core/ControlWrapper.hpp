@@ -1,8 +1,6 @@
 #pragma once
 
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
-#include "LayoutFlags.hpp"
-#include "LayoutWrapper.hpp"
 
 class ControlWrapper
 {
@@ -22,9 +20,12 @@ public:
 	{
 	}
 
-	virtual void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+	// Create the native widget under `parentWindow` and bind its events
+	// (retained backends: wxWindow* / QWidget*). Immediate backends create
+	// nothing — they draw in render().
+	virtual void realize(void* parentWindow)
 	{
-		layout->add(this, flags);
+		(void)parentWindow;
 	}
 
 	// -- engine path (LayoutEngine / ILayoutBackend) --------------------------
@@ -63,7 +64,12 @@ public:
 		return m_nativeWidget;
 	}
 
-	void setLayout(LayoutWrapper* layout);
+	// The user-requested withSize() dimensions ({-1,-1} = none); retained
+	// backends apply them as per-axis overrides of the native best size.
+	const Size& explicitSize() const
+	{
+		return m_size;
+	}
 
 protected:
 	void* m_nativeWidget = nullptr;

@@ -1,13 +1,11 @@
 #include "frameworks_core/DialogWrapper.hpp"
 #include "frameworks_core/ControlWrappers.hpp"
-#include "frameworks_core/GroupBoxWrapper.hpp"
-#include "frameworks_core/LayoutWrapper.hpp"
 
-#ifdef USE_LAYOUT_ENGINE
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
-#endif
+
+#include <algorithm>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -18,7 +16,7 @@
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
+	Logger::instance().log("DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
 #endif
 	ImGuiWindowFlags flags = ImGuiWindowFlags_None;
 	if (size.width > 0 && size.height > 0)
@@ -31,15 +29,17 @@ DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 void DialogWrapper::show()
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "DialogWrapper::show()\t-> ImGui::End()\n");
+	Logger::instance().log("DialogWrapper::show()\t-> ImGui::End()\n");
 	Logger::instance().stopLogging();
 #endif
 	ImGui::End();
 }
 
-#ifdef USE_LAYOUT_ENGINE
-void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size, LayoutNode& root)
+void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
+	std::unique_ptr<LayoutNode> rootPtr, bool resizable)
 {
+	// immediate mode: the tree lives for this frame only
+	LayoutNode& root = *rootPtr;
 	ImGuiLayoutBackend backend;
 	LayoutEngine engine(backend);
 
@@ -59,12 +59,37 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size, 
 		: Size { -1, -1 };
 	const Size content = engine.resolve(root, contentRequest);
 
-	// the engine owns the window size; the user cannot resize it
-	ImGui::SetNextWindowSize(
-		ImVec2((float)(content.width + chromeW), (float)(content.height + chromeH)),
-		ImGuiCond_Always);
-	if (ImGui::Begin(title.c_str(), nullptr, ImGuiWindowFlags_NoResize))
-		engine.render(root, content);
+	const ImVec2 winSize((float)(content.width + chromeW), (float)(content.height + chromeH));
+	ImGuiWindowFlags winFlags = ImGuiWindowFlags_None;
+	if (resizable)
+	{
+		// the measured content is the floor: the user can grow the window
+		// but never shrink content into clipping
+		const EdgeInsets margin = root.flags.border();
+		const ImVec2 minWinSize(
+			(float)(root.desired.width + margin.left + margin.right + chromeW),
+			(float)(root.desired.height + margin.top + margin.bottom + chromeH));
+		ImGui::SetNextWindowSizeConstraints(minWinSize, ImVec2(FLT_MAX, FLT_MAX));
+		ImGui::SetNextWindowSize(winSize, ImGuiCond_FirstUseEver);
+	}
+	else
+	{
+		// the engine owns the window size; the user cannot resize it
+		ImGui::SetNextWindowSize(winSize, ImGuiCond_Always);
+		winFlags |= ImGuiWindowFlags_NoResize;
+	}
+
+	if (ImGui::Begin(title.c_str(), nullptr, winFlags))
+	{
+		Size renderContent = content;
+		if (resizable)
+		{
+			// fill whatever size the user gave the window
+			const ImVec2 actual = ImGui::GetWindowSize();
+			renderContent.width = std::max(content.width, (int)actual.x - chromeW);
+			renderContent.height = std::max(content.height, (int)actual.y - chromeH);
+		}
+		engine.render(root, renderContent);
+	}
 	ImGui::End();
 }
-#endif

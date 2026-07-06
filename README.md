@@ -39,12 +39,15 @@ return Dialog {
 
 ## Features
 
-- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, and `Dialog`
+- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, `TabPanel`, and `Dialog`
+- **Framework-owned layout engine** — one shared measure/arrange engine computes every rectangle; backends only measure native widgets and place them, so the same tree follows identical layout rules on every backend (see `docs/specs/custom_layout_system/`)
+- **Sensible defaults, no flags required** — widgets size to their content (text fields never collapse below their text), sibling group boxes in a column equalize to the widest one (tallest in a row), and dialogs auto-fit their content
+- **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
+- **Dialog sizing policy** — dialogs are not user-resizable by default; opt in with `Dialog::Resizable()`, where the auto-fit size becomes the initial *and minimum* size so content can never be clipped
 - **CRTP widget hierarchy** — `Widget<T>` base with fluent `.withFlags()`, `.withSize()`, `.withPosition()`, `.withStyle()` modifiers
-- **Flexible layout system** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`
 - **Two-way data binding** — widgets accept either owned values or external references that stay in sync
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()` on supported widgets
-- **Multi-backend** — compile against ImGui, wxWidgets, or Qt with `USE_IMGUI` / `USE_WX` / `USE_QT`
+- **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
 
 ## Widget Catalogue
 
@@ -61,13 +64,18 @@ return Dialog {
 
 ## Building
 
-Select your backend via CMake:
+Select your backend via the `UI_FRAMEWORK` CMake variable (`IMGUI`, `WX`, or `QT`):
 
 ```sh
-cmake -DUSE_IMGUI=ON ..
-cmake --build .
+cmake -DUI_FRAMEWORK=IMGUI -B build/imgui
+cmake --build build/imgui
 ```
 
-Replace `USE_IMGUI` with `USE_WX` or `USE_QT` as needed.
+Per-backend build directories (`build/imgui`, `build/wx`, `build/qt`) can coexist.
+Unit tests for the layout engine are backend-free:
 
-The default build directory is `build/`. OpenGL deprecation warnings on macOS are expected and come from the ImGui backend, not from this project.
+```sh
+ctest --test-dir build/imgui        # or run build/<backend>/tests/layout_tests
+```
+
+OpenGL deprecation warnings on macOS are expected and come from the ImGui backend, not from this project.

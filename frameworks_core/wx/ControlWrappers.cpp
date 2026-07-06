@@ -1,5 +1,4 @@
 #include "frameworks_core/ControlWrappers.hpp"
-#include "frameworks_core/LayoutWrapper.hpp"
 #include <algorithm>
 
 #ifdef USE_LOGGER
@@ -18,26 +17,18 @@
 #include <wx/clrpicker.h>
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
-// createAndAdd() creates the native wxWidget from the collected data (plus the
-// position/size/style stored in the ControlWrapper base), binds its events, and
-// then registers it with the layout via ControlWrapper::createAndAdd().
-
-namespace
-{
-	inline wxWindow* parentWindow(ControlWrapper* parent)
-	{
-		return reinterpret_cast<wxWindow*>(parent->nativeHandle());
-	}
-}
+// realize() creates the native wxWidget from the collected data (plus the
+// position/size/style stored in the ControlWrapper base) under the given
+// parent window and binds its events; the layout engine measures and places.
 
 // ButtonWrapper -----------------------------------------------------------
 
-void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ButtonWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::createAndAdd()\t-> new wxButton()\n");
+	Logger::instance().log("ButtonWrapper::realize()\t-> new wxButton()\n");
 #endif
-	auto* btn = new wxButton(parentWindow(parent), wxID_ANY, m_label,
+	auto* btn = new wxButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = btn;
 
@@ -46,18 +37,17 @@ void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, 
 	else if (m_onClickWithWidget)
 		btn->Bind(wxEVT_BUTTON, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cb(nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
 
-void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void TextCtrlWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::createAndAdd()\t-> new wxTextCtrl()\n");
+	Logger::instance().log("TextCtrlWrapper::realize()\t-> new wxTextCtrl()\n");
 #endif
 	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* txt = new wxTextCtrl(parentWindow(parent), wxID_ANY, initial,
+	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = txt;
 
@@ -75,18 +65,17 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	else if (m_onChangeWithWidget)
 		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // PasswordInputWrapper -----------------------------------------------------------
 
-void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void PasswordInputWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::createAndAdd()\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
+	Logger::instance().log("PasswordInputWrapper::realize()\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
 #endif
 	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* txt = new wxTextCtrl(parentWindow(parent), wxID_ANY, initial,
+	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_PASSWORD);
 	m_nativeWidget = txt;
 
@@ -104,18 +93,17 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 	else if (m_onChangeWithWidget)
 		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
-void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::createAndAdd()\t-> new wxTextCtrl(wxTE_MULTILINE)\n");
+	Logger::instance().log("MultiLineTextCtrlWrapper::realize()\t-> new wxTextCtrl(wxTE_MULTILINE)\n");
 #endif
 	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* txt = new wxTextCtrl(parentWindow(parent), wxID_ANY, initial,
+	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_MULTILINE);
 	m_nativeWidget = txt;
 
@@ -133,30 +121,28 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 	else if (m_onChangeWithWidget)
 		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
 
-void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ReadonlyTextCtrlWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ReadonlyTextCtrlWrapper::createAndAdd()\t-> new wxTextCtrl(wxTE_READONLY)\n");
+	Logger::instance().log("ReadonlyTextCtrlWrapper::realize()\t-> new wxTextCtrl(wxTE_READONLY)\n");
 #endif
-	m_nativeWidget = new wxTextCtrl(parentWindow(parent), wxID_ANY, m_value,
+	m_nativeWidget = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_value,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_READONLY);
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ClickableTextWrapper -----------------------------------------------------------
 
-void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ClickableTextWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::createAndAdd()\t-> new wxStaticText()\n");
+	Logger::instance().log("ClickableTextWrapper::realize()\t-> new wxStaticText()\n");
 #endif
-	auto* st = new wxStaticText(parentWindow(parent), wxID_ANY, m_text,
+	auto* st = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = st;
 
@@ -165,17 +151,16 @@ void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 	else if (m_onClickWithWidget)
 		st->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // LinkTextWrapper -----------------------------------------------------------
 
-void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void LinkTextWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::createAndAdd()\t-> new wxHyperlinkCtrl()\n");
+	Logger::instance().log("LinkTextWrapper::realize()\t-> new wxHyperlinkCtrl()\n");
 #endif
-	auto* link = new wxHyperlinkCtrl(parentWindow(parent), wxID_ANY, m_text, wxEmptyString,
+	auto* link = new wxHyperlinkCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text, wxEmptyString,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = link;
 
@@ -184,35 +169,33 @@ void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	else if (m_onClickWithWidget)
 		link->Bind(wxEVT_HYPERLINK, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxHyperlinkEvent&) { cb(nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // StaticTextWrapper -----------------------------------------------------------
 
-void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void StaticTextWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "StaticTextWrapper::createAndAdd()\t-> new wxStaticText()\n");
+	Logger::instance().log("StaticTextWrapper::realize()\t-> new wxStaticText()\n");
 #endif
-	m_nativeWidget = new wxStaticText(parentWindow(parent), wxID_ANY, m_text,
+	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // DatePickerWrapper -----------------------------------------------------------
 
-void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void DatePickerWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::createAndAdd()\t-> new wxDatePickerCtrl()\n");
+	Logger::instance().log("DatePickerWrapper::realize()\t-> new wxDatePickerCtrl()\n");
 #endif
 	const Date& dval = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	wxDateTime dt;
 	dt.Set(static_cast<wxDateTime::wxDateTime_t>(dval.day),
 		static_cast<wxDateTime::Month>(dval.month - 1),
 		dval.year);
-	auto* dp = new wxDatePickerCtrl(parentWindow(parent), wxID_ANY, dt,
+	auto* dp = new wxDatePickerCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, dt,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = dp;
 
@@ -241,22 +224,21 @@ void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			cbw(date, nw);
 		});
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // TimePickerWrapper -----------------------------------------------------------
 
-void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void TimePickerWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::createAndAdd()\t-> new wxTimePickerCtrl()\n");
+	Logger::instance().log("TimePickerWrapper::realize()\t-> new wxTimePickerCtrl()\n");
 #endif
 	const Time& tval = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	wxDateTime dt = wxDateTime::Now();
 	dt.SetHour(tval.hour);
 	dt.SetMinute(tval.minute);
 	dt.SetSecond(tval.second);
-	auto* tp = new wxTimePickerCtrl(parentWindow(parent), wxID_ANY, dt,
+	auto* tp = new wxTimePickerCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, dt,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = tp;
 
@@ -285,16 +267,15 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			cbw(time, nw);
 		});
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // SliderWrapper -----------------------------------------------------------
 
 template <SliderValue T>
-void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void SliderWrapper<T>::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> new wxSlider()\n");
+	Logger::instance().log("SliderWrapper::realize()\t-> new wxSlider()\n");
 #endif
 	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	wxSlider* sl = nullptr;
@@ -303,12 +284,12 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 		int iMin = static_cast<int>(m_range.min / m_range.step);
 		int iMax = static_cast<int>(m_range.max / m_range.step);
 		int iVal = static_cast<int>(val / m_range.step);
-		sl = new wxSlider(parentWindow(parent), wxID_ANY, iVal, iMin, iMax,
+		sl = new wxSlider(static_cast<wxWindow*>(parentWindow), wxID_ANY, iVal, iMin, iMax,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	}
 	else
 	{
-		sl = new wxSlider(parentWindow(parent), wxID_ANY, static_cast<int>(val), m_range.min, m_range.max,
+		sl = new wxSlider(static_cast<wxWindow*>(parentWindow), wxID_ANY, static_cast<int>(val), m_range.min, m_range.max,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	}
 	m_nativeWidget = sl;
@@ -344,7 +325,6 @@ void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layou
 			sl->Bind(wxEVT_SLIDER, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(static_cast<T>(evt.GetInt()), nw); });
 	}
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 template class SliderWrapper<int>;
@@ -353,15 +333,15 @@ template class SliderWrapper<float>;
 // SpinBoxWrapper -----------------------------------------------------------
 
 template <SpinBoxValue T>
-void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void SpinBoxWrapper<T>::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> new wxSpinCtrl[Double]()\n");
+	Logger::instance().log("SpinBoxWrapper::realize()\t-> new wxSpinCtrl[Double]()\n");
 #endif
 	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	if constexpr (std::is_same_v<T, int>)
 	{
-		auto* spin = new wxSpinCtrl(parentWindow(parent), wxID_ANY, wxEmptyString,
+		auto* spin = new wxSpinCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxEmptyString,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style,
 			m_range.min, m_range.max, static_cast<int>(val));
 		m_nativeWidget = spin;
@@ -382,7 +362,7 @@ void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 	}
 	else
 	{
-		auto* spin = new wxSpinCtrlDouble(parentWindow(parent), wxID_ANY, wxEmptyString,
+		auto* spin = new wxSpinCtrlDouble(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxEmptyString,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style,
 			m_range.min, m_range.max, static_cast<double>(val), m_range.step);
 		m_nativeWidget = spin;
@@ -402,7 +382,6 @@ void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 			spin->Bind(wxEVT_SPINCTRLDOUBLE, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinDoubleEvent& evt) { cbw(static_cast<T>(evt.GetValue()), nw); });
 	}
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 template class SpinBoxWrapper<int>;
@@ -411,16 +390,16 @@ template class SpinBoxWrapper<float>;
 // RadioButtonWrapper -----------------------------------------------------------
 
 template <RadioButtonValue T>
-void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void RadioButtonWrapper<T>::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> new wxRadioButton()\n");
+	Logger::instance().log("RadioButtonWrapper::realize()\t-> new wxRadioButton()\n");
 #endif
 	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	wxRadioButton* rb = nullptr;
 	if constexpr (std::is_same_v<T, bool>)
 	{
-		rb = new wxRadioButton(parentWindow(parent), wxID_ANY, m_label,
+		rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 		rb->SetValue(val);
 	}
@@ -429,7 +408,7 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 		// m_index (assigned at construction) is the radio's position within its
 		// group; index 0 starts a new wx radio group.
 		long groupStyle = (m_index == 0) ? wxRB_GROUP : 0;
-		rb = new wxRadioButton(parentWindow(parent), wxID_ANY, m_label,
+		rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | groupStyle);
 		rb->SetValue(static_cast<int>(val) == m_index);
 	}
@@ -466,7 +445,6 @@ void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* 
 			rb->Bind(wxEVT_RADIOBUTTON, [index = m_index, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cbw(static_cast<T>(index), nw); });
 	}
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 template class RadioButtonWrapper<bool>;
@@ -474,13 +452,13 @@ template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
 
-void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void CheckBoxWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::createAndAdd()\t-> new wxCheckBox()\n");
+	Logger::instance().log("CheckBoxWrapper::realize()\t-> new wxCheckBox()\n");
 #endif
 	const bool checked = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* chk = new wxCheckBox(parentWindow(parent), wxID_ANY, m_label,
+	auto* chk = new wxCheckBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	chk->SetValue(checked);
 	m_nativeWidget = chk;
@@ -499,18 +477,17 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 	else if (m_onChangeWithWidget)
 		chk->Bind(wxEVT_CHECKBOX, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.IsChecked(), nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ToggleButtonWrapper -----------------------------------------------------------
 
-void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ToggleButtonWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::createAndAdd()\t-> new wxToggleButton()\n");
+	Logger::instance().log("ToggleButtonWrapper::realize()\t-> new wxToggleButton()\n");
 #endif
 	const bool toggled = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* btn = new wxToggleButton(parentWindow(parent), wxID_ANY, m_label,
+	auto* btn = new wxToggleButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	btn->SetValue(toggled);
 	m_nativeWidget = btn;
@@ -529,15 +506,14 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 	else if (m_onChangeWithWidget)
 		btn->Bind(wxEVT_TOGGLEBUTTON, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.IsChecked(), nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ImageWrapper -----------------------------------------------------------
 
-void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ImageWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ImageWrapper::createAndAdd()\t-> new wxStaticBitmap()\n");
+	Logger::instance().log("ImageWrapper::realize()\t-> new wxStaticBitmap()\n");
 #endif
 	static bool s_handlersInit = false;
 	if (!s_handlersInit)
@@ -549,7 +525,7 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 	if (wxImg.IsOk() && m_size.width > 0 && m_size.height > 0)
 		wxImg = wxImg.Scale(m_size.width, m_size.height, wxIMAGE_QUALITY_HIGH);
 	wxBitmap bmp(wxImg.IsOk() ? wxImg : wxImage(16, 16));
-	auto* bmpCtrl = new wxStaticBitmap(parentWindow(parent), wxID_ANY, bmp,
+	auto* bmpCtrl = new wxStaticBitmap(static_cast<wxWindow*>(parentWindow), wxID_ANY, bmp,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = bmpCtrl;
 
@@ -563,18 +539,17 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 	else if (m_onHoverWithWidget)
 		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ColorPickerWrapper -----------------------------------------------------------
 
-void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ColorPickerWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ColorPickerWrapper::createAndAdd()\t-> new wxColourPickerCtrl()\n");
+	Logger::instance().log("ColorPickerWrapper::realize()\t-> new wxColourPickerCtrl()\n");
 #endif
 	const Color& cval = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* picker = new wxColourPickerCtrl(parentWindow(parent), wxID_ANY,
+	auto* picker = new wxColourPickerCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY,
 		wxColour(static_cast<unsigned char>(cval.r * 255),
 		         static_cast<unsigned char>(cval.g * 255),
 		         static_cast<unsigned char>(cval.b * 255),
@@ -603,51 +578,48 @@ void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 			cbw(Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f }, nw);
 		});
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // SeparatorWrapper -----------------------------------------------------------
 
-void SeparatorWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void SeparatorWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SeparatorWrapper::createAndAdd()\t-> new wxStaticLine()\n");
+	Logger::instance().log("SeparatorWrapper::realize()\t-> new wxStaticLine()\n");
 #endif
-	m_nativeWidget = new wxStaticLine(parentWindow(parent), wxID_ANY,
+	m_nativeWidget = new wxStaticLine(static_cast<wxWindow*>(parentWindow), wxID_ANY,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxLI_HORIZONTAL);
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ProgressBarWrapper -----------------------------------------------------------
 
-void ProgressBarWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ProgressBarWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::createAndAdd()\t-> new wxGauge()\n");
+	Logger::instance().log("ProgressBarWrapper::realize()\t-> new wxGauge()\n");
 #endif
 	const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	auto* gauge = new wxGauge(parentWindow(parent), wxID_ANY, 100,
+	auto* gauge = new wxGauge(static_cast<wxWindow*>(parentWindow), wxID_ANY, 100,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxGA_HORIZONTAL | wxGA_SMOOTH);
 	gauge->SetValue(static_cast<int>(std::clamp(value, 0.0f, 1.0f) * 100));
 	m_nativeWidget = gauge;
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
-void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+void ComboBoxWrapper<T>::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> new wxComboBox()\n");
+	Logger::instance().log("ComboBoxWrapper::realize()\t-> new wxComboBox()\n");
 #endif
 	wxArrayString items;
 	for (const auto& c : m_choices)
 		items.Add(c);
 	const T& selected = m_externalRef ? m_externalRef->get() : m_ownedSelected;
-	auto* combo = new wxComboBox(parentWindow(parent), wxID_ANY, "",
+	auto* combo = new wxComboBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, "",
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items, m_style);
 	if constexpr (std::is_same_v<T, std::string>)
 		combo->SetValue(selected);
@@ -686,7 +658,6 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 			combo->Bind(wxEVT_COMBOBOX, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(static_cast<T>(evt.GetSelection()), nw); });
 	}
 
-	ControlWrapper::createAndAdd(parent, layout, flags);
 }
 
 template class ComboBoxWrapper<std::string>;

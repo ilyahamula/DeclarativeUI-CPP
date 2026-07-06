@@ -2,16 +2,12 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <tuple>
 
-#include "frameworks_core/GroupBoxWrapper.hpp"
-#include "create_and_add.hpp"
+#include "buildable.hpp"
 
-#ifdef USE_LAYOUT_ENGINE
-#include "frameworks_core/LayoutNode.hpp"
-#endif
-
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct GroupBox
 {
 	GroupBox(Orientation orient, const std::string& label, W... widgets)
@@ -29,30 +25,6 @@ struct GroupBox
 	{
 	}
 
-	std::unique_ptr<GroupBoxWrapper> createAndAdd(ControlWrapper* parent, LayoutFlags parentFlags)
-	{
-		auto box = std::make_unique<GroupBoxWrapper>(parent, m_orient, m_label);
-		::createAndAdd(box->staticBox(), box.get(), m_flags.value_or(parentFlags), m_widgets);
-		box->finilizeLayout();
-		return box;
-	}
-
-	auto createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags parentFlags)
-	{
-		parentLayout->add(parentFlags);
-		auto box = createAndAdd(parent, parentFlags);
-		parentLayout->add(box.get(), parentFlags);
-		return box;
-	}
-
-	auto fitTo(ControlWrapper* parent)
-	{
-		auto box = createAndAdd(parent, m_flags.value_or(LayoutFlags()));
-		parent->setLayout(box.get());
-		return box;
-	}
-
-#ifdef USE_LAYOUT_ENGINE
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeGroupBox(m_orient, m_label, m_flags.value_or(LayoutFlags{}));
@@ -61,7 +33,6 @@ struct GroupBox
 		}, m_widgets);
 		return node;
 	}
-#endif
 
 private:
 	Orientation m_orient;
@@ -70,7 +41,7 @@ private:
 	std::tuple<W...> m_widgets;
 };
 
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct HGroupBox : public GroupBox<W...>
 {
 	HGroupBox(W... widgets)
@@ -94,7 +65,7 @@ struct HGroupBox : public GroupBox<W...>
 	}
 };
 
-template<CreateAndAddable... W>
+template<NodeBuildable... W>
 struct VGroupBox : public GroupBox<W...>
 {
 	VGroupBox(W... widgets)

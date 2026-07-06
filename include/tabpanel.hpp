@@ -1,20 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <type_traits>
 
-#include "create_and_add.hpp"
-#include "fittable_layout.hpp"
-#include "frameworks_core/TabPanelWrapper.hpp"
-
-#ifdef USE_LAYOUT_ENGINE
-#include "frameworks_core/LayoutNode.hpp"
-#endif
+#include "buildable.hpp"
 
 template<typename T>
-concept TabContent = CreateAndAddable<T> && FittableLayout<T>;
+concept TabContent = NodeBuildable<T>;
 
 // ---------------------------------------------------------------------------
 // Tab — a single named tab with a content widget tree
@@ -65,23 +60,6 @@ struct TabPanel
 		, m_tabs(std::make_tuple(std::move(tabs)...))
 	{}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* parentLayout, LayoutFlags flags)
-	{
-		TabPanelWrapper wrapper(parent);
-		wrapper.addToLayout(parentLayout, m_flags.value_or(flags));
-		addTabs(wrapper);
-		wrapper.finalize();
-	}
-
-	void fitTo(ControlWrapper* parent)
-	{
-		TabPanelWrapper wrapper(parent);
-		wrapper.fitAsRoot(parent);
-		addTabs(wrapper);
-		wrapper.finalize();
-	}
-
-#ifdef USE_LAYOUT_ENGINE
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeTabPanel(m_flags.value_or(LayoutFlags{}));
@@ -93,22 +71,8 @@ struct TabPanel
 		}, m_tabs);
 		return node;
 	}
-#endif
 
 private:
 	std::optional<LayoutFlags> m_flags;
 	std::tuple<Tabs...> m_tabs;
-
-	void addTabs(TabPanelWrapper& wrapper)
-	{
-		std::apply([&](auto&... tab) {
-			([&] {
-				if (wrapper.beginTab(tab.label()))
-				{
-					tab.content().fitTo(wrapper.tabPageParent());
-					wrapper.endTab();
-				}
-			}(), ...);
-		}, m_tabs);
-	}
 };

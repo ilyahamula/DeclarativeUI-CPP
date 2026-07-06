@@ -23,6 +23,7 @@ inline auto drawControlsUI(
     std::function<void()> onCheckClick = []() {},
     std::function<void()> onMessageBoxClick = []() {})
 {
+    // Resizable: the auto-fit size is the initial and minimum window size
     return Dialog {
         "Controls Demo",
         VStack {
@@ -32,7 +33,7 @@ inline auto drawControlsUI(
                 VStack {
                     VGroupBox { "Text Input",
                         MultiLineTextCtrl{multilineText}
-                            .withFlags(LayoutFlags().Expand()),
+                            .withFlags(LayoutFlags().Expand().AutoGrow()),
                         HStack {
                             StaticText{"Password:"}
                                 .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
@@ -138,7 +139,7 @@ inline auto drawControlsUI(
                 })
             }
         }
-    };
+    }.Resizable();
 }
 
 inline auto drawUI(std::string& text,
