@@ -807,6 +807,7 @@ void ProgressBarWrapper::render(const Rect& frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	ImGui::ProgressBar(std::clamp(value, 0.0f, 1.0f), size);
+	auto clampedValue = std::clamp(value / 100.0f, 0.0f, 1.0f);
+	ImGui::ProgressBar(clampedValue, size);
 	ImGui::PopID();
 }
