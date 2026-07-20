@@ -1,6 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
-#include "frameworks_core/LayoutWrapper.hpp"
 #include <algorithm>
+#include <cmath>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -26,39 +26,131 @@
 // pos, size, style: not directly applicable in ImGui immediate mode.
 // Empty labels are mapped to a hidden ("##...") id at render time so the
 // stored label keeps the raw value the caller passed.
+//
+// Each wrapper implements the engine path (measureIntrinsic + render) per the
+// measurement contract table in docs/specs/custom_layout_system/architecture.md.
+// NOTE on editable fields: the declarative tree is rebuilt every frame on
+// ImGui, so "measure initial content" would re-measure the live value each
+// frame and grow the field while typing. ImGui editable fields therefore
+// measure content-independent defaults (the N-char floor); content-based
+// initial sampling applies to the retained backends (Phase 3).
+
+namespace
+{
+
+// "natural size" frame for the legacy path: render() applies no explicit size
+const Rect kNaturalFrame { -1, -1, -1, -1 };
+
+bool sized(const Rect& frame)
+{
+	return frame.width > 0;
+}
+
+int ceilInt(float v)
+{
+	return (int)std::ceil(v);
+}
+
+int frameHeight()
+{
+	return ceilInt(ImGui::GetFrameHeight());
+}
+
+// text-only items (StaticText, Selectable)
+Size textItemSize(const std::string& text)
+{
+	const ImVec2 t = ImGui::CalcTextSize(text.c_str());
+	return Size { ceilInt(t.x), ceilInt(t.y) };
+}
+
+// Selectable-based items (ClickableText, LinkText): the item rect is always
+// size_arg + ItemSpacing (the interactive area extends into the spacing), so
+// measure reports text + spacing and render passes frame - spacing back.
+Size selectableSize(const std::string& text)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const ImVec2 t = ImGui::CalcTextSize(text.c_str());
+	return Size { ceilInt(t.x + style.ItemSpacing.x), ceilInt(t.y + style.ItemSpacing.y) };
+}
+
+ImVec2 selectableSizeArg(const Rect& frame)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	return ImVec2(std::max(1.0f, (float)frame.width - style.ItemSpacing.x),
+		std::max(1.0f, (float)frame.height - style.ItemSpacing.y));
+}
+
+// framed items (Button): label + FramePadding
+Size framedTextSize(const std::string& text)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const ImVec2 t = ImGui::CalcTextSize(text.c_str());
+	return Size { ceilInt(t.x + style.FramePadding.x * 2.0f), frameHeight() };
+}
+
+// N-average-character floor for editable fields (architecture.md, N = 10)
+int editableFloorWidth()
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	return ceilInt(ImGui::CalcTextSize("0").x * 10.0f + style.FramePadding.x * 2.0f);
+}
+
+// glyph + label (CheckBox, RadioButton)
+Size glyphLabelSize(const std::string& label)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float glyph = ImGui::GetFrameHeight();
+	const float text = label.empty() ? 0.0f
+		: style.ItemInnerSpacing.x + ImGui::CalcTextSize(label.c_str()).x;
+	return Size { ceilInt(glyph + text), frameHeight() };
+}
+
+// default width for value controls with no content-derived width
+// (Slider, ProgressBar, ColorPicker) — an engine-path stand-in for
+// ImGui's window-relative CalcItemWidth
+constexpr int kDefaultControlWidth = 200;
+
+} // unnamed namespace
 
 // ButtonWrapper -----------------------------------------------------------
 
-void ButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ButtonWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ButtonWrapper::createAndAdd()\t-> ImGui::Button()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return framedTextSize(m_label);
+}
+
+void ButtonWrapper::render(const Rect& frame)
+{
 	const char* label = m_label.empty() ? "##button" : m_label.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	if (ImGui::Button(label))
+	const bool clicked = sized(frame)
+		? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
+		: ImGui::Button(label);
+	ImGui::PopID();
+	if (clicked)
 	{
 		if (m_onClick)
 			m_onClick();
 		else if (m_onClickWithWidget)
 			m_onClickWithWidget(m_nativeWidget);
 	}
-	ImGui::PopID();
 }
 
 // TextCtrlWrapper -----------------------------------------------------------
 
-void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size TextCtrlWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TextCtrlWrapper::createAndAdd()\t-> ImGui::InputText()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return Size { editableFloorWidth(), frameHeight() };
+}
+
+void TextCtrlWrapper::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
 	{
@@ -75,16 +167,19 @@ void TextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 
 // PasswordInputWrapper -----------------------------------------------------------
 
-void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size PasswordInputWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "PasswordInputWrapper::createAndAdd()\t-> ImGui::InputText(Password)\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return Size { editableFloorWidth(), frameHeight() };
+}
+
+void PasswordInputWrapper::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
 	{
@@ -101,18 +196,25 @@ void PasswordInputWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* l
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
-void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size MultiLineTextCtrlWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "MultiLineTextCtrlWrapper::createAndAdd()\t-> ImGui::InputTextMultiline()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// ImGui's default multiline height (8 text lines + frame padding)
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const int height = ceilInt(ImGui::GetTextLineHeight() * 8.0f + style.FramePadding.y * 2.0f);
+	return Size { editableFloorWidth(), height };
+}
+
+void MultiLineTextCtrlWrapper::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	char buf[4096] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	const ImVec2 size = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0, 0);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf)))
+	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf), size))
 	{
 		m_ownedValue = buf;
 		if (m_externalRef)
@@ -127,14 +229,20 @@ void MultiLineTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrappe
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
 
-void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ReadonlyTextCtrlWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ReadonlyTextCtrlWrapper::createAndAdd()\t-> ImGui::InputText(ReadOnly)\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// readonly content is static, so it may size to its text (with floor)
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const int contentW = ceilInt(ImGui::CalcTextSize(m_value.c_str()).x + style.FramePadding.x * 2.0f);
+	return Size { std::max(contentW, editableFloorWidth()), frameHeight() };
+}
+
+void ReadonlyTextCtrlWrapper::render(const Rect& frame)
+{
 	char buf[256] = {};
 	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
 	ImGui::PopID();
@@ -142,36 +250,43 @@ void ReadonlyTextCtrlWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper
 
 // ClickableTextWrapper -----------------------------------------------------------
 
-void ClickableTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ClickableTextWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ClickableTextWrapper::createAndAdd()\t-> ImGui::Selectable()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return selectableSize(m_text);
+}
+
+void ClickableTextWrapper::render(const Rect& frame)
+{
 	const char* text = m_text.empty() ? "##clickable" : m_text.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	if (ImGui::Selectable(text))
+	const bool clicked = sized(frame)
+		? ImGui::Selectable(text, false, 0, selectableSizeArg(frame))
+		: ImGui::Selectable(text);
+	ImGui::PopID();
+	if (clicked)
 	{
 		if (m_onClick)
 			m_onClick();
 		else if (m_onClickWithWidget)
 			m_onClickWithWidget(m_nativeWidget);
 	}
-	ImGui::PopID();
 }
 
 // LinkTextWrapper -----------------------------------------------------------
 
-void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size LinkTextWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "LinkTextWrapper::createAndAdd()\t-> ImGui::Selectable() [link style]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return selectableSize(m_text);
+}
+
+void LinkTextWrapper::render(const Rect& frame)
+{
 	const char* text = m_text.empty() ? "##link" : m_text.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.26f, 0.59f, 0.98f, 1.00f));
-	bool clicked = ImGui::Selectable(text);
+	const bool clicked = sized(frame)
+		? ImGui::Selectable(text, false, 0, selectableSizeArg(frame))
+		: ImGui::Selectable(text);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
 	if (clicked)
@@ -185,23 +300,40 @@ void LinkTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 
 // StaticTextWrapper -----------------------------------------------------------
 
-void StaticTextWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size StaticTextWrapper::measureIntrinsic(const Constraints& c)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "StaticTextWrapper::createAndAdd()\t-> ImGui::TextUnformatted()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// wraps at the offered width (auto-fit cap / fixed dialog width)
+	const ImVec2 t = ImGui::CalcTextSize(m_text.c_str(), nullptr, false, (float)c.maxWidth);
+	return Size { ceilInt(t.x), ceilInt(t.y) };
+}
+
+void StaticTextWrapper::render(const Rect& frame)
+{
+	const bool wrap = sized(frame)
+		&& ImGui::CalcTextSize(m_text.c_str()).x > (float)frame.width;
+	if (wrap)
+		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + (float)frame.width);
 	ImGui::TextUnformatted(m_text.c_str());
+	if (wrap)
+		ImGui::PopTextWrapPos();
 }
 
 // DatePickerWrapper -----------------------------------------------------------
 
-void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size DatePickerWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "DatePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [date]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
+	const float padW = style.FramePadding.x * 2.0f;
+	const float w = (ImGui::CalcTextSize("9999").x + padW + btnW)
+		+ (ImGui::CalcTextSize("12").x + padW + btnW)
+		+ (ImGui::CalcTextSize("31").x + padW + btnW)
+		+ 2.0f * 4.0f; // SameLine(0, 4) gaps
+	return Size { ceilInt(w), frameHeight() };
+}
+
+void DatePickerWrapper::render(const Rect&)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
@@ -236,12 +368,20 @@ void DatePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 
 // TimePickerWrapper -----------------------------------------------------------
 
-void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size TimePickerWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "TimePickerWrapper::createAndAdd()\t-> ImGui::InputInt x3 [time]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
+	const float padW = style.FramePadding.x * 2.0f;
+	const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
+	const float w = (ImGui::CalcTextSize("23").x + padW + btnW)
+		+ twoDigitW * 2.0f
+		+ 2.0f * 4.0f; // SameLine(0, 4) gaps
+	return Size { ceilInt(w), frameHeight() };
+}
+
+void TimePickerWrapper::render(const Rect&)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
@@ -279,28 +419,25 @@ void TimePickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layo
 // SliderWrapper -----------------------------------------------------------
 
 template <SliderValue T>
-void SliderWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size SliderWrapper<T>::measureIntrinsic(const Constraints&)
 {
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return Size { kDefaultControlWidth, frameHeight() };
+}
+
+template <SliderValue T>
+void SliderWrapper<T>::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
-	{
-#ifdef USE_LOGGER
-		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderInt()\n");
-#endif
 		changed = ImGui::SliderInt("##slider", &m_ownedValue, m_range.min, m_range.max);
-	}
 	else
-	{
-#ifdef USE_LOGGER
-		Logger::instance().log(LayoutWrapper::indent() + "SliderWrapper::createAndAdd()\t-> ImGui::SliderFloat()\n");
-#endif
 		changed = ImGui::SliderFloat("##slider", &m_ownedValue, m_range.min, m_range.max);
-	}
 	ImGui::PopID();
 
 	if (changed)
@@ -320,48 +457,44 @@ template class SliderWrapper<float>;
 // SpinBoxWrapper -----------------------------------------------------------
 
 template <SpinBoxValue T>
-void SpinBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size SpinBoxWrapper<T>::measureIntrinsic(const Constraints&)
 {
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	char bufMin[32], bufMax[32];
+	if constexpr (std::is_same_v<T, int>)
+	{
+		snprintf(bufMin, sizeof(bufMin), "%d", m_range.min);
+		snprintf(bufMax, sizeof(bufMax), "%d", m_range.max);
+	}
+	else
+	{
+		snprintf(bufMin, sizeof(bufMin), "%.3f", m_range.min);
+		snprintf(bufMax, sizeof(bufMax), "%.3f", m_range.max);
+	}
+	const float textW = std::max(ImGui::CalcTextSize(bufMin).x, ImGui::CalcTextSize(bufMax).x);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float stepBtnW = (m_range.step != 0) ? (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f : 0.0f;
+	const float minWidth = textW + style.FramePadding.x * 2.0f + stepBtnW;
+	return Size { ceilInt(std::max(minWidth, 60.0f)), frameHeight() };
+}
+
+template <SpinBoxValue T>
+void SpinBoxWrapper<T>::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
-	if (!flags.expand() && flags.proportion() == 0)
-	{
-		char bufMin[32], bufMax[32];
-		if constexpr (std::is_same_v<T, int>)
-		{
-			snprintf(bufMin, sizeof(bufMin), "%d", m_range.min);
-			snprintf(bufMax, sizeof(bufMax), "%d", m_range.max);
-		}
-		else
-		{
-			snprintf(bufMin, sizeof(bufMin), "%.3f", m_range.min);
-			snprintf(bufMax, sizeof(bufMax), "%.3f", m_range.max);
-		}
-		float textW = std::max(ImGui::CalcTextSize(bufMin).x, ImGui::CalcTextSize(bufMax).x);
-		const ImGuiStyle& style = ImGui::GetStyle();
-		float stepBtnW = (m_range.step != 0) ? (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f : 0.0f;
-		float minWidth = textW + style.FramePadding.x * 2.0f + stepBtnW;
-		ImGui::SetNextItemWidth(std::max(minWidth, 60.0f));
-	}
-
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
-#ifdef USE_LOGGER
-		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputInt()\n");
-#endif
 		changed = ImGui::InputInt("##spinbox", &m_ownedValue, static_cast<int>(m_range.step));
 		if (changed)
 			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
 	}
 	else
 	{
-#ifdef USE_LOGGER
-		Logger::instance().log(LayoutWrapper::indent() + "SpinBoxWrapper::createAndAdd()\t-> ImGui::InputFloat()\n");
-#endif
 		changed = ImGui::InputFloat("##spinbox", &m_ownedValue, m_range.step);
 		if (changed)
 			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
@@ -385,12 +518,14 @@ template class SpinBoxWrapper<float>;
 // RadioButtonWrapper -----------------------------------------------------------
 
 template <RadioButtonValue T>
-void RadioButtonWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size RadioButtonWrapper<T>::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "RadioButtonWrapper::createAndAdd()\t-> ImGui::RadioButton()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return glyphLabelSize(m_label);
+}
+
+template <RadioButtonValue T>
+void RadioButtonWrapper<T>::render(const Rect&)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##radio" : m_label.c_str();
@@ -428,12 +563,13 @@ template class RadioButtonWrapper<int>;
 
 // CheckBoxWrapper -----------------------------------------------------------
 
-void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size CheckBoxWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "CheckBoxWrapper::createAndAdd()\t-> ImGui::Checkbox()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return glyphLabelSize(m_label);
+}
+
+void CheckBoxWrapper::render(const Rect&)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##checkbox" : m_label.c_str();
@@ -452,12 +588,13 @@ void CheckBoxWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout
 
 // ToggleButtonWrapper -----------------------------------------------------------
 
-void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ToggleButtonWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ToggleButtonWrapper::createAndAdd()\t-> ImGui::Button() [toggle]\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return framedTextSize(m_label);
+}
+
+void ToggleButtonWrapper::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##toggle" : m_label.c_str();
@@ -468,7 +605,10 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 	}
-	if (ImGui::Button(label))
+	const bool clicked = sized(frame)
+		? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
+		: ImGui::Button(label);
+	if (clicked)
 	{
 		m_ownedValue = !m_ownedValue;
 		if (m_externalRef)
@@ -485,13 +625,19 @@ void ToggleButtonWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* la
 
 // ImageWrapper -----------------------------------------------------------
 
-void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ImageWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ImageWrapper::createAndAdd()\t-> ImGui::Image()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// natural image size; header-only probe, no decode (explicit withSize
+	// dimensions override per axis in measureContent)
+	if (m_imgWidth == 0 && !m_filePath.empty())
+		stbi_info(m_filePath.c_str(), &m_imgWidth, &m_imgHeight, nullptr);
+	const int w = m_displayWidth  > 0 ? m_displayWidth  : m_imgWidth;
+	const int h = m_displayHeight > 0 ? m_displayHeight : m_imgHeight;
+	return Size { w, h };
+}
 
+void ImageWrapper::render(const Rect& frame)
+{
 	if (m_textureId == nullptr && !m_filePath.empty())
 	{
 		stbi_set_flip_vertically_on_load(0);
@@ -512,8 +658,17 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (m_textureId != nullptr)
 	{
-		const float w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
-		const float h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
+		float w, h;
+		if (sized(frame))
+		{
+			w = (float)frame.width;
+			h = (float)frame.height;
+		}
+		else
+		{
+			w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
+			h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
+		}
 		ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)), ImVec2(w, h));
 		if (ImGui::IsItemHovered())
 		{
@@ -540,12 +695,20 @@ void ImageWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, L
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
-void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ComboBoxWrapper::createAndAdd()\t-> ImGui::Combo()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// widest choice + frame padding + arrow square
+	const ImGuiStyle& style = ImGui::GetStyle();
+	float widest = 0.0f;
+	for (const auto& choice : m_choices)
+		widest = std::max(widest, ImGui::CalcTextSize(choice.c_str()).x);
+	const float w = widest + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
+	return Size { ceilInt(w), frameHeight() };
+}
+
+template <ComboBoxValue T>
+void ComboBoxWrapper<T>::render(const Rect& frame)
+{
 	if (m_externalRef)
 	{
 		if constexpr (std::is_same_v<T, int>)
@@ -565,6 +728,8 @@ void ComboBoxWrapper<T>::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 		}
 	}
 
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
 	{
@@ -588,16 +753,19 @@ template class ComboBoxWrapper<int>;
 
 // ColorPickerWrapper -----------------------------------------------------------
 
-void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ColorPickerWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ColorPickerWrapper::createAndAdd()\t-> ImGui::ColorEdit4()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	return Size { kDefaultControlWidth, frameHeight() };
+}
+
+void ColorPickerWrapper::render(const Rect& frame)
+{
 	if (m_externalRef)
 		m_ownedValue = m_externalRef->get();
 
 	float col[4] = { m_ownedValue.r, m_ownedValue.g, m_ownedValue.b, m_ownedValue.a };
+	if (sized(frame))
+		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::ColorEdit4("##colorpicker", col))
 	{
@@ -614,26 +782,32 @@ void ColorPickerWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* lay
 
 // SeparatorWrapper -----------------------------------------------------------
 
-void SeparatorWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size SeparatorWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "SeparatorWrapper::createAndAdd()\t-> ImGui::Separator()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
+	// a hairline; spans when stretched/expanded
+	return Size { 0, 1 };
+}
+
+void SeparatorWrapper::render(const Rect&)
+{
 	ImGui::Separator();
 }
 
 // ProgressBarWrapper -----------------------------------------------------------
 
-void ProgressBarWrapper::createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags)
+Size ProgressBarWrapper::measureIntrinsic(const Constraints&)
 {
-#ifdef USE_LOGGER
-	Logger::instance().log(LayoutWrapper::indent() + "ProgressBarWrapper::createAndAdd()\t-> ImGui::ProgressBar()\n");
-#endif
-	ControlWrapper::createAndAdd(parent, layout, flags);
-	float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
-	float width = flags.expand() ? -FLT_MIN : 0.0f;
+	return Size { kDefaultControlWidth, frameHeight() };
+}
+
+void ProgressBarWrapper::render(const Rect& frame)
+{
+	const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const ImVec2 size = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, 0.0f);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	ImGui::ProgressBar(std::clamp(value, 0.0f, 1.0f), ImVec2(width, 0.0f));
+	auto clampedValue = std::clamp(value / 100.0f, 0.0f, 1.0f);
+	ImGui::ProgressBar(clampedValue, size);
 	ImGui::PopID();
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ControlWrapper.hpp"
-#include "create_and_add.hpp"
 
 #include <cstdio>
 #include <functional>
@@ -14,8 +13,8 @@
 //  - The constructor only collects the data needed to build the control
 //    (label/value/range/callbacks, plus position/size/style which are stored
 //    in the ControlWrapper base). It does NOT create any native object.
-//  - createAndAdd() is responsible for actually creating the backend control
-//    (wx) or rendering it (ImGui) and registering it with the layout.
+//  - realize() creates the native control on retained backends; on ImGui
+//    the widget draws itself in render() at the engine-computed rect.
 // Because the constructors are pure data collection, they are shared by every
 // backend and defined inline here.
 
@@ -34,7 +33,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -68,7 +73,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -103,7 +114,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -138,7 +155,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_ownedValue;
@@ -158,7 +181,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	const std::string& m_value;
@@ -179,7 +208,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -202,7 +237,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -221,7 +262,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_text;
@@ -253,7 +300,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Date m_ownedValue{};
@@ -288,7 +341,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Time m_ownedValue{};
@@ -326,7 +385,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Range<T> m_range;
@@ -368,7 +433,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Range<T> m_range;
@@ -413,7 +484,13 @@ public:
 	}
 
 	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	// Assigns the radio's index within its group. Consecutive radios sharing
@@ -477,7 +554,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -515,7 +598,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_label;
@@ -546,7 +635,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_filePath;
@@ -587,7 +682,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	Color m_ownedValue;
@@ -606,7 +707,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 };
 
 // ProgressBarWrapper -----------------------------------------------------------
@@ -627,7 +734,13 @@ public:
 	{
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	float m_ownedValue;
@@ -665,7 +778,13 @@ public:
 		buildItems();
 	}
 
-	void createAndAdd(ControlWrapper* parent, LayoutWrapper* layout, LayoutFlags flags) override;
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
 
 private:
 	// Builds the '\0'-separated item string and resolves the initial index

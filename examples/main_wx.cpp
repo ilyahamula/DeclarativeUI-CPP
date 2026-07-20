@@ -23,25 +23,8 @@ class DeclarativeApp : public wxApp
     bool m_tabLogging = false;
     Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-public:
-    bool OnInit() override
+    void DrawUI()
     {
-//         drawUI(m_text, m_sliderValue, m_sliderValue1, m_radioChoice, m_radioChoice1, m_selectedCombo, m_checked, [this]() {
-// #ifdef USE_LOGGER
-//             wxMessageBox(Logger::instance().getAll(), "Info", wxOK | wxICON_INFORMATION);
-// #else
-//             wxMessageBox(
-//                 "text: " + m_text + "\n"
-//                 "sliderValue: " + std::to_string(m_sliderValue) + "\n"
-//                 "sliderValue1: " + std::to_string(m_sliderValue1) + "\n"
-//                 "radioChoice: " + std::to_string(m_radioChoice) + "\n"
-//                 "radioChoice1: " + std::to_string(m_radioChoice1) + "\n"
-//                 "selectedCombo: " + m_selectedCombo + "\n"
-//                 "checked: " + std::string(m_checked ? "true" : "false"),
-//                 "State", wxOK | wxICON_INFORMATION);
-// #endif
-//         }).show();
-
         drawControlsUI(m_multilineText, m_password, m_spinInt,
             m_spinFloat, m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging, m_themeColor, [this]() {
             MessageBox("Controls State",
@@ -65,7 +48,12 @@ public:
                 .withButtons(MessageBoxButtons::YesNo)
                 .show();
         }).show();
+    }
 
+public:
+    bool OnInit() override
+    {
+        drawFixedLeftStretchRight().show();
         return true;
     }
 };

@@ -18,6 +18,61 @@ struct Size
 {
     int width;
     int height;
+
+    bool operator==(const Size&) const = default;
+};
+
+// ── Layout engine types (docs/specs/custom_layout_system/architecture.md) ──
+
+// Absolute rectangle assigned to a node by the arrange pass.
+struct Rect
+{
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+
+    bool operator==(const Rect&) const = default;
+};
+
+// Space offered to a node during the measure pass (constraints flow down,
+// desired sizes return up). Enables width-dependent height (text wrapping).
+struct Constraints
+{
+    int maxWidth = 0;
+    int maxHeight = 0;
+
+    bool operator==(const Constraints&) const = default;
+};
+
+// Cross-axis participation of a node in its parent's box.
+enum class Align
+{
+    Start,
+    Center,
+    End,
+    Stretch
+};
+
+// Per-side border accumulated from LayoutFlags::Border() calls.
+struct EdgeInsets
+{
+    int left = 0;
+    int right = 0;
+    int top = 0;
+    int bottom = 0;
+
+    bool operator==(const EdgeInsets&) const = default;
+};
+
+// Kind of a layout node; drives the kind-dependent defaults
+// (Leaf -> Align::Start, containers -> Align::Stretch).
+enum class NodeKind
+{
+    Box,
+    GroupBox,
+    TabPanel,
+    Leaf
 };
 
 template <SliderValue T>

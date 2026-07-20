@@ -4,9 +4,9 @@
 #include <string>
 
 #include "frameworks_core/DialogWrapper.hpp"
-#include "fittable_layout.hpp"
+#include "buildable.hpp"
 
-template<FittableLayout Content>
+template<NodeBuildable Content>
 struct Dialog
 {
 	Dialog(const std::string& title, Content content)
@@ -22,15 +22,25 @@ struct Dialog
 	{
 	}
 
+	// Opt-in user resizing. The auto-fit size becomes the initial AND
+	// minimum window size, so content can never be shrunk into clipping.
+	// Dialogs are not user-resizable by default.
+	Dialog& Resizable()
+	{
+		m_resizable = true;
+		return *this;
+	}
+
 	void show()
 	{
-		DialogWrapper wrapper(m_title, m_size);
-		m_content.fitTo(&wrapper);
-		wrapper.show();
+		// build the node tree first (no rendering), then the backend sizes
+		// the window from the engine result and draws
+		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable);
 	}
 
 private:
 	std::string m_title;
 	Size m_size { -1, -1 };
+	bool m_resizable = false;
 	Content m_content;
 };
