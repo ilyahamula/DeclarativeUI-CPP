@@ -71,9 +71,20 @@ public:
 		return m_size;
 	}
 
+	void setDisabled(bool disabled)
+	{
+		m_disabled = disabled;
+	}
+
+	bool isDisabled() const
+	{
+		return m_disabled;
+	}
+
 protected:
 	void* m_nativeWidget = nullptr;
 	Position m_pos { -1, -1 };
 	Size m_size { -1, -1 };
 	long m_style { 0 };
+	bool m_disabled = false;
 };

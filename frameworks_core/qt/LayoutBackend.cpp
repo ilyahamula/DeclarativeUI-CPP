@@ -44,7 +44,10 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 {
 	ControlWrapper* widget = leaf.widget;
 	if (widget->nativeHandle() == nullptr)
+	{
 		widget->realize(m_host); // create the native widget + connect signals
+		static_cast<QWidget*>(widget->nativeHandle())->setEnabled(!widget->isDisabled());
+	}
 
 	auto* window = static_cast<QWidget*>(widget->nativeHandle());
 	const QSize hint = window->sizeHint();

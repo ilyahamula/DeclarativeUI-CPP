@@ -41,7 +41,10 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 {
 	ControlWrapper* widget = leaf.widget;
 	if (widget->nativeHandle() == nullptr)
+	{
 		widget->realize(m_host); // create the native control + bind events
+		static_cast<wxWindow*>(widget->nativeHandle())->Enable(!widget->isDisabled());
+	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());
 	const wxSize best = window->GetBestSize();

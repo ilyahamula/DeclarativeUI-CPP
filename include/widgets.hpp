@@ -23,8 +23,9 @@ struct Widget
 		if (m_preCreateCallback)
 			m_preCreateCallback();
 
-		auto node = makeLeaf(createWrapper(m_position, m_size, m_style),
-			m_flags.value_or(LayoutFlags{}));
+		auto wrapper = createWrapper(m_position, m_size, m_style);
+		wrapper->setDisabled(m_isDisabled);
+		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(LayoutFlags{}));
 
 		if (m_postCreateCallback)
 			m_postCreateCallback();
@@ -69,6 +70,12 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
+	W& isDisabled(bool disabled = true)
+	{
+		m_isDisabled = disabled;
+		return static_cast<W&>(*this);
+	}
+
 	W& withStyle(long style)
 	{
 		m_style = style;
@@ -87,6 +94,7 @@ private: // callbacks
 	std::function<void(void*)> m_postCreateWithWidgetCallback;
 
 private:
+	bool m_isDisabled = false;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };
