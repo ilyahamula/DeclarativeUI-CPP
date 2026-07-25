@@ -262,10 +262,12 @@ inline auto drawProgressBarBindedToSlider(float& value, bool &checked)
         "Slider and Checkbox Dialog",
         VStack {
             ProgressBar{ value }
-                .withFlags(LayoutFlags().CenterHorizontal().CenterVertical().Expand()),
+                .withFlags(LayoutFlags().CenterHorizontal().CenterVertical().Expand())
+                .isDisabled(checked),
             HStack {
-                Slider { { .min = 0.0f, .max = 100.0f }, value },
-                CheckBox{checked, "Disable progress bar"}
+                Slider { { .min = 0.0f, .max = 100.0f }, value }
+                    .isDisabled(checked),
+                CheckBox{checked, "Disable"}
             }
         }
     };

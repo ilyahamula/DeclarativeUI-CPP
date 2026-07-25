@@ -92,7 +92,7 @@ int main(int argc, char** argv)
         ImGui::NewFrame();
 
         //DrawDemoUI();
-        drawFixedLeftStretchRight().show();
+        drawProgressBarBindedToSlider(value, checked).show();
 
         ImGui::Render();
         int display_w, display_h;

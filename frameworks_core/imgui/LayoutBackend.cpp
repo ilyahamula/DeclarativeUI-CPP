@@ -50,7 +50,9 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	// group the render so composite widgets (DatePicker = 3 items) read
 	// back as one item rect
 	ImGui::BeginGroup();
+	ImGui::BeginDisabled(leaf.widget->isDisabled());
 	leaf.widget->render(frame);
+	ImGui::EndDisabled();
 	ImGui::EndGroup();
 
 #ifndef NDEBUG
