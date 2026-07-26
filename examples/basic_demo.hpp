@@ -256,7 +256,7 @@ inline auto drawStaticText()
     };
 }
 
-inline auto drawProgressBarBindedToSlider(float& value, bool &checked)
+inline auto drawProgressBarBindedToSlider(float& value, bool& checked)
 {
     return Dialog {
         "Slider and Checkbox Dialog",
