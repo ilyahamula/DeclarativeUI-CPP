@@ -743,8 +743,7 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 				else if (cbw) cbw(value, nw);
 			});
 		if constexpr (std::is_same_v<T, std::string>)
-			
-		(combo,
+			bindExternalRefSync(combo,
 				[combo] { return combo->GetValue().ToStdString(); },
 				[&value] { return value; },
 				[combo](const std::string& v) { combo->ChangeValue(v); });
