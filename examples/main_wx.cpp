@@ -1,4 +1,4 @@
-#include "basic_demo.hpp"
+#include "demo/all_demos.hpp"
 #include <wx/wx.h>
 
 class DeclarativeApp : public wxApp
