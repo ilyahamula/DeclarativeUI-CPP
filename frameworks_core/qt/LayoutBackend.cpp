@@ -1,6 +1,7 @@
 #include "frameworks_core/qt/LayoutBackend.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/qt/RefSync.hpp"
 
 #include <QFontMetrics>
 #include <QGroupBox>
@@ -46,7 +47,20 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native widget + connect signals
-		static_cast<QWidget*>(widget->nativeHandle())->setEnabled(!widget->isDisabled());
+		auto* created = static_cast<QWidget*>(widget->nativeHandle());
+		created->setEnabled(!widget->isDisabled());
+
+		// A disabled flag bound by ref can flip at any time, and Qt applies the
+		// state only here, at creation -- so poll it like any other external ref.
+		// Hooked at the one place every widget type passes through exactly once,
+		// rather than repeated in each realize().
+		if (const auto& ref = widget->disabledRef())
+		{
+			bindExternalRefSync(created,
+				[created] { return created->isEnabled(); },
+				[&flag = ref->get()] { return !flag; },
+				[created](bool enable) { created->setEnabled(enable); });
+		}
 	}
 
 	auto* window = static_cast<QWidget*>(widget->nativeHandle());

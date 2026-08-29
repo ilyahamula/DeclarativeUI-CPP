@@ -1,5 +1,7 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
+#include <cmath>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -92,6 +94,10 @@ void TextCtrlWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
 	else if (m_onChange)
 		QObject::connect(edit, &QLineEdit::textChanged,
@@ -120,6 +126,10 @@ void PasswordInputWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
 	else if (m_onChange)
 		QObject::connect(edit, &QLineEdit::textChanged,
@@ -147,6 +157,10 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(edit,
+			[edit] { return edit->toPlainText().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setPlainText(qstr(v)); });
 	}
 	else if (m_onChange)
 		QObject::connect(edit, &QPlainTextEdit::textChanged,
@@ -225,6 +239,10 @@ void DatePickerWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(picker,
+			[picker] { return picker->date(); },
+			[&value] { return QDate(value.year, value.month, value.day); },
+			[picker](const QDate& d) { picker->setDate(d); });
 	}
 	else if (m_onChange)
 		QObject::connect(picker, &QDateEdit::dateChanged,
@@ -254,6 +272,10 @@ void TimePickerWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(picker,
+			[picker] { return picker->time(); },
+			[&value] { return QTime(value.hour, value.minute, value.second); },
+			[picker](const QTime& t) { picker->setTime(t); });
 	}
 	else if (m_onChange)
 		QObject::connect(picker, &QTimeEdit::timeChanged,
@@ -293,6 +315,16 @@ void SliderWrapper<T>::realize(void* parentWindow)
 	if (m_externalRef)
 	{
 		auto& value = m_externalRef->get();
+		// QSlider is integral; a float slider lives in step units, so compare there.
+		bindExternalRefSync(slider,
+			[slider] { return slider->value(); },
+			[&value, step = m_range.step] {
+				if constexpr (std::is_floating_point_v<T>)
+					return static_cast<int>(value / step);
+				else
+					return static_cast<int>(value);
+			},
+			[slider](int raw) { slider->setValue(raw); });
 		QObject::connect(slider, &QSlider::valueChanged,
 			[&value, toValue, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int raw) {
 				value = toValue(raw);
@@ -335,6 +367,10 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 					if (cb) cb(value);
 					else if (cbw) cbw(value, nw);
 				});
+			bindExternalRefSync(spin,
+				[spin] { return spin->value(); },
+				[&value] { return static_cast<int>(value); },
+				[spin](int v) { spin->setValue(v); });
 		}
 		else if (m_onChange)
 			QObject::connect(spin, &QSpinBox::valueChanged, [cb = std::move(m_onChange)](int v) { cb(v); });
@@ -359,6 +395,12 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 					if (cb) cb(value);
 					else if (cbw) cbw(value, nw);
 				});
+			// Quantise to step units: QDoubleSpinBox rounds what it stores to its
+			// decimals() setting, so a raw double compare would never settle.
+			bindExternalRefSync(spin,
+				[spin, step = m_range.step] { return std::lround(spin->value() / step); },
+				[&value, step = m_range.step] { return std::lround(value / step); },
+				[spin, step = m_range.step](long units) { spin->setValue(static_cast<double>(units) * step); });
 		}
 		else if (m_onChange)
 			QObject::connect(spin, &QDoubleSpinBox::valueChanged,
@@ -418,6 +460,16 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		// Every radio syncs itself; QButtonGroup clears the siblings when one is set.
+		bindExternalRefSync(radio,
+			[radio] { return radio->isChecked(); },
+			[&value, index = m_index] {
+				if constexpr (std::is_same_v<T, bool>)
+					return static_cast<bool>(value);
+				else
+					return static_cast<int>(value) == index;
+			},
+			[radio](bool on) { radio->setChecked(on); });
 	}
 	else if (m_onChange)
 		QObject::connect(radio, &QRadioButton::toggled,
@@ -463,6 +515,10 @@ void CheckBoxWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(box,
+			[box] { return box->isChecked(); },
+			[&value] { return value; },
+			[box](bool on) { box->setChecked(on); });
 	}
 	else if (m_onChange)
 		QObject::connect(box, &QCheckBox::toggled, [cb = std::move(m_onChange)](bool v) { cb(v); });
@@ -491,6 +547,10 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		bindExternalRefSync(button,
+			[button] { return button->isChecked(); },
+			[&value] { return value; },
+			[button](bool on) { button->setChecked(on); });
 	}
 	else if (m_onChange)
 		QObject::connect(button, &QPushButton::toggled, [cb = std::move(m_onChange)](bool v) { cb(v); });
@@ -536,12 +596,24 @@ void ColorPickerWrapper::realize(void* parentWindow)
 {
 	const Color initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	auto* button = new QPushButton(static_cast<QWidget*>(parentWindow));
-	auto applySwatch = [button](const Color& c) {
-		button->setStyleSheet(QStringLiteral("background-color: rgba(%1,%2,%3,%4);")
-			.arg((int)(c.r * 255)).arg((int)(c.g * 255)).arg((int)(c.b * 255)).arg((int)(c.a * 255)));
+	auto sheetFor = [](const Color& c) {
+		return QStringLiteral("background-color: rgba(%1,%2,%3,%4);")
+			.arg((int)(c.r * 255)).arg((int)(c.g * 255)).arg((int)(c.b * 255)).arg((int)(c.a * 255));
 	};
+	auto applySwatch = [button, sheetFor](const Color& c) { button->setStyleSheet(sheetFor(c)); };
 	applySwatch(initial);
 	m_nativeWidget = button;
+
+	// There is no getter for the swatch colour -- the stylesheet is the displayed
+	// state, so compare on that. Byte-quantised, so no float equality either.
+	if (m_externalRef)
+	{
+		auto& swatchValue = m_externalRef->get();
+		bindExternalRefSync(button,
+			[button] { return button->styleSheet(); },
+			[&swatchValue, sheetFor] { return sheetFor(swatchValue); },
+			[button](const QString& sheet) { button->setStyleSheet(sheet); });
+	}
 
 	// the button is the swatch; clicking opens the native color dialog
 	auto external = m_externalRef;
@@ -581,11 +653,26 @@ void SeparatorWrapper::realize(void* parentWindow)
 
 void ProgressBarWrapper::realize(void* parentWindow)
 {
-	const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	// The bound float is a 0..100 percentage, matching the bar's own integer range
+	// (and what the wx and ImGui backends do -- Qt used to read it as a 0..1
+	// fraction, which rendered the same tree differently here).
+	const auto toBar = [](float v) { return static_cast<int>(std::clamp(v, 0.0f, 100.0f)); };
+
+	const float initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	auto* bar = new QProgressBar(static_cast<QWidget*>(parentWindow));
 	bar->setRange(0, 100);
-	bar->setValue(static_cast<int>(std::clamp(value, 0.0f, 1.0f) * 100));
+	bar->setValue(toBar(initial));
 	m_nativeWidget = bar;
+
+	// A progress bar has no input of its own -- the bound float is only ever
+	// written from outside -- so the sync is the whole story here.
+	if (m_externalRef)
+	{
+		bindExternalRefSync(bar,
+			[bar] { return bar->value(); },
+			[&value = m_externalRef->get(), toBar] { return toBar(value); },
+			[bar](int v) { bar->setValue(v); });
+	}
 
 }
 
@@ -621,6 +708,16 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 					if (cb) cb(value);
 					else if (cbw) cbw(value, nw);
 				});
+		if constexpr (std::is_same_v<T, std::string>)
+			bindExternalRefSync(combo,
+				[combo] { return combo->currentText().toStdString(); },
+				[&value] { return value; },
+				[combo](const std::string& v) { combo->setCurrentText(qstr(v)); });
+		else
+			bindExternalRefSync(combo,
+				[combo] { return combo->currentIndex(); },
+				[&value] { return static_cast<int>(value); },
+				[combo](int i) { combo->setCurrentIndex(i); });
 	}
 	else if (m_onChange)
 	{
