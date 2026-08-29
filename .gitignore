@@ -62,6 +62,7 @@ images/
 # Claude
 .claude/
 .agents/
+CLAUDE.md
 
 # Local docs
 docs/
