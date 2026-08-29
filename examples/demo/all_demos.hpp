@@ -1,0 +1,13 @@
+#pragma once
+
+// Umbrella header: pulls in every demo dialog. The per-backend mains include
+// this one file so adding a demo never touches main_*.cpp.
+
+#include "controls_gallery.hpp"
+#include "composite_dialogs.hpp"
+#include "value_binding.hpp"
+#include "layout_probes.hpp"
+
+#ifdef USE_LOGGER
+#include "Logger.hpp"
+#endif

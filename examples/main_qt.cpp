@@ -1,4 +1,4 @@
-#include "basic_demo.hpp"
+#include "demo/all_demos.hpp"
 
 #include <QApplication>
 
@@ -49,7 +49,9 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    drawFixedLeftStretchRight().show();
+    float value = 50.5f;
+    bool checked = false;
+    drawProgressBarBindedToSlider(value, checked).show();
 
     return app.exec();
 }
