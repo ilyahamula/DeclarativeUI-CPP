@@ -1,5 +1,9 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
+#include <cmath>
+#include <tuple>
+#include <utility>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -59,6 +63,10 @@ void TextCtrlWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(txt,
+			[txt] { return txt->GetValue().ToStdString(); },
+			[&value] { return value; },
+			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 	else if (m_onChange)
 		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
@@ -87,6 +95,10 @@ void PasswordInputWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(txt,
+			[txt] { return txt->GetValue().ToStdString(); },
+			[&value] { return value; },
+			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 	else if (m_onChange)
 		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
@@ -115,6 +127,10 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(txt,
+			[txt] { return txt->GetValue().ToStdString(); },
+			[&value] { return value; },
+			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 	else if (m_onChange)
 		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
@@ -210,6 +226,21 @@ void DatePickerWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		// Compare the Y/M/D triple, not the wxDateTime: the picker keeps a time-of-day
+		// component that Date has no opinion about.
+		bindExternalRefSync(dp,
+			[dp] {
+				const wxDateTime d = dp->GetValue();
+				return std::tuple{ d.GetYear(), static_cast<int>(d.GetMonth()) + 1, static_cast<int>(d.GetDay()) };
+			},
+			[&value] { return std::tuple{ value.year, value.month, value.day }; },
+			[dp](const std::tuple<int, int, int>& ymd) {
+				wxDateTime d;
+				d.Set(static_cast<wxDateTime::wxDateTime_t>(std::get<2>(ymd)),
+					static_cast<wxDateTime::Month>(std::get<1>(ymd) - 1),
+					std::get<0>(ymd));
+				dp->SetValue(d);
+			});
 	}
 	else if (m_onChange)
 		dp->Bind(wxEVT_DATE_CHANGED, [cb = std::move(m_onChange)](wxDateEvent& evt) {
@@ -253,6 +284,14 @@ void TimePickerWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(tp,
+			[tp] {
+				int h = 0, m = 0, s = 0;
+				tp->GetTime(&h, &m, &s);
+				return std::tuple{ h, m, s };
+			},
+			[&value] { return std::tuple{ value.hour, value.minute, value.second }; },
+			[tp](const std::tuple<int, int, int>& hms) { tp->SetTime(std::get<0>(hms), std::get<1>(hms), std::get<2>(hms)); });
 	}
 	else if (m_onChange)
 		tp->Bind(wxEVT_TIME_CHANGED, [cb = std::move(m_onChange)](wxDateEvent& evt) {
@@ -309,6 +348,16 @@ void SliderWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		// wxSlider is integral; a float slider lives in step units, so compare there.
+		bindExternalRefSync(sl,
+			[sl] { return sl->GetValue(); },
+			[&value, step = m_range.step] {
+				if constexpr (std::is_floating_point_v<T>)
+					return static_cast<int>(value / step);
+				else
+					return static_cast<int>(value);
+			},
+			[sl](int v) { sl->SetValue(v); });
 	}
 	else if (m_onChange)
 	{
@@ -354,6 +403,10 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+			bindExternalRefSync(spin,
+				[spin] { return spin->GetValue(); },
+				[&value] { return static_cast<int>(value); },
+				[spin](int v) { spin->SetValue(v); });
 		}
 		else if (m_onChange)
 			spin->Bind(wxEVT_SPINCTRL, [cb = std::move(m_onChange)](wxSpinEvent& evt) { cb(evt.GetInt()); });
@@ -375,6 +428,12 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+			// Quantise both sides to step units: wxSpinCtrlDouble rounds what it stores to
+			// its display precision, so a raw double compare would push-and-round forever.
+			bindExternalRefSync(spin,
+				[spin, step = m_range.step] { return std::lround(spin->GetValue() / step); },
+				[&value, step = m_range.step] { return std::lround(value / step); },
+				[spin, step = m_range.step](long units) { spin->SetValue(static_cast<double>(units) * step); });
 		}
 		else if (m_onChange)
 			spin->Bind(wxEVT_SPINCTRLDOUBLE, [cb = std::move(m_onChange)](wxSpinDoubleEvent& evt) { cb(static_cast<T>(evt.GetValue())); });
@@ -429,6 +488,16 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		// Every radio in the group syncs itself; wx clears the siblings when one is set.
+		bindExternalRefSync(rb,
+			[rb] { return rb->GetValue(); },
+			[&value, index = m_index] {
+				if constexpr (std::is_same_v<T, bool>)
+					return static_cast<bool>(value);
+				else
+					return static_cast<int>(value) == index;
+			},
+			[rb](bool on) { rb->SetValue(on); });
 	}
 	else if (m_onChange)
 	{
@@ -471,6 +540,10 @@ void CheckBoxWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(chk,
+			[chk] { return chk->GetValue(); },
+			[&value] { return value; },
+			[chk](bool on) { chk->SetValue(on); });
 	}
 	else if (m_onChange)
 		chk->Bind(wxEVT_CHECKBOX, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.IsChecked()); });
@@ -500,6 +573,10 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		bindExternalRefSync(btn,
+			[btn] { return btn->GetValue(); },
+			[&value] { return value; },
+			[btn](bool on) { btn->SetValue(on); });
 	}
 	else if (m_onChange)
 		btn->Bind(wxEVT_TOGGLEBUTTON, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.IsChecked()); });
@@ -566,6 +643,17 @@ void ColorPickerWrapper::realize(void* parentWindow)
 			if (cb) cb(value);
 			else if (cbw) cbw(value, nw);
 		});
+		// Compare as wxColour: Color is float 0..1 but the control quantises to 0..255,
+		// so the byte domain is the only one where round-tripping is stable.
+		bindExternalRefSync(picker,
+			[picker] { return picker->GetColour(); },
+			[&value] {
+				return wxColour(static_cast<unsigned char>(value.r * 255),
+					static_cast<unsigned char>(value.g * 255),
+					static_cast<unsigned char>(value.b * 255),
+					static_cast<unsigned char>(value.a * 255));
+			},
+			[picker](const wxColour& c) { picker->SetColour(c); });
 	}
 	else if (m_onChange)
 		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [cb = std::move(m_onChange)](wxColourPickerEvent& evt) {
@@ -599,12 +687,24 @@ void ProgressBarWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ProgressBarWrapper::realize()\t-> new wxGauge()\n");
 #endif
-	const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	// The bound float is a 0..100 percentage, matching the gauge's own integer range.
+	const auto toGauge = [](float v) { return static_cast<int>(std::clamp(v, 0.0f, 100.0f)); };
+
+	const float initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
 	auto* gauge = new wxGauge(static_cast<wxWindow*>(parentWindow), wxID_ANY, 100,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxGA_HORIZONTAL | wxGA_SMOOTH);
-	gauge->SetValue(static_cast<int>(std::clamp(value, 0.0f, 1.0f) * 100));
+	gauge->SetValue(toGauge(initial));
 	m_nativeWidget = gauge;
 
+	// A progress bar has no input events of its own -- the bound float is only ever
+	// written from outside -- so the idle sync is the whole story here.
+	if (m_externalRef)
+	{
+		bindExternalRefSync(gauge,
+			[gauge] { return gauge->GetValue(); },
+			[&value = m_externalRef->get(), toGauge] { return toGauge(value); },
+			[gauge](int v) { gauge->SetValue(v); });
+	}
 }
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -642,6 +742,17 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
+		if constexpr (std::is_same_v<T, std::string>)
+			
+		(combo,
+				[combo] { return combo->GetValue().ToStdString(); },
+				[&value] { return value; },
+				[combo](const std::string& v) { combo->ChangeValue(v); });
+		else
+			bindExternalRefSync(combo,
+				[combo] { return combo->GetSelection(); },
+				[&value] { return static_cast<int>(value); },
+				[combo](int i) { combo->SetSelection(i); });
 	}
 	else if (m_onChange)
 	{

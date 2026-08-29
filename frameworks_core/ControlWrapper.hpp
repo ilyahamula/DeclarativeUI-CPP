@@ -2,6 +2,9 @@
 
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
 
+#include <functional>
+#include <optional>
+
 class ControlWrapper
 {
 public:
@@ -71,14 +74,32 @@ public:
 		return m_size;
 	}
 
-	void setDisabled(bool disabled)
+	// Snapshot: the control is disabled iff `disabled` was true at build time.
+	void setDisabled(const bool& disabled)
 	{
 		m_disabled = disabled;
+		m_disabledRef.reset();
+	}
+
+	// Bind to a caller-owned flag instead. isDisabled() then reports the live
+	// value, so an immediate backend picks the change up on its next frame for
+	// free; retained backends poll the ref (see the wx LayoutBackend) because
+	// they only apply the state once, when the native control is created.
+	void setDisabled(bool& disabled)
+	{
+		m_disabled = disabled;
+		m_disabledRef = disabled;
 	}
 
 	bool isDisabled() const
 	{
-		return m_disabled;
+		return m_disabledRef ? m_disabledRef->get() : m_disabled;
+	}
+
+	// Engaged when the disabled state is bound to a caller-owned flag.
+	const std::optional<std::reference_wrapper<bool>>& disabledRef() const
+	{
+		return m_disabledRef;
 	}
 
 protected:
@@ -87,4 +108,5 @@ protected:
 	Size m_size { -1, -1 };
 	long m_style { 0 };
 	bool m_disabled = false;
+	std::optional<std::reference_wrapper<bool>> m_disabledRef;
 };

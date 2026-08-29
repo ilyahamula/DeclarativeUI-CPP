@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 template <typename W>
@@ -24,7 +25,13 @@ struct Widget
 			m_preCreateCallback();
 
 		auto wrapper = createWrapper(m_position, m_size, m_style);
-		wrapper->setDisabled(m_isDisabled);
+		// as_const forces the snapshot overload: m_ownedDisabled belongs to this
+		// widget, which is a temporary in the declarative tree and dies with the
+		// enclosing expression -- only a caller-owned flag may be bound by ref.
+		if (m_disabledRef)
+			wrapper->setDisabled(m_disabledRef->get());
+		else
+			wrapper->setDisabled(std::as_const(m_ownedDisabled));
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(LayoutFlags{}));
 
 		if (m_postCreateCallback)
@@ -70,9 +77,20 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
-	W& isDisabled(bool disabled = true)
+	// Snapshot the flag as it stands now.
+	W& isDisabled(const bool& disabled = true)
 	{
-		m_isDisabled = disabled;
+		m_ownedDisabled = disabled;
+		m_disabledRef.reset();
+		return static_cast<W&>(*this);
+	}
+
+	// Bind to a caller-owned flag: flipping it enables/disables the control
+	// without rebuilding the tree. A non-const lvalue selects this overload.
+	W& isDisabled(bool& disabled)
+	{
+		m_ownedDisabled = disabled;
+		m_disabledRef = disabled;
 		return static_cast<W&>(*this);
 	}
 
@@ -94,7 +112,8 @@ private: // callbacks
 	std::function<void(void*)> m_postCreateWithWidgetCallback;
 
 private:
-	bool m_isDisabled = false;
+	bool m_ownedDisabled = false;
+	std::optional<std::reference_wrapper<bool>> m_disabledRef;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };

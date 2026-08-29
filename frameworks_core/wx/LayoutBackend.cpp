@@ -1,6 +1,7 @@
 #include "frameworks_core/wx/LayoutBackend.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/wx/RefSync.hpp"
 
 #include <wx/notebook.h>
 #include <wx/wx.h>
@@ -43,7 +44,21 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native control + bind events
-		static_cast<wxWindow*>(widget->nativeHandle())->Enable(!widget->isDisabled());
+		auto* created = static_cast<wxWindow*>(widget->nativeHandle());
+		created->Enable(!widget->isDisabled());
+
+		// A disabled flag bound by ref can flip at any time, and wx applies the
+		// state only here, at creation -- so poll it like any other external ref.
+		// Hooked at the one place every control type passes through exactly once,
+		// rather than repeated in each realize(). IsThisEnabled() reads the
+		// window's own flag, so a disabled parent never provokes a re-Enable.
+		if (const auto& ref = widget->disabledRef())
+		{
+			bindExternalRefSync(created,
+				[created] { return created->IsThisEnabled(); },
+				[&flag = ref->get()] { return !flag; },
+				[created](bool enable) { created->Enable(enable); });
+		}
 	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());

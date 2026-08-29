@@ -23,6 +23,9 @@ class DeclarativeApp : public wxApp
     bool m_tabLogging = false;
     Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
+    float value = 1.0f;
+    bool checked = false;
+
     void DrawUI()
     {
         drawControlsUI(m_multilineText, m_password, m_spinInt,
@@ -53,8 +56,14 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
-        drawFixedLeftStretchRight().show();
+        Bind(wxEVT_IDLE, &DeclarativeApp::OnIdle, this);
+        drawProgressBarBindedToSlider(value, checked).show();
         return true;
+    }
+
+    void OnIdle(wxIdleEvent& event)
+    {
+        wxApp::OnIdle(event);
     }
 };
 
