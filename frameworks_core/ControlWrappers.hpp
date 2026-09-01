@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ControlWrapper.hpp"
+#include "frameworks_core/CoreTypes/BoundValue.hpp"
 
 #include <cstdio>
 #include <functional>
@@ -13,6 +14,10 @@
 //  - The constructor only collects the data needed to build the control
 //    (label/value/range/callbacks, plus position/size/style which are stored
 //    in the ControlWrapper base). It does NOT create any native object.
+//  - A control's value arrives as a BoundValue<T>, taken by value: copying it
+//    carries over the caller's binding when there is one and the snapshot
+//    otherwise, so there is one constructor rather than a bound/unbound pair,
+//    and no wrapper can end up referring to the widget that built it.
 //  - realize() creates the native control on retained backends; on ImGui
 //    the widget draws itself in render() at the engine-computed rect.
 // Because the constructors are pure data collection, they are shared by every
@@ -51,23 +56,12 @@ private:
 class TextCtrlWrapper : public ControlWrapper
 {
 public:
-	TextCtrlWrapper(std::string& value,
+	TextCtrlWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	TextCtrlWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -82,8 +76,7 @@ public:
 #endif
 
 private:
-	std::string m_ownedValue;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -92,23 +85,12 @@ private:
 class PasswordInputWrapper : public ControlWrapper
 {
 public:
-	PasswordInputWrapper(std::string& value,
+	PasswordInputWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	PasswordInputWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -123,8 +105,7 @@ public:
 #endif
 
 private:
-	std::string m_ownedValue;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -133,23 +114,12 @@ private:
 class MultiLineTextCtrlWrapper : public ControlWrapper
 {
 public:
-	MultiLineTextCtrlWrapper(std::string& value,
+	MultiLineTextCtrlWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	MultiLineTextCtrlWrapper(const std::string& initialValue,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(initialValue)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -164,8 +134,7 @@ public:
 #endif
 
 private:
-	std::string m_ownedValue;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -278,23 +247,12 @@ private:
 class DatePickerWrapper : public ControlWrapper
 {
 public:
-	DatePickerWrapper(Date& value,
+	DatePickerWrapper(BoundValue<Date> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Date&)> onChange = {},
 		std::function<void(const Date&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	DatePickerWrapper(const Date& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&)> onChange = {},
-		std::function<void(const Date&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -309,8 +267,7 @@ public:
 #endif
 
 private:
-	Date m_ownedValue{};
-	std::optional<std::reference_wrapper<Date>> m_externalRef;
+	BoundValue<Date> m_value;
 	std::function<void(const Date&)> m_onChange;
 	std::function<void(const Date&, void*)> m_onChangeWithWidget;
 };
@@ -319,23 +276,12 @@ private:
 class TimePickerWrapper : public ControlWrapper
 {
 public:
-	TimePickerWrapper(Time& value,
+	TimePickerWrapper(BoundValue<Time> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Time&)> onChange = {},
 		std::function<void(const Time&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	TimePickerWrapper(const Time& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&)> onChange = {},
-		std::function<void(const Time&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -350,8 +296,7 @@ public:
 #endif
 
 private:
-	Time m_ownedValue{};
-	std::optional<std::reference_wrapper<Time>> m_externalRef;
+	BoundValue<Time> m_value;
 	std::function<void(const Time&)> m_onChange;
 	std::function<void(const Time&, void*)> m_onChangeWithWidget;
 };
@@ -361,25 +306,13 @@ template <SliderValue T>
 class SliderWrapper : public ControlWrapper
 {
 public:
-	SliderWrapper(Range<T> range, T& value,
+	SliderWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {},
 		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	SliderWrapper(Range<T> range, const T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -395,8 +328,7 @@ public:
 
 private:
 	Range<T> m_range;
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 };
@@ -409,25 +341,13 @@ template <SpinBoxValue T>
 class SpinBoxWrapper : public ControlWrapper
 {
 public:
-	SpinBoxWrapper(Range<T> range, T& value,
+	SpinBoxWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {},
 		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	SpinBoxWrapper(Range<T> range, const T& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_range(range)
-		, m_ownedValue(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -443,8 +363,7 @@ public:
 
 private:
 	Range<T> m_range;
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 };
@@ -458,29 +377,16 @@ class RadioButtonWrapper : public ControlWrapper
 {
 public:
 	RadioButtonWrapper(const std::string& label,
-		T& value, const Position& pos, const Size& size, long style,
+		BoundValue<T> value, const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {},
 		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
-		assignGroupIndex(&value);
-	}
-	RadioButtonWrapper(const std::string& label,
-		const T& initialValue, const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialValue)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-		assignGroupIndex(&m_ownedValue);
+		assignGroupIndex(&m_value.get());
 	}
 
 	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
@@ -511,8 +417,7 @@ private:
 	}
 
 	std::string m_label;
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 	int m_index = 0;
@@ -530,25 +435,12 @@ class CheckBoxWrapper : public ControlWrapper
 public:
 	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		bool& checked,
+		BoundValue<bool> checked,
 		std::function<void(bool)> onChange = {},
 		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
-		, m_ownedValue(checked)
-		, m_externalRef(checked)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	CheckBoxWrapper(const std::string& label,
-		const Position& pos, const Size& size, long style,
-		const bool& initialChecked,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialChecked)
+		, m_value(std::move(checked))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -564,8 +456,7 @@ public:
 
 private:
 	std::string m_label;
-	bool m_ownedValue;
-	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	BoundValue<bool> m_value;
 	std::function<void(bool)> m_onChange;
 	std::function<void(bool, void*)> m_onChangeWithWidget;
 };
@@ -575,24 +466,12 @@ class ToggleButtonWrapper : public ControlWrapper
 {
 public:
 	ToggleButtonWrapper(const std::string& label,
-		bool& toggled, const Position& pos, const Size& size, long style,
+		BoundValue<bool> toggled, const Position& pos, const Size& size, long style,
 		std::function<void(bool)> onChange = {},
 		std::function<void(bool, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
-		, m_ownedValue(toggled)
-		, m_externalRef(toggled)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	ToggleButtonWrapper(const std::string& label,
-		const bool& initialToggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_label(label)
-		, m_ownedValue(initialToggled)
+		, m_value(std::move(toggled))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -608,8 +487,7 @@ public:
 
 private:
 	std::string m_label;
-	bool m_ownedValue;
-	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	BoundValue<bool> m_value;
 	std::function<void(bool)> m_onChange;
 	std::function<void(bool, void*)> m_onChangeWithWidget;
 };
@@ -660,23 +538,12 @@ private:
 class ColorPickerWrapper : public ControlWrapper
 {
 public:
-	ColorPickerWrapper(Color& value,
+	ColorPickerWrapper(BoundValue<Color> value,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const Color&)> onChange = {},
 		std::function<void(const Color&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	ColorPickerWrapper(const Color& value,
-		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&)> onChange = {},
-		std::function<void(const Color&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
+		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -691,8 +558,7 @@ public:
 #endif
 
 private:
-	Color m_ownedValue;
-	std::optional<std::reference_wrapper<Color>> m_externalRef;
+	BoundValue<Color> m_value;
 	std::function<void(const Color&)> m_onChange;
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
@@ -720,17 +586,10 @@ public:
 class ProgressBarWrapper : public ControlWrapper
 {
 public:
-	ProgressBarWrapper(const float& value,
+	ProgressBarWrapper(BoundValue<float> value,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-	{
-	}
-	ProgressBarWrapper(float& value,
-		const Position& pos, const Size& size, long style)
-		: ControlWrapper(pos, size, style)
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(std::move(value))
 	{
 	}
 
@@ -743,8 +602,7 @@ public:
 #endif
 
 private:
-	float m_ownedValue;
-	std::optional<std::reference_wrapper<float>> m_externalRef;
+	BoundValue<float> m_value;
 };
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -753,25 +611,12 @@ class ComboBoxWrapper : public ControlWrapper
 {
 public:
 	ComboBoxWrapper(std::vector<std::string> choices,
-		T& selected, const Position& pos, const Size& size, long style,
+		BoundValue<T> selected, const Position& pos, const Size& size, long style,
 		std::function<void(const T&)> onChange = {},
 		std::function<void(const T&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
-		, m_externalRef(selected)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-		buildItems();
-	}
-	ComboBoxWrapper(std::vector<std::string> choices,
-		const T& selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
+		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -799,13 +644,13 @@ private:
 
 		if constexpr (std::is_same_v<T, int>)
 		{
-			m_currentItem = m_ownedSelected;
+			m_currentItem = m_value.get();
 		}
 		else
 		{
 			for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
 			{
-				if (m_choices[i] == m_ownedSelected)
+				if (m_choices[i] == m_value.get())
 				{
 					m_currentItem = i;
 					break;
@@ -817,8 +662,7 @@ private:
 	std::string m_items;
 	std::vector<std::string> m_choices;
 	int m_currentItem = 0;
-	T m_ownedSelected{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(const T&)> m_onChange;
 	std::function<void(const T&, void*)> m_onChangeWithWidget;
 };
@@ -838,26 +682,13 @@ public:
 	static constexpr bool kMultiSelect = MultiSelectListBoxValue<T>;
 
 	ListBoxWrapper(std::vector<std::string> items,
-		T& selected, int visibleRows, const Position& pos, const Size& size, long style,
+		BoundValue<T> selected, int visibleRows, const Position& pos, const Size& size, long style,
 		std::function<void(const T&)> onChange = {},
 		std::function<void(const T&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
-		, m_ownedSelected(selected)
-		, m_externalRef(selected)
-		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
-	{
-	}
-	ListBoxWrapper(std::vector<std::string> items,
-		const T& selected, int visibleRows, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
-		: ControlWrapper(pos, size, style)
-		, m_items(std::move(items))
-		, m_visibleRows(visibleRows)
-		, m_ownedSelected(selected)
+		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -940,29 +771,23 @@ public:
 		}
 	}
 
-	// Commit a new selection: owned copy, bound ref, then the user callback --
-	// in that order, so a handler reading the bound value sees the new one.
+	// Commit a new selection: the value first, then the user callback, so a
+	// handler reading the bound value sees the new one.
 	void commit(const std::vector<int>& indices)
 	{
-		m_ownedSelected = valueFor(m_items, indices);
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedSelected;
+		m_value.set(valueFor(m_items, indices));
 		if (m_onChange)
-			m_onChange(m_ownedSelected);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedSelected, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 
-	const T& boundValue() const
-	{
-		return m_externalRef ? m_externalRef->get() : m_ownedSelected;
-	}
+	const T& boundValue() const { return m_value.get(); }
 
 private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = 1;
-	T m_ownedSelected{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(const T&)> m_onChange;
 	std::function<void(const T&, void*)> m_onChangeWithWidget;
 };

@@ -59,7 +59,7 @@ struct LayoutNode
 			return true;
 		for (const LayoutNode* node = this; node != nullptr; node = node->parent)
 		{
-			if (node->disabled.value())
+			if (node->disabled.get())
 				return true;
 		}
 		return false;
@@ -81,9 +81,9 @@ struct LayoutNode
 		// The bools are caller-owned and outlive every window, so a backend may
 		// capture them; the nodes and wrappers must never be captured.
 		auto collect = [&sources](const DisabledFlag& flag) {
-			if (const bool* bound = flag.boundFlag())
+			if (const bool* bound = flag.boundValue())
 				sources.refs.push_back(bound);
-			else if (flag.value())
+			else if (flag.get())
 				sources.fixed = true;
 		};
 		if (widget != nullptr)

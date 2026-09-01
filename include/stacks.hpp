@@ -26,7 +26,7 @@ struct Stack
 	// as it stands now.
 	Stack& isDisabled(const bool& disabled = true)
 	{
-		m_disabled.set(disabled);
+		m_disabled.snapshot(disabled);
 		return *this;
 	}
 

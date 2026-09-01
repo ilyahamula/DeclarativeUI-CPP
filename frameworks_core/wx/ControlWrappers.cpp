@@ -50,14 +50,14 @@ void TextCtrlWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("TextCtrlWrapper::realize()\t-> new wxTextCtrl()\n");
 #endif
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = txt;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 			value = evt.GetString().ToStdString();
 			if (cb) cb(value);
@@ -82,14 +82,14 @@ void PasswordInputWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("PasswordInputWrapper::realize()\t-> new wxTextCtrl(wxTE_PASSWORD)\n");
 #endif
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_PASSWORD);
 	m_nativeWidget = txt;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 			value = evt.GetString().ToStdString();
 			if (cb) cb(value);
@@ -114,14 +114,14 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("MultiLineTextCtrlWrapper::realize()\t-> new wxTextCtrl(wxTE_MULTILINE)\n");
 #endif
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_MULTILINE);
 	m_nativeWidget = txt;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 			value = evt.GetString().ToStdString();
 			if (cb) cb(value);
@@ -206,7 +206,7 @@ void DatePickerWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("DatePickerWrapper::realize()\t-> new wxDatePickerCtrl()\n");
 #endif
-	const Date& dval = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Date& dval = m_value.get();
 	wxDateTime dt;
 	dt.Set(static_cast<wxDateTime::wxDateTime_t>(dval.day),
 		static_cast<wxDateTime::Month>(dval.month - 1),
@@ -215,9 +215,9 @@ void DatePickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = dp;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		dp->Bind(wxEVT_DATE_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
 			const wxDateTime& d = evt.GetDate();
 			value.year  = d.GetYear();
@@ -264,7 +264,7 @@ void TimePickerWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("TimePickerWrapper::realize()\t-> new wxTimePickerCtrl()\n");
 #endif
-	const Time& tval = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Time& tval = m_value.get();
 	wxDateTime dt = wxDateTime::Now();
 	dt.SetHour(tval.hour);
 	dt.SetMinute(tval.minute);
@@ -273,9 +273,9 @@ void TimePickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = tp;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		tp->Bind(wxEVT_TIME_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
 			const wxDateTime& d = evt.GetDate();
 			value.hour   = d.GetHour();
@@ -316,7 +316,7 @@ void SliderWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("SliderWrapper::realize()\t-> new wxSlider()\n");
 #endif
-	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& val = m_value.get();
 	wxSlider* sl = nullptr;
 	if constexpr (std::is_floating_point_v<T>)
 	{
@@ -333,9 +333,9 @@ void SliderWrapper<T>::realize(void* parentWindow)
 	}
 	m_nativeWidget = sl;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		if constexpr (std::is_floating_point_v<T>)
 			sl->Bind(wxEVT_SLIDER, [&value, step = m_range.step, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 				value = static_cast<T>(evt.GetInt()) * step;
@@ -387,7 +387,7 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("SpinBoxWrapper::realize()\t-> new wxSpinCtrl[Double]()\n");
 #endif
-	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& val = m_value.get();
 	if constexpr (std::is_same_v<T, int>)
 	{
 		auto* spin = new wxSpinCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxEmptyString,
@@ -395,9 +395,9 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 			m_range.min, m_range.max, static_cast<int>(val));
 		m_nativeWidget = spin;
 
-		if (m_externalRef)
+		if (m_value.isBound())
 		{
-			auto& value = m_externalRef->get();
+			auto& value = m_value.get();
 			spin->Bind(wxEVT_SPINCTRL, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinEvent& evt) {
 				value = evt.GetInt();
 				if (cb) cb(value);
@@ -420,9 +420,9 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 			m_range.min, m_range.max, static_cast<double>(val), m_range.step);
 		m_nativeWidget = spin;
 
-		if (m_externalRef)
+		if (m_value.isBound())
 		{
-			auto& value = m_externalRef->get();
+			auto& value = m_value.get();
 			spin->Bind(wxEVT_SPINCTRLDOUBLE, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinDoubleEvent& evt) {
 				value = static_cast<T>(evt.GetValue());
 				if (cb) cb(value);
@@ -454,7 +454,7 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("RadioButtonWrapper::realize()\t-> new wxRadioButton()\n");
 #endif
-	const T& val = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& val = m_value.get();
 	wxRadioButton* rb = nullptr;
 	if constexpr (std::is_same_v<T, bool>)
 	{
@@ -473,9 +473,9 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 	}
 	m_nativeWidget = rb;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		if constexpr (std::is_same_v<T, bool>)
 			rb->Bind(wxEVT_RADIOBUTTON, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
 				value = true;
@@ -526,15 +526,15 @@ void CheckBoxWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("CheckBoxWrapper::realize()\t-> new wxCheckBox()\n");
 #endif
-	const bool checked = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const bool checked = m_value.get();
 	auto* chk = new wxCheckBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	chk->SetValue(checked);
 	m_nativeWidget = chk;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		chk->Bind(wxEVT_CHECKBOX, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 			value = evt.IsChecked();
 			if (cb) cb(value);
@@ -559,15 +559,15 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ToggleButtonWrapper::realize()\t-> new wxToggleButton()\n");
 #endif
-	const bool toggled = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const bool toggled = m_value.get();
 	auto* btn = new wxToggleButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	btn->SetValue(toggled);
 	m_nativeWidget = btn;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		btn->Bind(wxEVT_TOGGLEBUTTON, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 			value = evt.IsChecked();
 			if (cb) cb(value);
@@ -625,7 +625,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ColorPickerWrapper::realize()\t-> new wxColourPickerCtrl()\n");
 #endif
-	const Color& cval = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Color& cval = m_value.get();
 	auto* picker = new wxColourPickerCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY,
 		wxColour(static_cast<unsigned char>(cval.r * 255),
 		         static_cast<unsigned char>(cval.g * 255),
@@ -634,9 +634,9 @@ void ColorPickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = picker;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxColourPickerEvent& evt) {
 			const wxColour& c = evt.GetColour();
 			value = Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f };
@@ -690,7 +690,7 @@ void ProgressBarWrapper::realize(void* parentWindow)
 	// The bound float is a 0..100 percentage, matching the gauge's own integer range.
 	const auto toGauge = [](float v) { return static_cast<int>(std::clamp(v, 0.0f, 100.0f)); };
 
-	const float initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const float initial = m_value.get();
 	auto* gauge = new wxGauge(static_cast<wxWindow*>(parentWindow), wxID_ANY, 100,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxGA_HORIZONTAL | wxGA_SMOOTH);
 	gauge->SetValue(toGauge(initial));
@@ -698,11 +698,11 @@ void ProgressBarWrapper::realize(void* parentWindow)
 
 	// A progress bar has no input events of its own -- the bound float is only ever
 	// written from outside -- so the idle sync is the whole story here.
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
 		bindExternalRefSync(gauge,
 			[gauge] { return gauge->GetValue(); },
-			[&value = m_externalRef->get(), toGauge] { return toGauge(value); },
+			[&value = m_value.get(), toGauge] { return toGauge(value); },
 			[gauge](int v) { gauge->SetValue(v); });
 	}
 }
@@ -718,7 +718,7 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 	wxArrayString items;
 	for (const auto& c : m_choices)
 		items.Add(c);
-	const T& selected = m_externalRef ? m_externalRef->get() : m_ownedSelected;
+	const T& selected = m_value.get();
 	auto* combo = new wxComboBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, "",
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items, m_style);
 	if constexpr (std::is_same_v<T, std::string>)
@@ -727,9 +727,9 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 		combo->SetSelection(selected);
 	m_nativeWidget = combo;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		if constexpr (std::is_same_v<T, std::string>)
 			combo->Bind(wxEVT_COMBOBOX, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
 				value = evt.GetString().ToStdString();
@@ -848,9 +848,9 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	const int rowHeight = list->GetCharHeight() + 2;
 	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		list->Bind(wxEVT_LISTBOX, [&value, list, items = m_items, cb = std::move(m_onChange),
 			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
 			value = valueFor(items, listBoxSelection(list, kMultiSelect));

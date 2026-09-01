@@ -31,7 +31,7 @@ struct Tab
 	// tab switching. Snapshot / caller-owned-flag overloads as on the widgets.
 	Tab& isDisabled(const bool& disabled = true)
 	{
-		m_disabled.set(disabled);
+		m_disabled.snapshot(disabled);
 		return *this;
 	}
 
@@ -83,7 +83,7 @@ struct TabPanel
 	// Snapshot / caller-owned-flag overloads exactly as on the widgets.
 	TabPanel& isDisabled(const bool& disabled = true)
 	{
-		m_disabled.set(disabled);
+		m_disabled.snapshot(disabled);
 		return *this;
 	}
 

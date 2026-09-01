@@ -29,7 +29,7 @@ struct GroupBox
 	// out too. Snapshot the flag as it stands now.
 	GroupBox& isDisabled(const bool& disabled = true)
 	{
-		m_disabled.set(disabled);
+		m_disabled.snapshot(disabled);
 		return *this;
 	}
 

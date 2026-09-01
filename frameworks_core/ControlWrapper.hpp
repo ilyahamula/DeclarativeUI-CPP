@@ -1,7 +1,9 @@
 #pragma once
 
-#include "frameworks_core/CoreTypes/DisabledFlag.hpp"
+#include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
+
+#include <utility>
 
 class ControlWrapper
 {
@@ -72,24 +74,18 @@ public:
 		return m_size;
 	}
 
-	// Snapshot: the control is disabled iff `disabled` was true at build time.
-	void setDisabled(const bool& disabled)
+	// Snapshot or live binding, as the widget resolved it. Bound, isDisabled()
+	// reports the live value, so an immediate backend picks a change up on its
+	// next frame for free; retained backends poll the flag (see the wx
+	// LayoutBackend) because they only apply the state once, at creation.
+	void setDisabled(DisabledFlag disabled)
 	{
-		m_disabled.set(disabled);
-	}
-
-	// Bind to a caller-owned flag instead. isDisabled() then reports the live
-	// value, so an immediate backend picks the change up on its next frame for
-	// free; retained backends poll the ref (see the wx LayoutBackend) because
-	// they only apply the state once, when the native control is created.
-	void setDisabled(bool& disabled)
-	{
-		m_disabled.bind(disabled);
+		m_disabled = std::move(disabled);
 	}
 
 	bool isDisabled() const
 	{
-		return m_disabled.value();
+		return m_disabled.get();
 	}
 
 	// This widget's own flag. A disabled ancestor container also disables it,

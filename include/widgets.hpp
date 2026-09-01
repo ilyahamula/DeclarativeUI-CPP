@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 
 #include <functional>
@@ -25,13 +26,10 @@ struct Widget
 			m_preCreateCallback();
 
 		auto wrapper = createWrapper(m_position, m_size, m_style);
-		// as_const forces the snapshot overload: m_ownedDisabled belongs to this
-		// widget, which is a temporary in the declarative tree and dies with the
-		// enclosing expression -- only a caller-owned flag may be bound by ref.
-		if (m_disabledRef)
-			wrapper->setDisabled(m_disabledRef->get());
-		else
-			wrapper->setDisabled(std::as_const(m_ownedDisabled));
+		// Copying carries the binding over when there is one and the snapshot
+		// otherwise, so the wrapper never ends up referring to this widget --
+		// a temporary that dies with the enclosing declarative expression.
+		wrapper->setDisabled(m_disabled);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(LayoutFlags{}));
 
 		if (m_postCreateCallback)
@@ -80,8 +78,7 @@ struct Widget
 	// Snapshot the flag as it stands now.
 	W& isDisabled(const bool& disabled = true)
 	{
-		m_ownedDisabled = disabled;
-		m_disabledRef.reset();
+		m_disabled.snapshot(disabled);
 		return static_cast<W&>(*this);
 	}
 
@@ -89,8 +86,7 @@ struct Widget
 	// without rebuilding the tree. A non-const lvalue selects this overload.
 	W& isDisabled(bool& disabled)
 	{
-		m_ownedDisabled = disabled;
-		m_disabledRef = disabled;
+		m_disabled.bind(disabled);
 		return static_cast<W&>(*this);
 	}
 
@@ -112,8 +108,7 @@ private: // callbacks
 	std::function<void(void*)> m_postCreateWithWidgetCallback;
 
 private:
-	bool m_ownedDisabled = false;
-	std::optional<std::reference_wrapper<bool>> m_disabledRef;
+	DisabledFlag m_disabled;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };
@@ -154,16 +149,20 @@ struct TextCtrl : Widget<TextCtrl>
 	{
 	}
 
+	// This constructor pair is the binding contract, and every value widget below
+	// repeats it: a non-const lvalue binds (edits write through to the caller's
+	// variable), anything else -- a literal, a temporary, a const -- is snapshotted.
+	// BoundValue's own constructors mirror the same overload pair, which is why the
+	// two bodies are identical.
 	explicit TextCtrl(const std::string& text)
 		: super()
-		, m_ownedText(text)
+		, m_value(text)
 	{
 	}
 
 	explicit TextCtrl(std::string& text)
 		: super()
-		, m_ownedText(text)
-		, m_externalRef(text)
+		, m_value(text)
 	{
 	}
 
@@ -185,14 +184,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<TextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<TextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TextCtrlWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	std::string m_ownedText;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -209,14 +205,13 @@ struct PasswordInput : Widget<PasswordInput>
 
 	explicit PasswordInput(const std::string& text)
 		: super()
-		, m_ownedText(text)
+		, m_value(text)
 	{
 	}
 
 	explicit PasswordInput(std::string& text)
 		: super()
-		, m_ownedText(text)
-		, m_externalRef(text)
+		, m_value(text)
 	{
 	}
 
@@ -238,14 +233,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<PasswordInputWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<PasswordInputWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<PasswordInputWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	std::string m_ownedText;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -262,14 +254,13 @@ struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
 
 	explicit MultiLineTextCtrl(const std::string& text)
 		: super()
-		, m_ownedText(text)
+		, m_value(text)
 	{
 	}
 
 	explicit MultiLineTextCtrl(std::string& text)
 		: super()
-		, m_ownedText(text)
-		, m_externalRef(text)
+		, m_value(text)
 	{
 	}
 
@@ -291,14 +282,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<MultiLineTextCtrlWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<MultiLineTextCtrlWrapper>(m_ownedText, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<MultiLineTextCtrlWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	std::string m_ownedText;
-	std::optional<std::reference_wrapper<std::string>> m_externalRef;
+	BoundValue<std::string> m_value;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -454,15 +442,14 @@ struct RadioButton : Widget<RadioButton<T>>
 
 	RadioButton(const T& value, const std::string& label = "")
 		: super()
-		, m_ownedValue(value)
+		, m_value(value)
 		, m_label(label)
 	{
 	}
 
 	RadioButton(T& value, const std::string& label = "")
 		: super()
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 		, m_label(label)
 	{
 	}
@@ -485,14 +472,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<RadioButtonWrapper<T>>(m_label, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_ownedValue, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::string m_label;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
@@ -522,15 +506,14 @@ struct CheckBox : Widget<CheckBox>
 
 	CheckBox(const bool& initialChecked, const std::string& label = "")
 		: super()
-		, m_ownedValue(initialChecked)
+		, m_value(initialChecked)
 		, m_label(label)
 	{
 	}
 
 	CheckBox(bool& checked, const std::string& label = "")
 		: super()
-		, m_ownedValue(checked)
-		, m_externalRef(checked)
+		, m_value(checked)
 		, m_label(label)
 	{
 	}
@@ -553,14 +536,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_externalRef->get(), m_onChange, m_onChangeWithWidget);
-		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, std::as_const(m_ownedValue), m_onChange, m_onChangeWithWidget);
+		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_value, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	bool m_ownedValue = false;
-	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	BoundValue<bool> m_value;
 	std::string m_label;
 	std::function<void(bool)> m_onChange;
 	std::function<void(bool, void*)> m_onChangeWithWidget;
@@ -577,21 +557,20 @@ struct ComboBox : Widget<ComboBox<T>>
 		, m_choices(std::move(choices))
 	{
 		if constexpr (std::is_same_v<T, std::string>)
-			m_ownedSelected = m_choices.empty() ? T{} : m_choices.front();
+			m_value.snapshot(m_choices.empty() ? T{} : m_choices.front());
 	}
 
 	ComboBox(std::vector<std::string> choices, const T& selected)
 		: super()
 		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
+		, m_value(selected)
 	{
 	}
 
 	ComboBox(std::vector<std::string> choices, T& selected)
 		: super()
 		, m_choices(std::move(choices))
-		, m_ownedSelected(selected)
-		, m_externalRef(selected)
+		, m_value(selected)
 	{
 	}
 
@@ -613,15 +592,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<ComboBoxWrapper<T>>(m_choices, std::as_const(m_ownedSelected), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::vector<std::string> m_choices;
-	T m_ownedSelected{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(const T&)> m_onChange;
 	std::function<void(const T&, void*)> m_onChangeWithWidget;
 };
@@ -655,21 +631,20 @@ struct ListBox : Widget<ListBox<T>>
 		// Single-select starts on the first item (as ComboBox does); multi-select
 		// starts empty -- "no rows selected" is the honest default for a list.
 		if constexpr (std::is_same_v<T, std::string>)
-			m_ownedSelected = m_items.empty() ? T{} : m_items.front();
+			m_value.snapshot(m_items.empty() ? T{} : m_items.front());
 	}
 
 	ListBox(std::vector<std::string> items, const T& selected)
 		: super()
 		, m_items(std::move(items))
-		, m_ownedSelected(selected)
+		, m_value(selected)
 	{
 	}
 
 	ListBox(std::vector<std::string> items, T& selected)
 		: super()
 		, m_items(std::move(items))
-		, m_ownedSelected(selected)
-		, m_externalRef(selected)
+		, m_value(selected)
 	{
 	}
 
@@ -697,16 +672,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<ListBoxWrapper<T>>(m_items, m_externalRef->get(), m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<ListBoxWrapper<T>>(m_items, std::as_const(m_ownedSelected), m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
-	T m_ownedSelected{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(const T&)> m_onChange;
 	std::function<void(const T&, void*)> m_onChangeWithWidget;
 };
@@ -726,22 +698,21 @@ struct Slider : Widget<Slider<T>>
 	explicit Slider(Range<T> range)
 		: super()
 		, m_range(range)
-		, m_ownedValue(range.min)
+		, m_value(std::as_const(range).min)
 	{
 	}
 
 	Slider(Range<T> range, const T& value)
 		: super()
 		, m_range(range)
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
 	Slider(Range<T> range, T& value)
 		: super()
 		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
@@ -763,15 +734,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<SliderWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<SliderWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SliderWrapper<T>>(m_range, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	Range<T> m_range;
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 };
@@ -794,22 +762,21 @@ struct SpinBox : Widget<SpinBox<T>>
 	explicit SpinBox(Range<T> range)
 		: super()
 		, m_range(range)
-		, m_ownedValue(range.min)
+		, m_value(std::as_const(range).min)
 	{
 	}
 
 	SpinBox(Range<T> range, const T& value)
 		: super()
 		, m_range(range)
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
 	SpinBox(Range<T> range, T& value)
 		: super()
 		, m_range(range)
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
@@ -831,15 +798,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<SpinBoxWrapper<T>>(m_range, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<SpinBoxWrapper<T>>(m_range, std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SpinBoxWrapper<T>>(m_range, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	Range<T> m_range;
-	T m_ownedValue{};
-	std::optional<std::reference_wrapper<T>> m_externalRef;
+	BoundValue<T> m_value;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 };
@@ -865,14 +829,13 @@ struct DatePicker : Widget<DatePicker>
 
 	explicit DatePicker(const Date& value)
 		: super()
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
 	explicit DatePicker(Date& value)
 		: super()
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
@@ -894,14 +857,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<DatePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<DatePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<DatePickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	Date m_ownedValue{};
-	std::optional<std::reference_wrapper<Date>> m_externalRef;
+	BoundValue<Date> m_value;
 	std::function<void(const Date&)> m_onChange;
 	std::function<void(const Date&, void*)> m_onChangeWithWidget;
 };
@@ -918,15 +878,14 @@ struct ToggleButton : Widget<ToggleButton>
 
 	ToggleButton(const bool& initialToggled, const std::string& label = "")
 		: super()
-		, m_ownedValue(initialToggled)
+		, m_value(initialToggled)
 		, m_label(label)
 	{
 	}
 
 	ToggleButton(bool& toggled, const std::string& label = "")
 		: super()
-		, m_ownedValue(toggled)
-		, m_externalRef(toggled)
+		, m_value(toggled)
 		, m_label(label)
 	{
 	}
@@ -949,15 +908,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<ToggleButtonWrapper>(m_label, m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<ToggleButtonWrapper>(m_label, m_ownedValue, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ToggleButtonWrapper>(m_label, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	std::string m_label;
-	bool m_ownedValue = false;
-	std::optional<std::reference_wrapper<bool>> m_externalRef;
+	BoundValue<bool> m_value;
 	std::function<void(bool)> m_onChange;
 	std::function<void(bool, void*)> m_onChangeWithWidget;
 };
@@ -969,14 +925,13 @@ struct ColorPicker : Widget<ColorPicker>
 
 	explicit ColorPicker(Color& value)
 		: super()
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
 	explicit ColorPicker(const Color& value)
 		: super()
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
@@ -998,14 +953,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<ColorPickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<ColorPickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ColorPickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	Color m_ownedValue;
-	std::optional<std::reference_wrapper<Color>> m_externalRef;
+	BoundValue<Color> m_value;
 	std::function<void(const Color&)> m_onChange;
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
@@ -1034,14 +986,13 @@ struct ProgressBar : Widget<ProgressBar>
 
 	explicit ProgressBar(const float& value)
 		: super()
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
 	explicit ProgressBar(float& value)
 		: super()
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
@@ -1051,14 +1002,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<ProgressBarWrapper>(m_externalRef->get(), pos, size, style);
-		return std::make_unique<ProgressBarWrapper>(std::as_const(m_ownedValue), pos, size, style);
+		return std::make_unique<ProgressBarWrapper>(m_value, pos, size, style);
 	}
 
 private:
-	float m_ownedValue = 0.0f;
-	std::optional<std::reference_wrapper<float>> m_externalRef;
+	BoundValue<float> m_value;
 };
 
 // Image -----------------------------------------------------------
@@ -1125,14 +1073,13 @@ struct TimePicker : Widget<TimePicker>
 
 	explicit TimePicker(const Time& value)
 		: super()
-		, m_ownedValue(value)
+		, m_value(value)
 	{
 	}
 
 	explicit TimePicker(Time& value)
 		: super()
-		, m_ownedValue(value)
-		, m_externalRef(value)
+		, m_value(value)
 	{
 	}
 
@@ -1154,14 +1101,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		if (m_externalRef)
-			return std::make_unique<TimePickerWrapper>(m_externalRef->get(), pos, size, style, m_onChange, m_onChangeWithWidget);
-		return std::make_unique<TimePickerWrapper>(std::as_const(m_ownedValue), pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TimePickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
-	Time m_ownedValue{};
-	std::optional<std::reference_wrapper<Time>> m_externalRef;
+	BoundValue<Time> m_value;
 	std::function<void(const Time&)> m_onChange;
 	std::function<void(const Time&, void*)> m_onChangeWithWidget;
 };

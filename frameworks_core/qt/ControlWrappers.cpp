@@ -83,13 +83,13 @@ void ButtonWrapper::realize(void* parentWindow)
 
 void TextCtrlWrapper::realize(void* parentWindow)
 {
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	m_nativeWidget = edit;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(edit, &QLineEdit::textChanged,
 			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
 				value = text.toStdString();
@@ -114,14 +114,14 @@ void TextCtrlWrapper::realize(void* parentWindow)
 
 void PasswordInputWrapper::realize(void* parentWindow)
 {
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	edit->setEchoMode(QLineEdit::Password);
 	m_nativeWidget = edit;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(edit, &QLineEdit::textChanged,
 			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
 				value = text.toStdString();
@@ -146,13 +146,13 @@ void PasswordInputWrapper::realize(void* parentWindow)
 
 void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 {
-	const std::string& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const std::string& initial = m_value.get();
 	auto* edit = new QPlainTextEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	m_nativeWidget = edit;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(edit, &QPlainTextEdit::textChanged,
 			[edit, &value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget] {
 				value = edit->toPlainText().toStdString();
@@ -226,15 +226,15 @@ void StaticTextWrapper::realize(void* parentWindow)
 
 void DatePickerWrapper::realize(void* parentWindow)
 {
-	const Date& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Date& initial = m_value.get();
 	auto* picker = new QDateEdit(QDate(initial.year, initial.month, initial.day), static_cast<QWidget*>(parentWindow));
 	picker->setCalendarPopup(true);
 	m_nativeWidget = picker;
 
 	auto toDate = [](const QDate& d) { return Date { d.year(), d.month(), d.day() }; };
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(picker, &QDateEdit::dateChanged,
 			[&value, toDate, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QDate d) {
 				value = toDate(d);
@@ -259,15 +259,15 @@ void DatePickerWrapper::realize(void* parentWindow)
 
 void TimePickerWrapper::realize(void* parentWindow)
 {
-	const Time& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Time& initial = m_value.get();
 	auto* picker = new QTimeEdit(QTime(initial.hour, initial.minute, initial.second), static_cast<QWidget*>(parentWindow));
 	picker->setDisplayFormat(QStringLiteral("HH:mm:ss"));
 	m_nativeWidget = picker;
 
 	auto toTime = [](QTime t) { return Time { t.hour(), t.minute(), t.second() }; };
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(picker, &QTimeEdit::timeChanged,
 			[&value, toTime, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QTime t) {
 				value = toTime(t);
@@ -293,7 +293,7 @@ void TimePickerWrapper::realize(void* parentWindow)
 template <SliderValue T>
 void SliderWrapper<T>::realize(void* parentWindow)
 {
-	const T& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& initial = m_value.get();
 	auto* slider = new QSlider(Qt::Horizontal, static_cast<QWidget*>(parentWindow));
 	if constexpr (std::is_floating_point_v<T>)
 	{
@@ -314,9 +314,9 @@ void SliderWrapper<T>::realize(void* parentWindow)
 		else
 			return static_cast<T>(raw);
 	};
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		// QSlider is integral; a float slider lives in step units, so compare there.
 		bindExternalRefSync(slider,
 			[slider] { return slider->value(); },
@@ -351,7 +351,7 @@ template class SliderWrapper<float>;
 template <SpinBoxValue T>
 void SpinBoxWrapper<T>::realize(void* parentWindow)
 {
-	const T& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& initial = m_value.get();
 	if constexpr (std::is_same_v<T, int>)
 	{
 		auto* spin = new QSpinBox(static_cast<QWidget*>(parentWindow));
@@ -360,9 +360,9 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 		spin->setValue(initial);
 		m_nativeWidget = spin;
 
-		if (m_externalRef)
+		if (m_value.isBound())
 		{
-			auto& value = m_externalRef->get();
+			auto& value = m_value.get();
 			QObject::connect(spin, &QSpinBox::valueChanged,
 				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int v) {
 					value = v;
@@ -388,9 +388,9 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 		spin->setValue(initial);
 		m_nativeWidget = spin;
 
-		if (m_externalRef)
+		if (m_value.isBound())
 		{
-			auto& value = m_externalRef->get();
+			auto& value = m_value.get();
 			QObject::connect(spin, &QDoubleSpinBox::valueChanged,
 				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](double v) {
 					value = static_cast<T>(v);
@@ -436,7 +436,7 @@ QButtonGroup* currentRadioGroup(QWidget* owner, bool startNew)
 template <RadioButtonValue T>
 void RadioButtonWrapper<T>::realize(void* parentWindow)
 {
-	const T& initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const T& initial = m_value.get();
 	auto* radio = new QRadioButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
 	m_nativeWidget = radio;
 
@@ -448,9 +448,9 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 	else
 		radio->setChecked(static_cast<int>(initial) == m_index);
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(radio, &QRadioButton::toggled,
 			[&value, index = m_index, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
 				if (!checked)
@@ -503,14 +503,14 @@ template class RadioButtonWrapper<int>;
 
 void CheckBoxWrapper::realize(void* parentWindow)
 {
-	const bool checked = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const bool checked = m_value.get();
 	auto* box = new QCheckBox(qstr(m_label), static_cast<QWidget*>(parentWindow));
 	box->setChecked(checked);
 	m_nativeWidget = box;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(box, &QCheckBox::toggled,
 			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) {
 				value = v;
@@ -534,15 +534,15 @@ void CheckBoxWrapper::realize(void* parentWindow)
 
 void ToggleButtonWrapper::realize(void* parentWindow)
 {
-	const bool toggled = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const bool toggled = m_value.get();
 	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
 	button->setCheckable(true);
 	button->setChecked(toggled);
 	m_nativeWidget = button;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(button, &QPushButton::toggled,
 			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) {
 				value = v;
@@ -596,7 +596,7 @@ void ImageWrapper::realize(void* parentWindow)
 
 void ColorPickerWrapper::realize(void* parentWindow)
 {
-	const Color initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const Color initial = m_value.get();
 	auto* button = new QPushButton(static_cast<QWidget*>(parentWindow));
 	auto sheetFor = [](const Color& c) {
 		return QStringLiteral("background-color: rgba(%1,%2,%3,%4);")
@@ -608,9 +608,9 @@ void ColorPickerWrapper::realize(void* parentWindow)
 
 	// There is no getter for the swatch colour -- the stylesheet is the displayed
 	// state, so compare on that. Byte-quantised, so no float equality either.
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& swatchValue = m_externalRef->get();
+		auto& swatchValue = m_value.get();
 		bindExternalRefSync(button,
 			[button] { return button->styleSheet(); },
 			[&swatchValue, sheetFor] { return sheetFor(swatchValue); },
@@ -618,11 +618,13 @@ void ColorPickerWrapper::realize(void* parentWindow)
 	}
 
 	// the button is the swatch; clicking opens the native color dialog
-	auto external = m_externalRef;
+	// The bound variable outlives the wrapper, so the handler may hold a pointer to
+	// it; a snapshot cannot be written back, hence the null and the `initial` copy.
+	Color* bound = m_value.isBound() ? &m_value.get() : nullptr;
 	QObject::connect(button, &QPushButton::clicked,
-		[button, applySwatch, external, initial,
+		[button, applySwatch, bound, initial,
 			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-			const Color current = external ? external->get() : initial;
+			const Color current = bound ? *bound : initial;
 			const QColor start((int)(current.r * 255), (int)(current.g * 255),
 				(int)(current.b * 255), (int)(current.a * 255));
 			const QColor picked = QColorDialog::getColor(start, button, QString(),
@@ -631,8 +633,8 @@ void ColorPickerWrapper::realize(void* parentWindow)
 				return;
 			const Color color { (float)picked.redF(), (float)picked.greenF(),
 				(float)picked.blueF(), (float)picked.alphaF() };
-			if (external)
-				external->get() = color;
+			if (bound)
+				*bound = color;
 			applySwatch(color);
 			if (cb) cb(color);
 			else if (cbw) cbw(color, nw);
@@ -660,7 +662,7 @@ void ProgressBarWrapper::realize(void* parentWindow)
 	// fraction, which rendered the same tree differently here).
 	const auto toBar = [](float v) { return static_cast<int>(std::clamp(v, 0.0f, 100.0f)); };
 
-	const float initial = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const float initial = m_value.get();
 	auto* bar = new QProgressBar(static_cast<QWidget*>(parentWindow));
 	bar->setRange(0, 100);
 	bar->setValue(toBar(initial));
@@ -668,11 +670,11 @@ void ProgressBarWrapper::realize(void* parentWindow)
 
 	// A progress bar has no input of its own -- the bound float is only ever
 	// written from outside -- so the sync is the whole story here.
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
 		bindExternalRefSync(bar,
 			[bar] { return bar->value(); },
-			[&value = m_externalRef->get(), toBar] { return toBar(value); },
+			[&value = m_value.get(), toBar] { return toBar(value); },
 			[bar](int v) { bar->setValue(v); });
 	}
 
@@ -686,16 +688,16 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 	auto* combo = new QComboBox(static_cast<QWidget*>(parentWindow));
 	for (const auto& choice : m_choices)
 		combo->addItem(qstr(choice));
-	const T& selected = m_externalRef ? m_externalRef->get() : m_ownedSelected;
+	const T& selected = m_value.get();
 	if constexpr (std::is_same_v<T, std::string>)
 		combo->setCurrentText(qstr(selected));
 	else
 		combo->setCurrentIndex(selected);
 	m_nativeWidget = combo;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		if constexpr (std::is_same_v<T, std::string>)
 			QObject::connect(combo, &QComboBox::currentTextChanged,
 				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
@@ -805,9 +807,9 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	setListWidgetSelection(list, indicesFor(m_items, boundValue()));
 	m_nativeWidget = list;
 
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
-		auto& value = m_externalRef->get();
+		auto& value = m_value.get();
 		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
 			[&value, list, items = m_items, cb = std::move(m_onChange),
 				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {

@@ -145,22 +145,18 @@ Size TextCtrlWrapper::measureIntrinsic(const Constraints&)
 
 void TextCtrlWrapper::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
 	{
-		m_ownedValue = buf;
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		m_value.set(buf);
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -174,22 +170,18 @@ Size PasswordInputWrapper::measureIntrinsic(const Constraints&)
 
 void PasswordInputWrapper::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
 	{
-		m_ownedValue = buf;
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		m_value.set(buf);
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -206,23 +198,19 @@ Size MultiLineTextCtrlWrapper::measureIntrinsic(const Constraints&)
 
 void MultiLineTextCtrlWrapper::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	char buf[4096] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_ownedValue.c_str());
+	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
 	const ImVec2 size = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0, 0);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf), size))
 	{
-		m_ownedValue = buf;
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		m_value.set(buf);
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -334,9 +322,8 @@ Size DatePickerWrapper::measureIntrinsic(const Constraints&)
 
 void DatePickerWrapper::render(const Rect&)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
-
+	// Edited in place: bound, this is the caller's Date; unbound, our snapshot.
+	Date& date = m_value.get();
 	bool changed = false;
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	{
@@ -344,25 +331,23 @@ void DatePickerWrapper::render(const Rect&)
 		const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
 		const float padW = style.FramePadding.x * 2.0f;
 		ImGui::SetNextItemWidth(ImGui::CalcTextSize("9999").x + padW + btnW);
-		changed |= ImGui::InputInt("##dp_year",  &m_ownedValue.year,  1, 10);
+		changed |= ImGui::InputInt("##dp_year",  &date.year,  1, 10);
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(ImGui::CalcTextSize("12").x + padW + btnW);
-		changed |= ImGui::InputInt("##dp_month", &m_ownedValue.month, 1, 0);
+		changed |= ImGui::InputInt("##dp_month", &date.month, 1, 0);
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(ImGui::CalcTextSize("31").x + padW + btnW);
-		changed |= ImGui::InputInt("##dp_day",   &m_ownedValue.day,   1, 0);
+		changed |= ImGui::InputInt("##dp_day",   &date.day,   1, 0);
 	}
 	ImGui::PopID();
 	if (changed)
 	{
-		m_ownedValue.month = std::clamp(m_ownedValue.month, 1, 12);
-		m_ownedValue.day   = std::clamp(m_ownedValue.day,   1, 31);
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		date.month = std::clamp(date.month, 1, 12);
+		date.day   = std::clamp(date.day,   1, 31);
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(date);
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(date, m_nativeWidget);
 	}
 }
 
@@ -382,9 +367,8 @@ Size TimePickerWrapper::measureIntrinsic(const Constraints&)
 
 void TimePickerWrapper::render(const Rect&)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
-
+	// Edited in place: bound, this is the caller's Time; unbound, our snapshot.
+	Time& time = m_value.get();
 	bool changed = false;
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	{
@@ -393,26 +377,24 @@ void TimePickerWrapper::render(const Rect&)
 		const float padW  = style.FramePadding.x * 2.0f;
 		const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
 		ImGui::SetNextItemWidth(ImGui::CalcTextSize("23").x + padW + btnW);
-		changed |= ImGui::InputInt("##tp_hour",   &m_ownedValue.hour,   1, 0);
+		changed |= ImGui::InputInt("##tp_hour",   &time.hour,   1, 0);
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(twoDigitW);
-		changed |= ImGui::InputInt("##tp_minute", &m_ownedValue.minute, 1, 0);
+		changed |= ImGui::InputInt("##tp_minute", &time.minute, 1, 0);
 		ImGui::SameLine(0, 4);
 		ImGui::SetNextItemWidth(twoDigitW);
-		changed |= ImGui::InputInt("##tp_second", &m_ownedValue.second, 1, 0);
+		changed |= ImGui::InputInt("##tp_second", &time.second, 1, 0);
 	}
 	ImGui::PopID();
 	if (changed)
 	{
-		m_ownedValue.hour   = std::clamp(m_ownedValue.hour,   0, 23);
-		m_ownedValue.minute = std::clamp(m_ownedValue.minute, 0, 59);
-		m_ownedValue.second = std::clamp(m_ownedValue.second, 0, 59);
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		time.hour   = std::clamp(time.hour,   0, 23);
+		time.minute = std::clamp(time.minute, 0, 59);
+		time.second = std::clamp(time.second, 0, 59);
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(time);
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(time, m_nativeWidget);
 	}
 }
 
@@ -427,27 +409,22 @@ Size SliderWrapper<T>::measureIntrinsic(const Constraints&)
 template <SliderValue T>
 void SliderWrapper<T>::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
-
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
-		changed = ImGui::SliderInt("##slider", &m_ownedValue, m_range.min, m_range.max);
+		changed = ImGui::SliderInt("##slider", &m_value.get(), m_range.min, m_range.max);
 	else
-		changed = ImGui::SliderFloat("##slider", &m_ownedValue, m_range.min, m_range.max);
+		changed = ImGui::SliderFloat("##slider", &m_value.get(), m_range.min, m_range.max);
 	ImGui::PopID();
 
 	if (changed)
 	{
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 }
 
@@ -480,35 +457,30 @@ Size SpinBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <SpinBoxValue T>
 void SpinBoxWrapper<T>::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
-
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
-		changed = ImGui::InputInt("##spinbox", &m_ownedValue, static_cast<int>(m_range.step));
+		changed = ImGui::InputInt("##spinbox", &m_value.get(), static_cast<int>(m_range.step));
 		if (changed)
-			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
+			m_value.set(std::clamp(m_value.get(), m_range.min, m_range.max));
 	}
 	else
 	{
-		changed = ImGui::InputFloat("##spinbox", &m_ownedValue, m_range.step);
+		changed = ImGui::InputFloat("##spinbox", &m_value.get(), m_range.step);
 		if (changed)
-			m_ownedValue = std::clamp(m_ownedValue, m_range.min, m_range.max);
+			m_value.set(std::clamp(m_value.get(), m_range.min, m_range.max));
 	}
 	ImGui::PopID();
 
 	if (changed)
 	{
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 }
 
@@ -526,33 +498,27 @@ Size RadioButtonWrapper<T>::measureIntrinsic(const Constraints&)
 template <RadioButtonValue T>
 void RadioButtonWrapper<T>::render(const Rect&)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##radio" : m_label.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if constexpr (std::is_same_v<T, bool>)
 	{
-		if (ImGui::RadioButton(label, m_ownedValue))
+		if (ImGui::RadioButton(label, m_value.get()))
 		{
-			m_ownedValue = !m_ownedValue;
-			if (m_externalRef)
-				m_externalRef->get() = m_ownedValue;
+			m_value.set(!m_value.get());
 			if (m_onChange)
-				m_onChange(m_ownedValue);
+				m_onChange(m_value.get());
 			else if (m_onChangeWithWidget)
-				m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+				m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 		}
 	}
 	else
 	{
-		if (ImGui::RadioButton(label, &m_ownedValue, m_index))
+		if (ImGui::RadioButton(label, &m_value.get(), m_index))
 		{
-			if (m_externalRef)
-				m_externalRef->get() = m_ownedValue;
 			if (m_onChange)
-				m_onChange(m_ownedValue);
+				m_onChange(m_value.get());
 			else if (m_onChangeWithWidget)
-				m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+				m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 		}
 	}
 	ImGui::PopID();
@@ -570,18 +536,14 @@ Size CheckBoxWrapper::measureIntrinsic(const Constraints&)
 
 void CheckBoxWrapper::render(const Rect&)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##checkbox" : m_label.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	if (ImGui::Checkbox(label, &m_ownedValue))
+	if (ImGui::Checkbox(label, &m_value.get()))
 	{
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -595,11 +557,9 @@ Size ToggleButtonWrapper::measureIntrinsic(const Constraints&)
 
 void ToggleButtonWrapper::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
 	const char* label = m_label.empty() ? "##toggle" : m_label.c_str();
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	const bool wasToggled = m_ownedValue;
+	const bool wasToggled = m_value.get();
 	if (wasToggled)
 	{
 		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -610,13 +570,11 @@ void ToggleButtonWrapper::render(const Rect& frame)
 		: ImGui::Button(label);
 	if (clicked)
 	{
-		m_ownedValue = !m_ownedValue;
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		m_value.set(!m_value.get());
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	if (wasToggled)
 		ImGui::PopStyleColor(2);
@@ -709,17 +667,17 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <ComboBoxValue T>
 void ComboBoxWrapper<T>::render(const Rect& frame)
 {
-	if (m_externalRef)
+	if (m_value.isBound())
 	{
 		if constexpr (std::is_same_v<T, int>)
 		{
-			m_currentItem = m_externalRef->get();
+			m_currentItem = m_value.get();
 		}
 		else
 		{
 			for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
 			{
-				if (m_choices[i] == m_externalRef->get())
+				if (m_choices[i] == m_value.get())
 				{
 					m_currentItem = i;
 					break;
@@ -734,16 +692,14 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
 	{
 		if constexpr (std::is_same_v<T, int>)
-			m_ownedSelected = m_currentItem;
+			m_value.set(m_currentItem);
 		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.size()))
-			m_ownedSelected = m_choices[m_currentItem];
+			m_value.set(m_choices[m_currentItem]);
 
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedSelected;
 		if (m_onChange)
-			m_onChange(m_ownedSelected);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedSelected, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -829,22 +785,18 @@ Size ColorPickerWrapper::measureIntrinsic(const Constraints&)
 
 void ColorPickerWrapper::render(const Rect& frame)
 {
-	if (m_externalRef)
-		m_ownedValue = m_externalRef->get();
-
-	float col[4] = { m_ownedValue.r, m_ownedValue.g, m_ownedValue.b, m_ownedValue.a };
+	const Color& cur = m_value.get();
+	float col[4] = { cur.r, cur.g, cur.b, cur.a };
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (ImGui::ColorEdit4("##colorpicker", col))
 	{
-		m_ownedValue = Color{ col[0], col[1], col[2], col[3] };
-		if (m_externalRef)
-			m_externalRef->get() = m_ownedValue;
+		m_value.set(Color{ col[0], col[1], col[2], col[3] });
 		if (m_onChange)
-			m_onChange(m_ownedValue);
+			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_ownedValue, m_nativeWidget);
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -871,7 +823,7 @@ Size ProgressBarWrapper::measureIntrinsic(const Constraints&)
 
 void ProgressBarWrapper::render(const Rect& frame)
 {
-	const float value = m_externalRef ? m_externalRef->get() : m_ownedValue;
+	const float value = m_value.get();
 	const ImVec2 size = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f);
