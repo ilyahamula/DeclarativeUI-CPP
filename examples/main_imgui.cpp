@@ -84,16 +84,23 @@ int main(int argc, char** argv)
     float value = 5.0f;
     bool checked = false;
 
-    // Selection demo state. Bound by reference, so it has to outlive the frame
-    // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string favouriteLanguage = "Rust";
-    std::vector<int> selectedTags { 1, 3 };
-    std::string comboChoice = "C++";
-    bool listsDisabled = false;
+    // Container-disabling demo state. Bound by reference, so it has to outlive
+    // the frame loop -- ImGui rebuilds the tree every frame and reads these live.
+    std::string deliveryName = "Ada Lovelace";
+    std::string deliveryEmail = "ada@example.com";
+    int copies = 1;
+    bool express = false;
+    bool groupDisabled = false;
 
-    // ListBox value-binding demo state.
-    std::string mirroredListChoice = "Rust";
-    bool listMirrorDisabled = false;
+    std::string tabNote = "Notes...";
+    int level = 3;
+    bool verboseLogging = false;
+    bool pageDisabled = false;
+    bool panelDisabled = false;
+
+    // Container value-binding demo state.
+    int boundCount = 40;
+    bool countLocked = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -104,9 +111,9 @@ int main(int argc, char** argv)
         ImGui::NewFrame();
 
         //DrawDemoUI();
-        drawProgressBarBindedToSlider(value, checked).show();
-        drawSelectionUI(favouriteLanguage, selectedTags, comboChoice, listsDisabled).show();
-        drawListBoxMirror(mirroredListChoice, listMirrorDisabled).show();
+        drawGroupBoxDisabling(deliveryName, deliveryEmail, copies, express, groupDisabled).show();
+        drawStackAndTabDisabling(tabNote, level, verboseLogging, pageDisabled, panelDisabled).show();
+        drawGroupDisabledByCheckBox(boundCount, countLocked).show();
 
         ImGui::Render();
         int display_w, display_h;

@@ -6,6 +6,7 @@
 #include "controls_gallery.hpp"
 #include "selection_gallery.hpp"
 #include "composite_dialogs.hpp"
+#include "container_disabling.hpp"
 #include "value_binding.hpp"
 #include "layout_probes.hpp"
 

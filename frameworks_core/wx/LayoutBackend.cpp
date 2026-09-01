@@ -24,6 +24,32 @@ wxString labelText(const std::string& label)
 	return text;
 }
 
+// Applies a node's effective disabled state to the window that was just
+// created for it (leaf control, group-box chrome, notebook or page), and keeps
+// polling when some flag in the chain is caller-owned. Hooked at the one place
+// each window passes through exactly once, rather than repeated in realize().
+void applyDisabled(wxWindow* window, const LayoutNode& node)
+{
+	// IsThisEnabled() reads the window's own flag, so a disabled parent (a
+	// notebook over its pages) never provokes a re-Enable of a child.
+	window->Enable(!node.isDisabledEffective());
+
+	// A bound flag can flip at any time and wx applies the state only here, at
+	// creation -- so poll it like any other external ref. A chain that is
+	// fixed, or holds no bound flag at all, can never change again.
+	const auto sources = node.disabledSources();
+	if (sources.fixed || sources.refs.empty())
+		return;
+
+	bindExternalRefSync(window,
+		[window] { return window->IsThisEnabled(); },
+		[refs = sources.refs] {
+			return std::none_of(refs.begin(), refs.end(),
+				[](const bool* flag) { return *flag; });
+		},
+		[window](bool enable) { window->Enable(enable); });
+}
+
 } // unnamed namespace
 
 WxLayoutBackend::WxLayoutBackend(wxWindow* host)
@@ -44,21 +70,7 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native control + bind events
-		auto* created = static_cast<wxWindow*>(widget->nativeHandle());
-		created->Enable(!widget->isDisabled());
-
-		// A disabled flag bound by ref can flip at any time, and wx applies the
-		// state only here, at creation -- so poll it like any other external ref.
-		// Hooked at the one place every control type passes through exactly once,
-		// rather than repeated in each realize(). IsThisEnabled() reads the
-		// window's own flag, so a disabled parent never provokes a re-Enable.
-		if (const auto& ref = widget->disabledRef())
-		{
-			bindExternalRefSync(created,
-				[created] { return created->IsThisEnabled(); },
-				[&flag = ref->get()] { return !flag; },
-				[created](bool enable) { created->Enable(enable); });
-		}
+		applyDisabled(static_cast<wxWindow*>(widget->nativeHandle()), leaf);
 	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());
@@ -117,6 +129,8 @@ wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)
 		window = new wxStaticBox(m_host, wxID_ANY, labelText(node.label));
 	else if (node.kind == NodeKind::TabPanel)
 		window = new wxNotebook(m_host, wxID_ANY);
+	if (window != nullptr)
+		applyDisabled(window, node);
 	m_containers[&node] = window;
 	return window;
 }
@@ -176,6 +190,7 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		{
 			page = new wxPanel(notebook);
 			notebook->AddPage(page, labelText(node.label));
+			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}
 		scope.parent = page;

@@ -20,6 +20,9 @@ public:
 
 private:
 	// containers currently open, to recognize tab pages (children of an
-	// open TabPanel) without parent pointers in LayoutNode
+	// open TabPanel)
 	std::vector<const LayoutNode*> m_containerStack;
+	// whether each open container pushed a BeginDisabled scope, so
+	// endContainer pops exactly the ones beginContainer pushed
+	std::vector<bool> m_disabledStack;
 };

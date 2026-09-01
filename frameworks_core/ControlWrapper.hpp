@@ -1,9 +1,7 @@
 #pragma once
 
+#include "frameworks_core/CoreTypes/DisabledFlag.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
-
-#include <functional>
-#include <optional>
 
 class ControlWrapper
 {
@@ -77,8 +75,7 @@ public:
 	// Snapshot: the control is disabled iff `disabled` was true at build time.
 	void setDisabled(const bool& disabled)
 	{
-		m_disabled = disabled;
-		m_disabledRef.reset();
+		m_disabled.set(disabled);
 	}
 
 	// Bind to a caller-owned flag instead. isDisabled() then reports the live
@@ -87,19 +84,19 @@ public:
 	// they only apply the state once, when the native control is created.
 	void setDisabled(bool& disabled)
 	{
-		m_disabled = disabled;
-		m_disabledRef = disabled;
+		m_disabled.bind(disabled);
 	}
 
 	bool isDisabled() const
 	{
-		return m_disabledRef ? m_disabledRef->get() : m_disabled;
+		return m_disabled.value();
 	}
 
-	// Engaged when the disabled state is bound to a caller-owned flag.
-	const std::optional<std::reference_wrapper<bool>>& disabledRef() const
+	// This widget's own flag. A disabled ancestor container also disables it,
+	// which only the node tree knows -- see LayoutNode::isDisabledEffective().
+	const DisabledFlag& disabledFlag() const
 	{
-		return m_disabledRef;
+		return m_disabled;
 	}
 
 protected:
@@ -107,6 +104,5 @@ protected:
 	Position m_pos { -1, -1 };
 	Size m_size { -1, -1 };
 	long m_style { 0 };
-	bool m_disabled = false;
-	std::optional<std::reference_wrapper<bool>> m_disabledRef;
+	DisabledFlag m_disabled;
 };
