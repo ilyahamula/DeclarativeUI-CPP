@@ -26,6 +26,17 @@ class DeclarativeApp : public wxApp
     float value = 1.0f;
     bool checked = false;
 
+    // Selection demo state: members, so the bound refs outlive the modeless
+    // dialog that reads them.
+    std::string m_favouriteLanguage = "Rust";
+    std::vector<int> m_selectedTags { 1, 3 };
+    std::string m_comboChoice = "C++";
+    bool m_listsDisabled = false;
+
+    // ListBox value-binding demo state.
+    std::string m_mirroredListChoice = "Rust";
+    bool m_listMirrorDisabled = false;
+
     void DrawUI()
     {
         drawControlsUI(m_multilineText, m_password, m_spinInt,
@@ -58,6 +69,8 @@ public:
     {
         Bind(wxEVT_IDLE, &DeclarativeApp::OnIdle, this);
         drawProgressBarBindedToSlider(value, checked).show();
+        drawSelectionUI(m_favouriteLanguage, m_selectedTags, m_comboChoice, m_listsDisabled).show();
+        drawListBoxMirror(m_mirroredListChoice, m_listMirrorDisabled).show();
         return true;
     }
 

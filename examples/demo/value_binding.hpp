@@ -22,6 +22,7 @@
 #include "declarative_ui.hpp"
 
 #include <string>
+#include <vector>
 
 inline auto drawProgressBarBindedToSlider(float& value, bool& checked)
 {
@@ -129,6 +130,33 @@ inline auto drawToggleMirror(bool& flag, bool& disabled)
             ToggleButton{flag, "Same bool"}
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
                 .isDisabled(disabled),
+            CheckBox{disabled, "Disable both"}
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// Two ListBoxes over one std::string. Picking an item in either box moves the
+// selection in the other -- the same shared-ref sync as drawTextMirror/
+// drawChoiceMirror, just with ListBox's single-select binding instead.
+inline auto drawListBoxMirror(std::string& choice, bool& disabled)
+{
+    return Dialog {
+        "Two ListBoxes (shared string)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                ListBox<std::string> { {"C++", "Rust", "Python", "Go", "Zig"}, choice }
+                    .withVisibleRows(5)
+                    .withSize({140, 110})
+                    .withFlags(LayoutFlags().Expand())
+                    .isDisabled(disabled),
+                ListBox<std::string> { {"C++", "Rust", "Python", "Go", "Zig"}, choice }
+                    .withVisibleRows(5)
+                    .withSize({140, 110})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Left, 8))
+                    .isDisabled(disabled)
+            },
             CheckBox{disabled, "Disable both"}
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
         }

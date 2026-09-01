@@ -4,6 +4,7 @@
 // this one file so adding a demo never touches main_*.cpp.
 
 #include "controls_gallery.hpp"
+#include "selection_gallery.hpp"
 #include "composite_dialogs.hpp"
 #include "value_binding.hpp"
 #include "layout_probes.hpp"

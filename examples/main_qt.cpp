@@ -53,5 +53,18 @@ int main(int argc, char** argv)
     bool checked = false;
     drawProgressBarBindedToSlider(value, checked).show();
 
+    // Selection demo state: locals of main, so the bound refs outlive the
+    // modeless dialog that reads them for the whole of exec().
+    std::string favouriteLanguage = "Rust";
+    std::vector<int> selectedTags { 1, 3 };
+    std::string comboChoice = "C++";
+    bool listsDisabled = false;
+    drawSelectionUI(favouriteLanguage, selectedTags, comboChoice, listsDisabled).show();
+
+    // ListBox value-binding demo state.
+    std::string mirroredListChoice = "Rust";
+    bool listMirrorDisabled = false;
+    drawListBoxMirror(mirroredListChoice, listMirrorDisabled).show();
+
     return app.exec();
 }

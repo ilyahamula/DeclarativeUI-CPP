@@ -83,6 +83,18 @@ int main(int argc, char** argv)
 
     float value = 5.0f;
     bool checked = false;
+
+    // Selection demo state. Bound by reference, so it has to outlive the frame
+    // loop -- ImGui rebuilds the tree every frame and reads these live.
+    std::string favouriteLanguage = "Rust";
+    std::vector<int> selectedTags { 1, 3 };
+    std::string comboChoice = "C++";
+    bool listsDisabled = false;
+
+    // ListBox value-binding demo state.
+    std::string mirroredListChoice = "Rust";
+    bool listMirrorDisabled = false;
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -93,6 +105,8 @@ int main(int argc, char** argv)
 
         //DrawDemoUI();
         drawProgressBarBindedToSlider(value, checked).show();
+        drawSelectionUI(favouriteLanguage, selectedTags, comboChoice, listsDisabled).show();
+        drawListBoxMirror(mirroredListChoice, listMirrorDisabled).show();
 
         ImGui::Render();
         int display_w, display_h;

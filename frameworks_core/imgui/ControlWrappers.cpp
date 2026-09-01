@@ -751,6 +751,75 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// ListBoxWrapper -----------------------------------------------------------
+
+template <ListBoxValue T>
+Size ListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	// Same shape as ImGui's own list-box default (rows of GetTextLineHeightWithSpacing
+	// plus vertical frame padding), with the row count coming from the widget and
+	// the width from the widest item + a scrollbar's worth of slack.
+	const ImGuiStyle& style = ImGui::GetStyle();
+	float widest = 0.0f;
+	for (const auto& item : m_items)
+		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
+	const float w = widest + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
+		+ style.FramePadding.y * 2.0f;
+	return Size { ceilInt(w), ceilInt(h) };
+}
+
+template <ListBoxValue T>
+void ListBoxWrapper<T>::render(const Rect& frame)
+{
+	// Read the selection back from the binding every frame: the tree is rebuilt
+	// per frame anyway, so a value written from anywhere else is picked up for
+	// free -- no ref sync needed here, unlike the retained backends.
+	const std::vector<int> selection = indicesFor(m_items, boundValue());
+	const auto isSelected = [&selection](int index) {
+		return std::find(selection.begin(), selection.end(), index) != selection.end();
+	};
+
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, 0.0f); // 0 = ImGui's default list-box size
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	if (ImGui::BeginListBox("##listbox", box))
+	{
+		for (int i = 0; i < (int)m_items.size(); ++i)
+		{
+			if (!ImGui::Selectable(m_items[i].c_str(), isSelected(i)))
+				continue;
+
+			std::vector<int> next { i };
+			if constexpr (kMultiSelect)
+			{
+				// ImGui has no native multi-select: a plain click replaces the
+				// selection and ctrl/cmd-click toggles one row. Shift-click range
+				// selection is left to the retained backends, which get it from
+				// the platform for free.
+				const ImGuiIO& io = ImGui::GetIO();
+				if (io.KeyCtrl || io.KeySuper)
+				{
+					next = selection;
+					if (const auto it = std::find(next.begin(), next.end(), i); it != next.end())
+						next.erase(it);
+					else
+						next.insert(std::upper_bound(next.begin(), next.end(), i), i);
+				}
+			}
+			commit(next);
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopID();
+}
+
+template class ListBoxWrapper<int>;
+template class ListBoxWrapper<std::string>;
+template class ListBoxWrapper<std::vector<int>>;
+template class ListBoxWrapper<std::vector<std::string>>;
+
 // ColorPickerWrapper -----------------------------------------------------------
 
 Size ColorPickerWrapper::measureIntrinsic(const Constraints&)
