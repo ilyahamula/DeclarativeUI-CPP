@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <optional>
+#include <string>
 
 // A control's value: either a snapshot the framework owns or a live binding to
 // a caller-owned variable. Held by the declarative widget (include/widgets.hpp)
@@ -79,3 +80,8 @@ private:
 // bound flag has to be pollable: a retained backend mirrors it into the native
 // window long after the control was created.
 using DisabledFlag = BoundValue<bool>;
+
+// A control's hover text, on the same terms: a snapshot taken when the tree was
+// built, or a live binding to a caller-owned string. Held by ControlWrapper --
+// tooltips decorate leaves only, so no container carries one.
+using TooltipText = BoundValue<std::string>;

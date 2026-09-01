@@ -3,33 +3,33 @@
 
 class DeclarativeApp : public wxApp
 {
-    // Table demo state: members, so the bound refs outlive the modeless dialogs
-    // that read them.
-    // The Notes column is editable, which is the other half of why these are
-    // refs: an edit has to land somewhere the widgets do not own.
-    TableRows m_files {
-        { "main.cpp",      "12 KB", "entry point" },
-        { "layout.cpp",    "48 KB", "measure/arrange" },
-        { "measure.cpp",   "9 KB",  "" },
-        { "widgets.hpp",   "31 KB", "public API" },
-        { "stacks.hpp",    "7 KB",  "" },
-        { "buildable.hpp", "3 KB",  "concepts" },
-    };
-    int m_selectedRow = 0;
-    std::vector<int> m_checkedRows { 1, 3 };
-    bool m_tablesDisabled = false;
+    // Tooltip demo state: members, so the bound refs outlive the modeless
+    // dialogs that read them.
+    // `m_tooltipHint` is the live-bound one -- it is a TextCtrl's value in the
+    // binding dialog and, at the same time, the hover text of two controls
+    // beside it.
+    std::string m_multilineText = "Type something here...";
+    std::string m_password;
+    int m_spinInt = 42;
+    float m_spinFloat = 1.5f;
+    Date m_date { .year = 2026, .month = 2, .day = 22 };
+    Time m_time { .hour = 9, .minute = 30, .second = 0 };
+    bool m_toggle = false;
+    float m_progress = 0.35f;
+    std::string m_tabNote = "Add notes here...";
+    bool m_tabLogging = false;
+    Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // The same widget bound the other way: one rows vector and one key shared by
-    // two tables.
-    TableRows m_sharedFiles = m_files;
-    std::string m_sharedFile = "layout.cpp";
-    bool m_mirrorDisabled = false;
+    std::string m_tooltipHint = "Edit the field above and hover me again.";
+    bool m_tooltipDisabled = false;
 
 public:
     bool OnInit() override
     {
-        drawTableUI(m_files, m_selectedRow, m_checkedRows, m_tablesDisabled).show();
-        drawTableMirror(m_sharedFiles, m_sharedFile, m_mirrorDisabled).show();
+        drawControlsUI(m_multilineText, m_password, m_spinInt, m_spinFloat,
+            m_date, m_time, m_toggle, m_progress, m_tabNote, m_tabLogging,
+            m_themeColor).show();
+        drawTooltipBinding(m_tooltipHint, m_tooltipDisabled).show();
         return true;
     }
 };

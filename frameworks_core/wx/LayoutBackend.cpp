@@ -4,6 +4,7 @@
 #include "frameworks_core/wx/RefSync.hpp"
 
 #include <wx/notebook.h>
+#include <wx/tooltip.h>
 #include <wx/wx.h>
 
 #include <algorithm>
@@ -50,6 +51,35 @@ void applyDisabled(wxWindow* window, const LayoutNode& node)
 		[window](bool enable) { window->Enable(enable); });
 }
 
+// Applies a leaf's tooltip to the control just created for it, and keeps
+// polling when the text is caller-owned. No disabled check is needed: wx does
+// not deliver tooltip events to a disabled window, which is what Qt does too
+// and what the ImGui backend reproduces by hand.
+void applyTooltip(wxWindow* window, const ControlWrapper& widget)
+{
+	auto push = [window](const std::string& text) {
+		if (text.empty())
+			window->UnsetToolTip();
+		else
+			window->SetToolTip(wxString::FromUTF8(text));
+	};
+	push(widget.tooltip());
+
+	// The string is caller-owned and outlives every window, so it may be
+	// captured; the wrapper it came from must never be.
+	const std::string* bound = widget.boundTooltip();
+	if (bound == nullptr)
+		return; // a snapshot cannot change behind us
+
+	bindExternalRefSync(window,
+		[window] {
+			const wxToolTip* tip = window->GetToolTip();
+			return tip != nullptr ? std::string(tip->GetTip().ToUTF8()) : std::string();
+		},
+		[bound] { return *bound; },
+		push);
+}
+
 } // unnamed namespace
 
 WxLayoutBackend::WxLayoutBackend(wxWindow* host)
@@ -71,6 +101,7 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	{
 		widget->realize(m_host); // create the native control + bind events
 		applyDisabled(static_cast<wxWindow*>(widget->nativeHandle()), leaf);
+		applyTooltip(static_cast<wxWindow*>(widget->nativeHandle()), *widget);
 	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());

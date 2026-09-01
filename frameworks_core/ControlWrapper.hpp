@@ -3,6 +3,7 @@
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
 
+#include <string>
 #include <utility>
 
 class ControlWrapper
@@ -95,10 +96,36 @@ public:
 		return m_disabled;
 	}
 
+	// Hover text, snapshot or live binding, exactly as setDisabled() takes the
+	// disabled flag -- and for the same reason the copy is taken by value: the
+	// widget that supplied it is a temporary that dies with the enclosing
+	// declarative expression.
+	void setTooltip(TooltipText tooltip)
+	{
+		m_tooltip = std::move(tooltip);
+	}
+
+	// Empty means "no tooltip". Bound, this reports the live text, so an
+	// immediate backend picks an edit up on its next frame for free; retained
+	// backends poll it (see the wx/Qt LayoutBackends) because they apply it
+	// once, at creation.
+	const std::string& tooltip() const
+	{
+		return m_tooltip.get();
+	}
+
+	// Non-null only while bound: the caller-owned string a retained backend has
+	// to keep watching. A snapshot reports nullptr -- nothing can change it.
+	const std::string* boundTooltip() const
+	{
+		return m_tooltip.boundValue();
+	}
+
 protected:
 	void* m_nativeWidget = nullptr;
 	Position m_pos { -1, -1 };
 	Size m_size { -1, -1 };
 	long m_style { 0 };
 	DisabledFlag m_disabled;
+	TooltipText m_tooltip;
 };

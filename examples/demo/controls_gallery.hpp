@@ -24,6 +24,11 @@ inline auto drawControlsUI(
     std::function<void()> onCheckClick = []() {},
     std::function<void()> onMessageBoxClick = []() {})
 {
+    // A spread of controls carries .withTooltip("..."), the leaf-only hover-text
+    // modifier: snapshot text here, the live-bound form in value_binding.hpp.
+    // It is pure decoration -- it never reaches the engine, so nothing below
+    // moves because of it.
+    //
     // Pinned geometry: every leaf carries an explicit size (withSize; -1
     // keeps that axis engine-driven) and every group box / tab panel a
     // MinSize outer box generous enough to absorb per-backend chrome
@@ -50,7 +55,8 @@ inline auto drawControlsUI(
                         LayoutFlags().MinSize({kBoxW, 200}),
                         MultiLineTextCtrl{multilineText}
                             .withSize({-1, 90})
-                            .withFlags(LayoutFlags().Expand()),
+                            .withFlags(LayoutFlags().Expand())
+                            .withTooltip("Free-form notes. Scrolls once it fills up."),
                         HStack {
                             StaticText{"Password:"}
                                 .withSize({kLabelW, kLabelH})
@@ -58,11 +64,13 @@ inline auto drawControlsUI(
                             PasswordInput{password}
                                 .withSize({-1, kRowH})
                                 .withFlags(LayoutFlags().Proportion(1))
+                                .withTooltip("At least 8 characters, one of them a digit.")
                         },
                         LinkText{"Visit documentation"}
                             .withSize({-1, kLabelH})
                             .withFlags(LayoutFlags().Border(Side::Top, 5))
                             .onClick([]() {})
+                            .withTooltip("Opens the online reference in your browser.")
                     },
                     HGroupBox { "Numeric Values",
                         LayoutFlags().MinSize({kBoxW, 90}).Border(Side::Top, 8),
@@ -71,12 +79,14 @@ inline auto drawControlsUI(
                                 .withSize({kFieldW, kLabelH}),
                             SpinBox { { .min = 0, .max = 100 }, spinInt }
                                 .withSize({kFieldW, kRowH})
+                                .withTooltip("Whole numbers, 0 to 100.")
                         },
                         VStack {
                             StaticText{"Float"}
                                 .withSize({kFieldW, kLabelH}),
                             SpinBox { { .min = 0.0f, .max = 10.0f, .step = 0.1f }, spinFloat }
                                 .withSize({kFieldW, kRowH})
+                                .withTooltip("0.0 to 10.0, stepping by 0.1.")
                         }
                     },
                     VGroupBox { "Date & Time",
@@ -87,6 +97,7 @@ inline auto drawControlsUI(
                                 .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
                             DatePicker{date}
                                 .withSize({kPickerW, kRowH})
+                                .withTooltip("Composite control -- the tooltip covers all three fields.")
                         },
                         HStack {
                             StaticText{"Time"}
@@ -107,6 +118,7 @@ inline auto drawControlsUI(
                             .withFlags(LayoutFlags().CenterHorizontal())
                             .onClick([]() {})
                             .onHover([]() {})
+                            .withTooltip("Cat03.jpg -- click to open full size.")
                     },
                     VGroupBox { "Progress",
                         LayoutFlags().MinSize({kBoxW, 90}).Border(Side::Top, 8),
@@ -117,6 +129,7 @@ inline auto drawControlsUI(
                             ProgressBar{progress}
                                 .withSize({-1, 18})
                                 .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                                .withTooltip("Driven by the slider in the binding demos.")
                         },
                         HStack {
                             StaticText{"Fixed 60%:"}
@@ -141,7 +154,8 @@ inline auto drawControlsUI(
                             VStack {
                                 LayoutFlags().Border(Side::All, 5),
                                 CheckBox{tabLogging, "Enable logging"}
-                                    .withSize({-1, kRowH}),
+                                    .withSize({-1, kRowH})
+                                    .withTooltip("Writes a verbose trace to disk."),
                                 Separator{}.withFlags(LayoutFlags().Expand()),
                                 HStack {
                                     StaticText{"Theme color:"}
@@ -150,6 +164,7 @@ inline auto drawControlsUI(
                                     ColorPicker{themeColor}
                                         .withSize({-1, kRowH})
                                         .withFlags(LayoutFlags().Proportion(1))
+                                        .withTooltip("Accent color applied across the app.")
                                 }
                             }
                         },
@@ -172,7 +187,8 @@ inline auto drawControlsUI(
                 Button{"Check"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())
-                    .onClick(std::move(onCheckClick)),
+                    .onClick(std::move(onCheckClick))
+                    .withTooltip("Validates every field in this dialog."),
                 Button{"MessageBox"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().Border(Side::Left, 8).CenterVertical())

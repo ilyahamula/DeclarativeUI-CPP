@@ -258,6 +258,47 @@ inline auto drawTableMirror(TableRows& rows, std::string& selected, bool& disabl
     };
 }
 
+// One string, three jobs: it is the TextCtrl's value AND the live-bound tooltip
+// of the two controls below it. Type in the field and hover either one -- the
+// hover text is already the new string, with nothing rebuilt and no callback
+// wiring. The Button alongside carries a snapshot instead, so it keeps saying
+// the same thing however the field is edited: that is the whole difference
+// between withTooltip(std::string&) and withTooltip(const std::string&).
+//
+// Tooltips are leaf-only -- a Stack is pure geometry with no native window to
+// hang one on -- so the group box below has no tooltip of its own, only its
+// children do. Disabling suppresses the tooltip everywhere: wx and Qt deliver
+// no tooltip event to a disabled window, and the ImGui backend matches them.
+inline auto drawTooltipBinding(std::string& hint, bool& disabled)
+{
+    return Dialog {
+        "Live tooltips (shared string)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"Tooltip text (hover the controls below):"}
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            TextCtrl{hint}
+                .withFlags(LayoutFlags().Expand())
+                .withTooltip("Whatever you type here becomes the hover text below."),
+            HGroupBox { "Both bound to the same string",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                Button{"Hover me"}
+                    .withSize({110, 28})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .withTooltip(hint)
+                    .isDisabled(disabled),
+                CheckBox{disabled, "...and me"}
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 12))
+                    .withTooltip(hint)
+            },
+            Button{"Snapshot tooltip"}
+                .withSize({160, 28})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+                .withTooltip("Taken once, at build time -- editing the field above never changes this.")
+        }
+    };
+}
+
 // One bool, three jobs: it is the CheckBox's own value, it disables the group
 // box holding the two mirrored spin boxes, and it disables the reset Button --
 // all by reference, so ticking the box updates every one of them at once. The

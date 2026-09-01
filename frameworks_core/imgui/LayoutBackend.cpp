@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 namespace
 {
@@ -46,13 +47,15 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	if (leaf.widget == nullptr)
 		return;
 
+	// own flag OR'd with every ancestor container's — BeginDisabled nests the
+	// same way, so a leaf inside a disabled group box stays disabled either way
+	const bool disabled = leaf.isDisabledEffective();
+
 	ImGui::SetCursorPos(toWindowPos(frame));
 	// group the render so composite widgets (DatePicker = 3 items) read
 	// back as one item rect
 	ImGui::BeginGroup();
-	// own flag OR'd with every ancestor container's — BeginDisabled nests the
-	// same way, so a leaf inside a disabled group box stays disabled either way
-	ImGui::BeginDisabled(leaf.isDisabledEffective());
+	ImGui::BeginDisabled(disabled);
 	leaf.widget->render(frame);
 	ImGui::EndDisabled();
 	ImGui::EndGroup();
@@ -71,6 +74,16 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 			item.x, item.y, frame.width, frame.height);
 	}
 #endif
+
+	// EndGroup emits the whole render as one item, so a composite widget hovers
+	// as a single rect — but it emits it OUTSIDE the BeginDisabled scope, so a
+	// disabled control would still answer IsItemHovered(). Excluded by hand to
+	// match wx and Qt, neither of which delivers tooltip events to a disabled
+	// window. Runs after the drift guard so SetTooltip's own window can never
+	// disturb the item rect the guard reads.
+	const std::string& tooltip = leaf.widget->tooltip();
+	if (!disabled && !tooltip.empty())
+		ImGui::SetItemTooltip("%s", tooltip.c_str());
 }
 
 EdgeInsets ImGuiLayoutBackend::containerInsets(const LayoutNode& node)

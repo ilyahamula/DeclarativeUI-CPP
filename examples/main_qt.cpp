@@ -6,29 +6,30 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Table demo state: locals of main, so the bound refs outlive the modeless
-    // dialogs that read them for the whole of exec().
-    // The Notes column is editable, which is the other half of why these are
-    // refs: an edit has to land somewhere the widgets do not own.
-    TableRows files {
-        { "main.cpp",      "12 KB", "entry point" },
-        { "layout.cpp",    "48 KB", "measure/arrange" },
-        { "measure.cpp",   "9 KB",  "" },
-        { "widgets.hpp",   "31 KB", "public API" },
-        { "stacks.hpp",    "7 KB",  "" },
-        { "buildable.hpp", "3 KB",  "concepts" },
-    };
-    int selectedRow = 0;
-    std::vector<int> checkedRows { 1, 3 };
-    bool tablesDisabled = false;
-    drawTableUI(files, selectedRow, checkedRows, tablesDisabled).show();
+    // Tooltip demo state: locals of main, so the bound refs outlive the
+    // modeless dialogs that read them for the whole of exec().
+    // `tooltipHint` is the live-bound one -- it is a TextCtrl's value in the
+    // binding dialog and, at the same time, the hover text of two controls
+    // beside it.
+    std::string multilineText = "Type something here...";
+    std::string password;
+    int spinInt = 42;
+    float spinFloat = 1.5f;
+    Date date { .year = 2026, .month = 2, .day = 22 };
+    Time time { .hour = 9, .minute = 30, .second = 0 };
+    bool toggle = false;
+    float progress = 0.35f;
+    std::string tabNote = "Add notes here...";
+    bool tabLogging = false;
+    Color themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // The same widget bound the other way: one rows vector and one key shared by
-    // two tables.
-    TableRows sharedFiles = files;
-    std::string sharedFile = "layout.cpp";
-    bool mirrorDisabled = false;
-    drawTableMirror(sharedFiles, sharedFile, mirrorDisabled).show();
+    std::string tooltipHint = "Edit the field above and hover me again.";
+    bool tooltipDisabled = false;
+
+    drawControlsUI(multilineText, password, spinInt, spinFloat,
+        date, time, toggle, progress, tabNote, tabLogging,
+        themeColor).show();
+    drawTooltipBinding(tooltipHint, tooltipDisabled).show();
 
     return app.exec();
 }

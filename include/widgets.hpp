@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -30,6 +31,7 @@ struct Widget
 		// otherwise, so the wrapper never ends up referring to this widget --
 		// a temporary that dies with the enclosing declarative expression.
 		wrapper->setDisabled(m_disabled);
+		wrapper->setTooltip(m_tooltip);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(LayoutFlags{}));
 
 		if (m_postCreateCallback)
@@ -90,6 +92,22 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
+	// Hover text for the control. Empty clears it. Snapshot the text as it
+	// stands now -- a string literal lands here, as it cannot bind.
+	W& withTooltip(const std::string& tooltip)
+	{
+		m_tooltip.snapshot(tooltip);
+		return static_cast<W&>(*this);
+	}
+
+	// Bind to a caller-owned string: rewriting it retargets the tooltip without
+	// rebuilding the tree. A non-const lvalue selects this overload.
+	W& withTooltip(std::string& tooltip)
+	{
+		m_tooltip.bind(tooltip);
+		return static_cast<W&>(*this);
+	}
+
 	W& withStyle(long style)
 	{
 		m_style = style;
@@ -109,6 +127,7 @@ private: // callbacks
 
 private:
 	DisabledFlag m_disabled;
+	TooltipText m_tooltip;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };

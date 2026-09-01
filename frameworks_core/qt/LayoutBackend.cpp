@@ -51,6 +51,29 @@ void applyDisabled(QWidget* window, const LayoutNode& node)
 		[window](bool enable) { window->setEnabled(enable); });
 }
 
+// Applies a leaf's tooltip to the widget just created for it, and keeps polling
+// when the text is caller-owned. No disabled check is needed: Qt does not
+// deliver tooltip events to a disabled widget -- the wx twin relies on the same
+// native behaviour, and the ImGui backend reproduces it by hand.
+void applyTooltip(QWidget* window, const ControlWrapper& widget)
+{
+	auto push = [window](const std::string& text) {
+		window->setToolTip(QString::fromStdString(text)); // empty clears it
+	};
+	push(widget.tooltip());
+
+	// The string is caller-owned and outlives every widget, so it may be
+	// captured; the wrapper it came from must never be.
+	const std::string* bound = widget.boundTooltip();
+	if (bound == nullptr)
+		return; // a snapshot cannot change behind us
+
+	bindExternalRefSync(window,
+		[window] { return window->toolTip().toStdString(); },
+		[bound] { return *bound; },
+		push);
+}
+
 } // unnamed namespace
 
 QtLayoutBackend::QtLayoutBackend(QWidget* host)
@@ -72,6 +95,7 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	{
 		widget->realize(m_host); // create the native widget + connect signals
 		applyDisabled(static_cast<QWidget*>(widget->nativeHandle()), leaf);
+		applyTooltip(static_cast<QWidget*>(widget->nativeHandle()), *widget);
 	}
 
 	auto* window = static_cast<QWidget*>(widget->nativeHandle());
