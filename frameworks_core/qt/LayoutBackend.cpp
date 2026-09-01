@@ -27,6 +27,30 @@ QString labelText(const std::string& label)
 	return text;
 }
 
+// Applies a node's effective disabled state to the widget that was just
+// created for it (leaf control, group box, tab widget or page), and keeps
+// polling when some flag in the chain is caller-owned. Hooked at the one place
+// each widget passes through exactly once, rather than repeated in realize().
+void applyDisabled(QWidget* window, const LayoutNode& node)
+{
+	window->setEnabled(!node.isDisabledEffective());
+
+	// A bound flag can flip at any time and Qt applies the state only here, at
+	// creation -- so poll it like any other external ref. A chain that is
+	// fixed, or holds no bound flag at all, can never change again.
+	const auto sources = node.disabledSources();
+	if (sources.fixed || sources.refs.empty())
+		return;
+
+	bindExternalRefSync(window,
+		[window] { return window->isEnabled(); },
+		[refs = sources.refs] {
+			return std::none_of(refs.begin(), refs.end(),
+				[](const bool* flag) { return *flag; });
+		},
+		[window](bool enable) { window->setEnabled(enable); });
+}
+
 } // unnamed namespace
 
 QtLayoutBackend::QtLayoutBackend(QWidget* host)
@@ -47,20 +71,7 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native widget + connect signals
-		auto* created = static_cast<QWidget*>(widget->nativeHandle());
-		created->setEnabled(!widget->isDisabled());
-
-		// A disabled flag bound by ref can flip at any time, and Qt applies the
-		// state only here, at creation -- so poll it like any other external ref.
-		// Hooked at the one place every widget type passes through exactly once,
-		// rather than repeated in each realize().
-		if (const auto& ref = widget->disabledRef())
-		{
-			bindExternalRefSync(created,
-				[created] { return created->isEnabled(); },
-				[&flag = ref->get()] { return !flag; },
-				[created](bool enable) { created->setEnabled(enable); });
-		}
+		applyDisabled(static_cast<QWidget*>(widget->nativeHandle()), leaf);
 	}
 
 	auto* window = static_cast<QWidget*>(widget->nativeHandle());
@@ -133,6 +144,8 @@ QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)
 		window = new QGroupBox(labelText(node.label), m_host);
 	else if (node.kind == NodeKind::TabPanel)
 		window = new QTabWidget(m_host);
+	if (window != nullptr)
+		applyDisabled(window, node);
 	m_containers[&node] = window;
 	return window;
 }
@@ -191,6 +204,7 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		{
 			page = new QWidget(tabs);
 			tabs->addTab(page, labelText(node.label));
+			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}
 		scope.parent = page;

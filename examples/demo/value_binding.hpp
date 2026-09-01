@@ -162,3 +162,35 @@ inline auto drawListBoxMirror(std::string& choice, bool& disabled)
         }
     };
 }
+
+// One bool, three jobs: it is the CheckBox's own value, it disables the group
+// box holding the two mirrored spin boxes, and it disables the reset Button --
+// all by reference, so ticking the box updates every one of them at once. The
+// spin boxes never mention the flag; they inherit it from their container.
+inline auto drawGroupDisabledByCheckBox(int& value, bool& disabled)
+{
+    return Dialog {
+        "Group box bound to isDisabled()",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HGroupBox { "Mirrored count",
+                LayoutFlags().Expand().MinSize({280, -1}),
+                SpinBox { Range<int>{ .min = 0, .max = 100 }, value }
+                    .withSize({100, 26})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Slider { Range<int>{ .min = 0, .max = 100 }, value }
+                    .withSize({150, 24})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical().Border(Side::Left, 10))
+            }
+            .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 12),
+                CheckBox{disabled, "Lock the group"},
+                Button{"Reset"}
+                    .withSize({90, 28})
+                    .withFlags(LayoutFlags().Border(Side::Left, 12))
+                    .onClick([&value]() { value = 0; })
+            }
+        }
+    };
+}

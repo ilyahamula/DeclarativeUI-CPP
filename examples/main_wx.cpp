@@ -26,16 +26,23 @@ class DeclarativeApp : public wxApp
     float value = 1.0f;
     bool checked = false;
 
-    // Selection demo state: members, so the bound refs outlive the modeless
-    // dialog that reads them.
-    std::string m_favouriteLanguage = "Rust";
-    std::vector<int> m_selectedTags { 1, 3 };
-    std::string m_comboChoice = "C++";
-    bool m_listsDisabled = false;
+    // Container-disabling demo state: members, so the bound refs outlive the
+    // modeless dialogs that read them.
+    std::string m_deliveryName = "Ada Lovelace";
+    std::string m_deliveryEmail = "ada@example.com";
+    int m_copies = 1;
+    bool m_express = false;
+    bool m_groupDisabled = false;
 
-    // ListBox value-binding demo state.
-    std::string m_mirroredListChoice = "Rust";
-    bool m_listMirrorDisabled = false;
+    std::string m_tabNote2 = "Notes...";
+    int m_level = 3;
+    bool m_verboseLogging = false;
+    bool m_pageDisabled = false;
+    bool m_panelDisabled = false;
+
+    // Container value-binding demo state.
+    int m_boundCount = 40;
+    bool m_countLocked = false;
 
     void DrawUI()
     {
@@ -68,9 +75,9 @@ public:
     bool OnInit() override
     {
         Bind(wxEVT_IDLE, &DeclarativeApp::OnIdle, this);
-        drawProgressBarBindedToSlider(value, checked).show();
-        drawSelectionUI(m_favouriteLanguage, m_selectedTags, m_comboChoice, m_listsDisabled).show();
-        drawListBoxMirror(m_mirroredListChoice, m_listMirrorDisabled).show();
+        drawGroupBoxDisabling(m_deliveryName, m_deliveryEmail, m_copies, m_express, m_groupDisabled).show();
+        drawStackAndTabDisabling(m_tabNote2, m_level, m_verboseLogging, m_pageDisabled, m_panelDisabled).show();
+        drawGroupDisabledByCheckBox(m_boundCount, m_countLocked).show();
         return true;
     }
 

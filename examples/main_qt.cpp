@@ -49,22 +49,26 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    float value = 50.5f;
-    bool checked = false;
-    drawProgressBarBindedToSlider(value, checked).show();
+    // Container-disabling demo state: locals of main, so the bound refs
+    // outlive the modeless dialogs that read them for the whole of exec().
+    std::string deliveryName = "Ada Lovelace";
+    std::string deliveryEmail = "ada@example.com";
+    int copies = 1;
+    bool express = false;
+    bool groupDisabled = false;
+    drawGroupBoxDisabling(deliveryName, deliveryEmail, copies, express, groupDisabled).show();
 
-    // Selection demo state: locals of main, so the bound refs outlive the
-    // modeless dialog that reads them for the whole of exec().
-    std::string favouriteLanguage = "Rust";
-    std::vector<int> selectedTags { 1, 3 };
-    std::string comboChoice = "C++";
-    bool listsDisabled = false;
-    drawSelectionUI(favouriteLanguage, selectedTags, comboChoice, listsDisabled).show();
+    std::string tabNote = "Notes...";
+    int level = 3;
+    bool verboseLogging = false;
+    bool pageDisabled = false;
+    bool panelDisabled = false;
+    drawStackAndTabDisabling(tabNote, level, verboseLogging, pageDisabled, panelDisabled).show();
 
-    // ListBox value-binding demo state.
-    std::string mirroredListChoice = "Rust";
-    bool listMirrorDisabled = false;
-    drawListBoxMirror(mirroredListChoice, listMirrorDisabled).show();
+    // Container value-binding demo state.
+    int boundCount = 40;
+    bool countLocked = false;
+    drawGroupDisabledByCheckBox(boundCount, countLocked).show();
 
     return app.exec();
 }

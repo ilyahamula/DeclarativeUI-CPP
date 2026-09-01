@@ -50,7 +50,9 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	// group the render so composite widgets (DatePicker = 3 items) read
 	// back as one item rect
 	ImGui::BeginGroup();
-	ImGui::BeginDisabled(leaf.widget->isDisabled());
+	// own flag OR'd with every ancestor container's — BeginDisabled nests the
+	// same way, so a leaf inside a disabled group box stays disabled either way
+	ImGui::BeginDisabled(leaf.isDisabledEffective());
 	leaf.widget->render(frame);
 	ImGui::EndDisabled();
 	ImGui::EndGroup();
@@ -95,6 +97,11 @@ EdgeInsets ImGuiLayoutBackend::containerInsets(const LayoutNode& node)
 
 bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 {
+	// A disabled container greys its own chrome and everything drawn inside
+	// it: BeginDisabled nests by OR, so no child can opt back in. The scope is
+	// popped in endContainer, and on every early-out below.
+	const bool disabled = node.isDisabledEffective();
+
 	// a container whose open parent is a TabPanel is a tab page
 	const bool isTabPage = !m_containerStack.empty()
 		&& m_containerStack.back()->kind == NodeKind::TabPanel;
@@ -103,9 +110,20 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 		const char* label = node.label.empty() ? "##tab" : node.label.c_str();
 		if (!ImGui::BeginTabItem(label))
 			return false; // inactive page: engine skips the subtree
+
+		// The scope opens AFTER the tab item, so a disabled page greys its
+		// content but keeps its label selectable -- wxNotebook has no per-tab
+		// enable, and greying only here would make ImGui the odd one out.
+		// Disable the whole TabPanel to lock tab switching on all three.
+		if (disabled)
+			ImGui::BeginDisabled();
 		m_containerStack.push_back(&node);
+		m_disabledStack.push_back(disabled);
 		return true;
 	}
+
+	if (disabled)
+		ImGui::BeginDisabled();
 
 	switch (node.kind)
 	{
@@ -132,6 +150,8 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 		if (!ImGui::BeginTabBar("##tabs"))
 		{
 			ImGui::PopID();
+			if (disabled)
+				ImGui::EndDisabled();
 			return false;
 		}
 		break;
@@ -141,22 +161,33 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 	}
 
 	m_containerStack.push_back(&node);
+	m_disabledStack.push_back(disabled);
 	return true;
 }
 
 void ImGuiLayoutBackend::endContainer(const LayoutNode& node)
 {
+	bool disabled = false;
 	if (!m_containerStack.empty() && m_containerStack.back() == &node)
+	{
 		m_containerStack.pop_back();
+		disabled = m_disabledStack.back();
+		m_disabledStack.pop_back();
+	}
 
 	const bool isTabPage = !m_containerStack.empty()
 		&& m_containerStack.back()->kind == NodeKind::TabPanel;
+
+	// closed before EndTabItem (it opened after BeginTabItem) but after the
+	// other chrome, which it greyed
+	if (disabled)
+		ImGui::EndDisabled();
+
 	if (isTabPage)
 	{
 		ImGui::EndTabItem();
-		return;
 	}
-	if (node.kind == NodeKind::TabPanel)
+	else if (node.kind == NodeKind::TabPanel)
 	{
 		ImGui::EndTabBar();
 		ImGui::PopID();
