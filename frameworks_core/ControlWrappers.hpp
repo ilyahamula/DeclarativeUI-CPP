@@ -12,6 +12,18 @@
 #include <utility>
 #include <vector>
 
+// Every wrapper declares the same shape of per-backend override: realize() on
+// the retained backends (wx/Qt), measureIntrinsic()/render() on ImGui (see the
+// wrapper contract below). One macro call replaces that repeated block.
+#if defined(USE_WX) || defined(USE_QT)
+#define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
+	void realize(void* parentWindow) override
+#elif defined(USE_IMGUI)
+#define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
+	Size measureIntrinsic(const Constraints& c) override; \
+	void render(const Rect& frame) override
+#endif
+
 // NOTE: All wrappers follow the same contract:
 //  - The constructor only collects the data needed to build the control
 //    (label/value/range/callbacks, plus position/size/style which are stored
@@ -40,13 +52,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_label;
@@ -69,13 +75,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<std::string> m_value;
@@ -98,13 +98,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<std::string> m_value;
@@ -127,13 +121,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<std::string> m_value;
@@ -152,13 +140,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	const std::string& m_value;
@@ -179,13 +161,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_text;
@@ -208,13 +184,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_text;
@@ -233,13 +203,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_text;
@@ -260,13 +224,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<Date> m_value;
@@ -289,13 +247,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<Time> m_value;
@@ -320,13 +272,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	Range<T> m_range;
@@ -355,13 +301,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	Range<T> m_range;
@@ -392,13 +332,7 @@ public:
 	}
 
 	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	// Assigns the radio's index within its group. Consecutive radios sharing
@@ -448,13 +382,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_label;
@@ -479,13 +407,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_label;
@@ -515,13 +437,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	std::string m_filePath;
@@ -551,13 +467,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<Color> m_value;
@@ -575,13 +485,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 };
 
 // ProgressBarWrapper -----------------------------------------------------------
@@ -595,13 +499,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	BoundValue<float> m_value;
@@ -625,13 +523,7 @@ public:
 		buildItems();
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
 	// Builds the '\0'-separated item string and resolves the initial index
@@ -696,13 +588,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 	// Item indices the control should show for `value`. Out-of-range entries
 	// are dropped rather than clamped: a stale index means "not in this list",
@@ -838,13 +724,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 	static std::string joinPath(const std::string& parentPath, const std::string& label)
 	{
@@ -980,13 +860,7 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-#endif
-#ifdef USE_IMGUI
-	Size measureIntrinsic(const Constraints& c) override;
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 	// A cell's text, or "" for a ragged row that is short of this column. Rows
 	// are not required to be the same length as the column list: a short row is
