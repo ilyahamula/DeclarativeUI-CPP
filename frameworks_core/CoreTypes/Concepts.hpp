@@ -46,3 +46,19 @@ struct ListBoxItemTraits<std::vector<T>>
 
 template <ListBoxValue T>
 using ListBoxItem = typename ListBoxItemTraits<T>::Item;
+
+// A TreeView addresses items by PATH -- the item's labels from the root joined
+// by '/' -- rather than by index: an index says nothing about where an item
+// sits in a tree, and the native item handles (wxTreeItemId, QTreeWidgetItem*)
+// are backend types that cannot cross into the public API.
+//
+// Unlike ListBox, the bound type does NOT pick the selection mode: a tree is
+// single-select by default and TreeView::isMultiSelect() widens it. The vector
+// binding is simply what gives multi-select somewhere to put the extra paths,
+// which is why isMultiSelect() is only offered on it.
+template <typename T>
+concept TreeViewValue = std::same_as<T, std::string>
+	|| std::same_as<T, std::vector<std::string>>;
+
+template <typename T>
+concept MultiSelectTreeViewValue = std::same_as<T, std::vector<std::string>>;

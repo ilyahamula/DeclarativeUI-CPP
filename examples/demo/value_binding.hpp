@@ -163,6 +163,52 @@ inline auto drawListBoxMirror(std::string& choice, bool& disabled)
     };
 }
 
+// Two TreeViews and a TextCtrl over one std::string. The trees write the
+// selected item's PATH into the shared string, so picking in either tree moves
+// the selection in the other and the field spells out what was picked.
+//
+// It also runs the other way: type a valid path into the field -- "src/engine"
+// -- and both trees select it. That is the ref sync doing its job in the
+// direction no control initiated, which is exactly what a bound value buys.
+// A path that matches nothing simply selects nothing; a stale path is "not in
+// this tree", and quietly selecting a neighbour would be worse.
+//
+// Note the trees expand independently: `expanded` on a TreeItem seeds the
+// initial state, it is not a bound value.
+inline auto drawTreeViewMirror(std::string& path, bool& disabled)
+{
+    const std::vector<TreeItem> tree {
+        { "src", { { "main.cpp" }, { "engine", { { "layout.cpp" } } } }, true },
+        { "docs", { { "readme.md" } } },
+    };
+
+    return Dialog {
+        "Two TreeViews (shared path)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"Pick in either tree, or type a path:"}
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            HStack {
+                TreeView { tree, path }
+                    .withVisibleRows(6)
+                    .withSize({170, 140})
+                    .withFlags(LayoutFlags().Expand())
+                    .isDisabled(disabled),
+                TreeView { tree, path }
+                    .withVisibleRows(6)
+                    .withSize({170, 140})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Left, 8))
+                    .isDisabled(disabled)
+            },
+            TextCtrl{path}
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+                .isDisabled(disabled),
+            CheckBox{disabled, "Disable both"}
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
 // One bool, three jobs: it is the CheckBox's own value, it disables the group
 // box holding the two mirrored spin boxes, and it disables the reset Button --
 // all by reference, so ticking the box updates every one of them at once. The

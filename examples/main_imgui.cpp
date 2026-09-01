@@ -14,32 +14,20 @@ namespace
 
 int main(int argc, char** argv)
 {
-    float value = 5.0f;
-    bool checked = false;
+    // TreeView demo state. Bound by reference, so it has to outlive the frame
+    // loop -- ImGui rebuilds the tree every frame and reads these live.
+    std::string selectedFile = "src/main.cpp";
+    std::vector<std::string> selectedModules { "include" };
+    bool treesDisabled = false;
 
-    // Container-disabling demo state. Bound by reference, so it has to outlive
-    // the frame loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string deliveryName = "Ada Lovelace";
-    std::string deliveryEmail = "ada@example.com";
-    int copies = 1;
-    bool express = false;
-    bool groupDisabled = false;
-
-    std::string tabNote = "Notes...";
-    int level = 3;
-    bool verboseLogging = false;
-    bool pageDisabled = false;
-    bool panelDisabled = false;
-
-    // Container value-binding demo state.
-    int boundCount = 40;
-    bool countLocked = false;
+    // The same widget bound the other way: one path shared by two trees.
+    std::string sharedPath = "src/engine";
+    bool mirrorDisabled = false;
 
     runImGuiApp([&]
     {
-        drawGroupBoxDisabling(deliveryName, deliveryEmail, copies, express, groupDisabled).show();
-        drawStackAndTabDisabling(tabNote, level, verboseLogging, pageDisabled, panelDisabled).show();
-        drawGroupDisabledByCheckBox(boundCount, countLocked).show();
+        drawTreeUI(selectedFile, selectedModules, treesDisabled).show();
+        drawTreeViewMirror(sharedPath, mirrorDisabled).show();
     });
 
     return 0;

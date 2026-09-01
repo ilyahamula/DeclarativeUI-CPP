@@ -19,6 +19,7 @@
 #include <wx/gauge.h>
 #include <wx/statline.h>
 #include <wx/clrpicker.h>
+#include <wx/treectrl.h>
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -881,3 +882,189 @@ template class ListBoxWrapper<int>;
 template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
+
+// TreeViewWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// Carries an item's full path on the native item, so a selection event decodes
+// to a path with a single lookup instead of walking back up through labels --
+// which would also be ambiguous once two siblings share a name.
+class TreePathData : public wxTreeItemData
+{
+public:
+	explicit TreePathData(std::string itemPath)
+		: path(std::move(itemPath))
+	{
+	}
+
+	std::string path;
+};
+
+std::string treeItemPath(const wxTreeCtrl* tree, const wxTreeItemId& id)
+{
+	if (!id.IsOk())
+		return {};
+	const auto* data = static_cast<TreePathData*>(tree->GetItemData(id));
+	return data ? data->path : std::string {};
+}
+
+// Depth-first over every item below `parent`. The hidden root is never visited
+// with itself as an argument, so it never appears in a selection.
+void forEachTreeItem(wxTreeCtrl* tree, const wxTreeItemId& parent,
+	const std::function<void(const wxTreeItemId&)>& fn)
+{
+	wxTreeItemIdValue cookie;
+	for (wxTreeItemId id = tree->GetFirstChild(parent, cookie); id.IsOk();
+		id = tree->GetNextChild(parent, cookie))
+	{
+		fn(id);
+		forEachTreeItem(tree, id, fn);
+	}
+}
+
+std::vector<std::string> treeSelection(wxTreeCtrl* tree, bool multiSelect)
+{
+	std::vector<std::string> paths;
+	if (multiSelect)
+	{
+		wxArrayTreeItemIds ids;
+		tree->GetSelections(ids);
+		paths.reserve(ids.GetCount());
+		for (const auto& id : ids)
+			paths.push_back(treeItemPath(tree, id));
+	}
+	else if (const wxTreeItemId id = tree->GetSelection(); id.IsOk())
+	{
+		paths.push_back(treeItemPath(tree, id));
+	}
+	// The hidden root carries no TreePathData and wx can report it selected;
+	// an empty path is that non-item, not a selection.
+	paths.erase(std::remove(paths.begin(), paths.end(), std::string {}), paths.end());
+	return paths;
+}
+
+// Programmatic selection. Unlike the list-box setters, wxTreeCtrl::SelectItem
+// DOES fire wxEVT_TREE_SEL_CHANGED, so every caller here has to hold the
+// re-entry guard the ref sync installs -- see realize().
+void setTreeSelection(wxTreeCtrl* tree, const std::vector<std::string>& paths, bool multiSelect)
+{
+	if (multiSelect)
+		tree->UnselectAll();
+	else
+		tree->Unselect();
+
+	if (paths.empty())
+		return;
+
+	forEachTreeItem(tree, tree->GetRootItem(), [&](const wxTreeItemId& id) {
+		const std::string path = treeItemPath(tree, id);
+		if (multiSelect
+			? std::find(paths.begin(), paths.end(), path) != paths.end()
+			: path == paths.front())
+		{
+			tree->SelectItem(id);
+		}
+	});
+}
+
+void addTreeItems(wxTreeCtrl* tree, const wxTreeItemId& parent,
+	const std::vector<TreeItem>& items, const std::string& parentPath, char separator)
+{
+	for (const TreeItem& item : items)
+	{
+		const std::string path = parentPath.empty()
+			? item.label
+			: parentPath + separator + item.label;
+		const wxTreeItemId id = tree->AppendItem(parent, item.label, -1, -1, new TreePathData(path));
+		addTreeItems(tree, id, item.children, path, separator);
+		// Expanding is done after the children exist: wx has nothing to expand
+		// on a childless item and silently ignores the call.
+		if (item.expanded && !item.children.empty())
+			tree->Expand(id);
+	}
+}
+
+} // unnamed namespace
+
+template <TreeViewValue T>
+void TreeViewWrapper<T>::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("TreeViewWrapper::realize()\t-> new wxTreeCtrl()\n");
+#endif
+	// wxTreeCtrl has exactly one root, but a TreeItem list has many top-level
+	// items, so the root is a hidden placeholder every top-level item hangs off.
+	const long selectionStyle = m_multiSelect ? wxTR_MULTIPLE : wxTR_SINGLE;
+	auto* tree = new wxTreeCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		m_style | selectionStyle | wxTR_HIDE_ROOT | wxTR_HAS_BUTTONS | wxTR_NO_LINES);
+	tree->AddRoot("");
+	addTreeItems(tree, tree->GetRootItem(), m_items, std::string {}, kPathSeparator);
+	m_nativeWidget = tree;
+
+	// wxTreeCtrl's best size is its client area, not its content, so it would
+	// ask the engine for whatever it happens to have been given. Compute the
+	// same shape the other two backends do: widest indented label, visibleRows
+	// of height.
+	constexpr int kTreeFrame = 6;      // border the native control draws
+	constexpr int kScrollbarSlack = 20; // room for the vertical scrollbar
+	int widest = 0;
+	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+		widest = std::max(widest,
+			static_cast<int>(tree->GetIndent()) * (depth + 1)
+				+ tree->GetTextExtent(item.label).GetWidth());
+	});
+	const int rowHeight = tree->GetCharHeight() + 4;
+	tree->CacheBestSize(wxSize(widest + kTreeFrame + kScrollbarSlack,
+		rowHeight * m_visibleRows + kTreeFrame));
+
+	setTreeSelection(tree, pathsFor(boundValue()), m_multiSelect);
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		// SelectItem notifies, so mirroring the ref into the control would
+		// re-enter this handler and echo the value straight back out. The guard
+		// is shared by both lambdas and lives as long as they do.
+		auto syncing = std::make_shared<bool>(false);
+		tree->Bind(wxEVT_TREE_SEL_CHANGED, [&value, tree, syncing, multi = m_multiSelect,
+			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
+			nw = m_nativeWidget](wxTreeEvent& evt) {
+			evt.Skip();
+			if (*syncing)
+				return;
+			value = valueFor(treeSelection(tree, multi));
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		bindExternalRefSync(tree,
+			[tree, multi = m_multiSelect] { return treeSelection(tree, multi); },
+			[&value] { return pathsFor(value); },
+			[tree, syncing, multi = m_multiSelect](const std::vector<std::string>& paths) {
+				*syncing = true;
+				setTreeSelection(tree, paths, multi);
+				*syncing = false;
+			});
+	}
+	else if (m_onChange)
+	{
+		tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, multi = m_multiSelect,
+			cb = std::move(m_onChange)](wxTreeEvent& evt) {
+			evt.Skip();
+			cb(valueFor(treeSelection(tree, multi)));
+		});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, multi = m_multiSelect,
+			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxTreeEvent& evt) {
+			evt.Skip();
+			cbw(valueFor(treeSelection(tree, multi)), nw);
+		});
+	}
+}
+
+template class TreeViewWrapper<std::string>;
+template class TreeViewWrapper<std::vector<std::string>>;

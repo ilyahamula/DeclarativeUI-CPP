@@ -776,6 +776,122 @@ template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
 
+// TreeViewWrapper -----------------------------------------------------------
+
+template <TreeViewValue T>
+Size TreeViewWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	// Widest row is the deepest-indented label plus the arrow ImGui draws in
+	// front of it (one indent step per level, including the item's own);
+	// height is visibleRows of them, the same shape the ListBox measure has.
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float indent = ImGui::GetTreeNodeToLabelSpacing();
+	float widest = 0.0f;
+	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+		widest = std::max(widest,
+			indent * (float)(depth + 1) + ImGui::CalcTextSize(item.label.c_str()).x);
+	});
+	const float w = widest + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
+		+ style.FramePadding.y * 2.0f;
+	return Size { ceilInt(w), ceilInt(h) };
+}
+
+template <TreeViewValue T>
+void TreeViewWrapper<T>::render(const Rect& frame)
+{
+	// Read the selection back from the binding every frame: the tree is rebuilt
+	// per frame anyway, so a value written from anywhere else is picked up for
+	// free -- no ref sync needed here, unlike the retained backends.
+	const std::vector<std::string> selection = pathsFor(boundValue());
+	const auto isSelected = [&selection](const std::string& path) {
+		return std::find(selection.begin(), selection.end(), path) != selection.end();
+	};
+
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows);
+
+	std::vector<std::string> next;
+	bool changed = false;
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	// ImGui has no tree container the way it has BeginListBox, so a framed child
+	// window is what gives the tree its scrollable box. BeginChild must be paired
+	// with EndChild whatever it returns (ImGui >= 1.90).
+	ImGui::BeginChild("##tree", box, ImGuiChildFlags_FrameStyle);
+
+	// Expansion state is ImGui's, not ours: the wrapper dies with the frame and
+	// could not remember what the user opened. Pushing the item's index per
+	// level keeps node IDs stable across frames -- which is what lets ImGui's
+	// own ID-keyed storage carry open/closed -- and keeps duplicate sibling
+	// labels apart.
+	const auto draw = [&](auto&& self, const std::vector<TreeItem>& items, const std::string& parentPath) -> void {
+		for (int i = 0; i < (int)items.size(); ++i)
+		{
+			const TreeItem& item = items[i];
+			const std::string path = joinPath(parentPath, item.label);
+			const bool isLeaf = item.children.empty();
+
+			// OpenOnArrow separates the two gestures a tree row carries: the
+			// arrow toggles, the label selects. Without it a click would only
+			// ever expand, and the control could never be selected from.
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow
+				| ImGuiTreeNodeFlags_OpenOnDoubleClick
+				| ImGuiTreeNodeFlags_SpanAvailWidth;
+			if (isLeaf)
+				flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+			if (item.expanded)
+				flags |= ImGuiTreeNodeFlags_DefaultOpen;
+			if (isSelected(path))
+				flags |= ImGuiTreeNodeFlags_Selected;
+
+			ImGui::PushID(i);
+			const bool open = ImGui::TreeNodeEx("##item", flags, "%s", item.label.c_str());
+			if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+			{
+				next = { path };
+				if (m_multiSelect)
+				{
+					// ImGui has no native multi-select: a plain click replaces the
+					// selection and ctrl/cmd-click toggles one row. Shift-click range
+					// selection is left to the retained backends, which get it from
+					// the platform for free.
+					const ImGuiIO& io = ImGui::GetIO();
+					if (io.KeyCtrl || io.KeySuper)
+					{
+						next = selection;
+						if (const auto it = std::find(next.begin(), next.end(), path); it != next.end())
+							next.erase(it);
+						else
+							next.push_back(path);
+					}
+				}
+				changed = true;
+			}
+			if (open && !isLeaf)
+			{
+				self(self, item.children, path);
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+	};
+	draw(draw, m_items, std::string {});
+
+	ImGui::EndChild();
+	ImGui::PopID();
+
+	// Committed after the child closes: commit() runs the user's callback, which
+	// may open a message box or otherwise draw, and that must not land inside
+	// the tree's own window.
+	if (changed)
+		commit(next);
+}
+
+template class TreeViewWrapper<std::string>;
+template class TreeViewWrapper<std::vector<std::string>>;
+
 // ColorPickerWrapper -----------------------------------------------------------
 
 Size ColorPickerWrapper::measureIntrinsic(const Constraints&)

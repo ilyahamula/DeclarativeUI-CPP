@@ -3,30 +3,21 @@
 
 class DeclarativeApp : public wxApp
 {
-    // Container-disabling demo state: members, so the bound refs outlive the
-    // modeless dialogs that read them.
-    std::string m_deliveryName = "Ada Lovelace";
-    std::string m_deliveryEmail = "ada@example.com";
-    int m_copies = 1;
-    bool m_express = false;
-    bool m_groupDisabled = false;
+    // TreeView demo state: members, so the bound refs outlive the modeless
+    // dialogs that read them.
+    std::string m_selectedFile = "src/main.cpp";
+    std::vector<std::string> m_selectedModules { "include" };
+    bool m_treesDisabled = false;
 
-    std::string m_tabNote2 = "Notes...";
-    int m_level = 3;
-    bool m_verboseLogging = false;
-    bool m_pageDisabled = false;
-    bool m_panelDisabled = false;
-
-    // Container value-binding demo state.
-    int m_boundCount = 40;
-    bool m_countLocked = false;
+    // The same widget bound the other way: one path shared by two trees.
+    std::string m_sharedPath = "src/engine";
+    bool m_mirrorDisabled = false;
 
 public:
     bool OnInit() override
     {
-        drawGroupBoxDisabling(m_deliveryName, m_deliveryEmail, m_copies, m_express, m_groupDisabled).show();
-        drawStackAndTabDisabling(m_tabNote2, m_level, m_verboseLogging, m_pageDisabled, m_panelDisabled).show();
-        drawGroupDisabledByCheckBox(m_boundCount, m_countLocked).show();
+        drawTreeUI(m_selectedFile, m_selectedModules, m_treesDisabled).show();
+        drawTreeViewMirror(m_sharedPath, m_mirrorDisabled).show();
         return true;
     }
 };

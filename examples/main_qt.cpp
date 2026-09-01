@@ -6,26 +6,17 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Container-disabling demo state: locals of main, so the bound refs
-    // outlive the modeless dialogs that read them for the whole of exec().
-    std::string deliveryName = "Ada Lovelace";
-    std::string deliveryEmail = "ada@example.com";
-    int copies = 1;
-    bool express = false;
-    bool groupDisabled = false;
-    drawGroupBoxDisabling(deliveryName, deliveryEmail, copies, express, groupDisabled).show();
+    // TreeView demo state: locals of main, so the bound refs outlive the
+    // modeless dialogs that read them for the whole of exec().
+    std::string selectedFile = "src/main.cpp";
+    std::vector<std::string> selectedModules { "include" };
+    bool treesDisabled = false;
+    drawTreeUI(selectedFile, selectedModules, treesDisabled).show();
 
-    std::string tabNote = "Notes...";
-    int level = 3;
-    bool verboseLogging = false;
-    bool pageDisabled = false;
-    bool panelDisabled = false;
-    drawStackAndTabDisabling(tabNote, level, verboseLogging, pageDisabled, panelDisabled).show();
-
-    // Container value-binding demo state.
-    int boundCount = 40;
-    bool countLocked = false;
-    drawGroupDisabledByCheckBox(boundCount, countLocked).show();
+    // The same widget bound the other way: one path shared by two trees.
+    std::string sharedPath = "src/engine";
+    bool mirrorDisabled = false;
+    drawTreeViewMirror(sharedPath, mirrorDisabled).show();
 
     return app.exec();
 }

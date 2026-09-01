@@ -796,3 +796,133 @@ extern template class ListBoxWrapper<int>;
 extern template class ListBoxWrapper<std::string>;
 extern template class ListBoxWrapper<std::vector<int>>;
 extern template class ListBoxWrapper<std::vector<std::string>>;
+
+// TreeViewWrapper -----------------------------------------------------------
+// Hierarchical, collapsible item list. The selection is carried as item PATHS
+// ("Fruits/Apple") everywhere inside the wrapper -- pathsFor() and valueFor()
+// are the only two places the bound type is decoded, so all three backends
+// share one interpretation of it, exactly as ListBoxWrapper does with indices.
+//
+// Paths rather than indices because an index is meaningless in a tree, and the
+// native handles that would otherwise identify an item (wxTreeItemId,
+// QTreeWidgetItem*) are backend types that cannot reach the public API.
+//
+// Multi-select is a runtime flag, not a property of T: a tree is single-select
+// by default on every binding, and TreeView::isMultiSelect() widens it.
+template <TreeViewValue T>
+class TreeViewWrapper : public ControlWrapper
+{
+public:
+	// A label containing this would produce an ambiguous path. Callers author
+	// their own labels, so that is documented rather than escaped -- escaping
+	// would make the bound value awkward to compare against a literal, which
+	// is the whole point of binding paths instead of handles.
+	static constexpr char kPathSeparator = '/';
+
+	static constexpr bool kVectorBinding = MultiSelectTreeViewValue<T>;
+
+	TreeViewWrapper(std::vector<TreeItem> items,
+		BoundValue<T> selected, int visibleRows, bool multiSelect,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_visibleRows(visibleRows)
+		, m_multiSelect(multiSelect)
+		, m_value(std::move(selected))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
+
+	static std::string joinPath(const std::string& parentPath, const std::string& label)
+	{
+		return parentPath.empty() ? label : parentPath + kPathSeparator + label;
+	}
+
+	// Depth-first walk in declaration order, handing `fn` each item, its full
+	// path and its depth. Backends that need the parent handle to build their
+	// native tree recurse themselves; this is for the passes that only need the
+	// flat sequence, chiefly measurement.
+	//
+	// Static, and taking the items explicitly, for the same reason the decoders
+	// below are: the retained backends call these from event handlers and idle
+	// syncs, which must not capture the wrapper (see wx/RefSync.hpp -- wrapper
+	// and window teardown order is not fixed), only the items they copy.
+	template <typename Fn>
+	static void forEachItem(const std::vector<TreeItem>& items, const Fn& fn,
+		const std::string& parentPath = {}, int depth = 0)
+	{
+		for (const TreeItem& item : items)
+		{
+			const std::string path = joinPath(parentPath, item.label);
+			fn(item, path, depth);
+			forEachItem(item.children, fn, path, depth + 1);
+		}
+	}
+
+	// Paths the control should show selected. Empty entries are dropped: "" is
+	// how a single-path binding spells "nothing selected", and it matches no
+	// item -- a path is only ever empty above the first label.
+	static std::vector<std::string> pathsFor(const T& value)
+	{
+		std::vector<std::string> paths;
+		if constexpr (kVectorBinding)
+		{
+			for (const std::string& path : value)
+			{
+				if (!path.empty())
+					paths.push_back(path);
+			}
+		}
+		else if (!value.empty())
+		{
+			paths.push_back(value);
+		}
+		return paths;
+	}
+
+	// The inverse. A single-path binding with nothing selected reports "" --
+	// the same "no selection" spelling pathsFor() drops. A vector binding left
+	// single-select simply never receives more than one path.
+	static T valueFor(const std::vector<std::string>& paths)
+	{
+		if constexpr (kVectorBinding)
+			return T(paths.begin(), paths.end());
+		else
+			return paths.empty() ? std::string {} : paths.front();
+	}
+
+	// Commit a new selection: the value first, then the user callback, so a
+	// handler reading the bound value sees the new one.
+	void commit(const std::vector<std::string>& paths)
+	{
+		m_value.set(valueFor(paths));
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+
+	const T& boundValue() const { return m_value.get(); }
+
+private:
+	std::vector<TreeItem> m_items;
+	int m_visibleRows = 1;
+	bool m_multiSelect = false;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+extern template class TreeViewWrapper<std::string>;
+extern template class TreeViewWrapper<std::vector<std::string>>;

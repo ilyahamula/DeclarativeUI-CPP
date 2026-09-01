@@ -14,6 +14,8 @@ static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);
 static_assert(NodeBuildable<ListBox<std::vector<int>>>);
 static_assert(NodeBuildable<ListBox<std::vector<std::string>>>);
+static_assert(NodeBuildable<TreeView<std::string>>);
+static_assert(NodeBuildable<TreeView<std::vector<std::string>>>);
 static_assert(NodeBuildable<HStack<Button, TextCtrl>>);
 static_assert(NodeBuildable<VStack<StaticText, Button>>);
 

@@ -2,6 +2,9 @@
 
 #include "frameworks_core/CoreTypes/Concepts.hpp"
 
+#include <string>
+#include <vector>
+
 enum class Orientation
 {
     Horizontal,
@@ -103,6 +106,21 @@ struct Color
 	float g = 0.0f;
 	float b = 0.0f;
 	float a = 1.0f;
+};
+
+// One node of a TreeView's item tree. Framework-independent by design: every
+// backend walks this same structure to build (wx/Qt) or draw (ImGui) its own
+// items, so a tree is described once and looks the same everywhere.
+//
+// `expanded` is the INITIAL state only. Once the control exists the user owns
+// it -- wx/Qt keep it in the native control and ImGui in its own ID-keyed
+// storage, because the ImGui tree is rebuilt every frame and could not
+// remember it otherwise.
+struct TreeItem
+{
+	std::string label;
+	std::vector<TreeItem> children;
+	bool expanded = false;
 };
 
 enum class Side : int

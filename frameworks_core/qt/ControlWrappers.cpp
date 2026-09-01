@@ -26,6 +26,8 @@
 #include <QSpinBox>
 #include <QStyle>
 #include <QTimeEdit>
+#include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 
 // realize() creates the QWidget under the given parent window and connects
 // its signals (plain lambda connects — no moc). The layout engine measures
@@ -842,3 +844,149 @@ template class ListBoxWrapper<int>;
 template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
+
+// TreeViewWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// An item's full path, stashed on the item itself so a selection decodes with a
+// single lookup rather than by walking parents back up through their labels --
+// which would also be ambiguous once two siblings share a name.
+constexpr int kTreePathRole = Qt::UserRole;
+
+// QTreeWidget inherits QAbstractScrollArea's fixed ~256x192 sizeHint, which
+// ignores both the item text and the item count, so it would size the same tree
+// differently from wx and ImGui. This one reports the content width measured at
+// realize time and visibleRows of height -- a virtual override, no Q_OBJECT.
+class SizedTreeWidget : public QTreeWidget
+{
+public:
+	using QTreeWidget::QTreeWidget;
+
+	int visibleRows = 1;
+	int contentWidth = 0;
+
+	QSize sizeHint() const override
+	{
+		const int rowHeight = topLevelItemCount() > 0
+			? sizeHintForRow(0)
+			: fontMetrics().height();
+		const int chrome = frameWidth() * 2;
+		return QSize(contentWidth + chrome + style()->pixelMetric(QStyle::PM_ScrollBarExtent),
+			rowHeight * visibleRows + chrome);
+	}
+};
+
+std::string treeItemPath(const QTreeWidgetItem* item)
+{
+	return item ? item->data(0, kTreePathRole).toString().toStdString() : std::string {};
+}
+
+std::vector<std::string> treeSelection(const QTreeWidget* tree)
+{
+	std::vector<std::string> paths;
+	for (QTreeWidgetItemIterator it(const_cast<QTreeWidget*>(tree)); *it; ++it)
+	{
+		if ((*it)->isSelected())
+			paths.push_back(treeItemPath(*it));
+	}
+	return paths;
+}
+
+void setTreeSelection(QTreeWidget* tree, const std::vector<std::string>& paths)
+{
+	for (QTreeWidgetItemIterator it(tree); *it; ++it)
+	{
+		const std::string path = treeItemPath(*it);
+		(*it)->setSelected(std::find(paths.begin(), paths.end(), path) != paths.end());
+	}
+}
+
+// `parent` is null for top-level items -- QTreeWidget is natively multi-root, so
+// unlike wx there is no placeholder root to hang them off.
+void addTreeItems(QTreeWidget* tree, QTreeWidgetItem* parent,
+	const std::vector<TreeItem>& items, const std::string& parentPath, char separator)
+{
+	for (const TreeItem& item : items)
+	{
+		const std::string path = parentPath.empty()
+			? item.label
+			: parentPath + separator + item.label;
+		auto* node = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree);
+		node->setText(0, qstr(item.label));
+		node->setData(0, kTreePathRole, qstr(path));
+		addTreeItems(tree, node, item.children, path, separator);
+		if (item.expanded && node->childCount() > 0)
+			node->setExpanded(true);
+	}
+}
+
+} // unnamed namespace
+
+template <TreeViewValue T>
+void TreeViewWrapper<T>::realize(void* parentWindow)
+{
+	auto* tree = new SizedTreeWidget(static_cast<QWidget*>(parentWindow));
+	tree->visibleRows = m_visibleRows;
+	tree->setColumnCount(1);
+	// Single unnamed column: a TreeItem carries one label, and a header would
+	// eat a row of height the engine has not budgeted for.
+	tree->setHeaderHidden(true);
+	addTreeItems(tree, nullptr, m_items, std::string {}, kPathSeparator);
+
+	// ExtendedSelection is Qt's ctrl/shift-click mode; MultiSelection would
+	// toggle on a plain click, which is not what a desktop tree does.
+	tree->setSelectionMode(m_multiSelect
+		? QAbstractItemView::ExtendedSelection
+		: QAbstractItemView::SingleSelection);
+
+	// Measured here rather than in sizeHint(): indentation is per-level and
+	// only the item tree knows each item's depth.
+	int widest = 0;
+	const QFontMetrics metrics = tree->fontMetrics();
+	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+		widest = std::max(widest,
+			tree->indentation() * (depth + 1) + metrics.horizontalAdvance(qstr(item.label)));
+	});
+	tree->contentWidth = widest;
+
+	setTreeSelection(tree, pathsFor(boundValue()));
+	m_nativeWidget = tree;
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
+			[&value, tree, cb = std::move(m_onChange),
+				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+				value = valueFor(treeSelection(tree));
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		// setSelected() emits itemSelectionChanged for programmatic writes too,
+		// but the ref sync already wraps every push in a QSignalBlocker on the
+		// widget, so mirroring never re-enters the handler above.
+		bindExternalRefSync(tree,
+			[tree] { return treeSelection(tree); },
+			[&value] { return pathsFor(value); },
+			[tree](const std::vector<std::string>& paths) { setTreeSelection(tree, paths); });
+	}
+	else if (m_onChange)
+	{
+		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
+			[tree, cb = std::move(m_onChange)]() {
+				cb(valueFor(treeSelection(tree)));
+			});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
+			[tree, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+				cbw(valueFor(treeSelection(tree)), nw);
+			});
+	}
+}
+
+template class TreeViewWrapper<std::string>;
+template class TreeViewWrapper<std::vector<std::string>>;

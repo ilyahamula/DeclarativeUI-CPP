@@ -689,6 +689,107 @@ ListBox(std::vector<std::string>, T&) -> ListBox<T>;
 template <ListBoxValue T>
 ListBox(std::vector<std::string>, const T&) -> ListBox<T>;
 
+// TreeView -----------------------------------------------------------
+// Hierarchical, collapsible list. Items are a nested TreeItem literal and the
+// selection is an item's PATH -- its labels from the root joined by '/' --
+// because an index says nothing about where an item sits in a tree:
+//
+//   TreeView { { {"Fruits", { {"Apple"}, {"Banana"} }, true} }, picked }
+//
+// Single-select by default, on every binding. isMultiSelect() widens it and is
+// offered only on the std::vector<std::string> binding, which is the one with
+// somewhere to put the extra paths.
+template <TreeViewValue T>
+struct TreeView : Widget<TreeView<T>>
+{
+	using super = Widget<TreeView<T>>;
+
+	// Rows shown before the tree scrolls. It drives the intrinsic height on all
+	// three backends for the reason ListBox needs the same knob: wxTreeCtrl
+	// reports its client area, QTreeWidget a fixed ~192px and ImGui nothing at
+	// all, so the same tree would not lay out identically otherwise. Deeper
+	// than ListBox's default because a tree spends rows on its categories.
+	static constexpr int kDefaultVisibleRows = 8;
+
+	explicit TreeView(std::vector<TreeItem> items)
+		: super()
+		, m_items(std::move(items))
+	{
+		// No default selection, unlike ListBox: a tree's first item is usually a
+		// category rather than a choice, so "nothing selected" is the honest
+		// starting state.
+	}
+
+	TreeView(std::vector<TreeItem> items, const T& selected)
+		: super()
+		, m_items(std::move(items))
+		, m_value(selected)
+	{
+	}
+
+	TreeView(std::vector<TreeItem> items, T& selected)
+		: super()
+		, m_items(std::move(items))
+		, m_value(selected)
+	{
+	}
+
+	TreeView& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	// Constrained to the vector binding: a single-path binding has nowhere to
+	// put a second selection, so asking for multi-select there is a compile
+	// error rather than a control that silently drops all but one item.
+	TreeView& isMultiSelect(bool multiSelect = true)
+		requires MultiSelectTreeViewValue<T>
+	{
+		m_multiSelect = multiSelect;
+		return *this;
+	}
+
+	TreeView& onChange(std::function<void(const T&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	TreeView& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<TreeViewWrapper<T>>(m_items, m_value, m_visibleRows, m_multiSelect, pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	std::vector<TreeItem> m_items;
+	int m_visibleRows = kDefaultVisibleRows;
+	bool m_multiSelect = false;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+// An unbound tree reports its selection through onChange only, so the single
+// path binding is the one that costs nothing to default to.
+TreeView(std::vector<TreeItem>) -> TreeView<std::string>;
+
+template <TreeViewValue T>
+TreeView(std::vector<TreeItem>, T&) -> TreeView<T>;
+
+template <TreeViewValue T>
+TreeView(std::vector<TreeItem>, const T&) -> TreeView<T>;
+
 // Slider -----------------------------------------------------------
 template <SliderValue T>
 struct Slider : Widget<Slider<T>>
