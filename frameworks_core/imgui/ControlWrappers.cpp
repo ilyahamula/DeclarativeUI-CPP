@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #ifdef USE_LOGGER
@@ -891,6 +892,255 @@ void TreeViewWrapper<T>::render(const Rect& frame)
 
 template class TreeViewWrapper<std::string>;
 template class TreeViewWrapper<std::vector<std::string>>;
+
+// TableWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// Text buffer for a cell being edited. Fixed size because imgui_stdlib (the
+// std::string InputText overload) is not part of this build; a longer value is
+// truncated as it is typed, never in the caller's data behind their back.
+constexpr int kCellEditBufferSize = 256;
+
+} // unnamed namespace
+
+template <TableValue T>
+Size TableWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const auto measureText = [](const std::string& text) {
+		return ceilInt(ImGui::CalcTextSize(text.c_str()).x);
+	};
+
+	// Cell padding is charged per column -- ImGui draws it on both sides of
+	// every cell -- and the scrollbar once, the same accounting the list box
+	// measure does.
+	const TableRows& rows = m_rows.get();
+	int width = ceilInt(style.ScrollbarSize);
+	for (int column = 0; column < (int)m_columns.size(); ++column)
+	{
+		width += columnWidth(m_columns, rows, column, measureText)
+			+ ceilInt(style.CellPadding.x * 2.0f);
+	}
+
+	// visibleRows + 1: the header row is always drawn, so it is always measured.
+	// The sort arrow rides inside the header cell's own padding.
+	const float height = ImGui::GetTextLineHeightWithSpacing() * (float)(m_visibleRows + 1)
+		+ style.CellPadding.y * 2.0f;
+	return Size { width, ceilInt(height) };
+}
+
+template <TableValue T>
+void TableWrapper<T>::render(const Rect& frame)
+{
+	const int columnCount = (int)m_columns.size();
+	if (columnCount == 0)
+		return;
+
+	// Read rows and selection back from their bindings every frame: the tree is
+	// rebuilt per frame anyway, so a value written from anywhere else is picked
+	// up for free -- no ref sync needed here, unlike the retained backends.
+	const TableRows& rows = m_rows.get();
+	const std::vector<int> selection = rowIndicesFor(rows, boundValue());
+	const auto isSelected = [&selection](int row) {
+		return std::find(selection.begin(), selection.end(), row) != selection.end();
+	};
+
+	const bool anySortable = std::any_of(m_columns.begin(), m_columns.end(),
+		[](const TableColumn& column) { return column.sortable; });
+
+	// ScrollX rather than stretching columns to the frame: the three backends
+	// should agree on column widths, so a table narrower than its frame leaves
+	// the same gap everywhere, and a wider one scrolls rather than being
+	// squeezed into a shape wx and Qt would not produce.
+	ImGuiTableFlags tableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders
+		| ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+	// SortTristate is what keeps the first frame UNSORTED. Plain Sortable makes
+	// ImGui adopt a default sort column immediately, so a table would come up
+	// ordered by its first sortable column here while wx and Qt come up in
+	// declaration order -- the same tree looking different on one backend.
+	// Tristate costs ImGui users a third click state (asc -> desc -> none) that
+	// the retained backends do not offer; showing the caller's own row order
+	// until a header is actually clicked is worth that.
+	if (anySortable)
+		tableFlags |= ImGuiTableFlags_Sortable | ImGuiTableFlags_SortTristate;
+
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * (float)(m_visibleRows + 1));
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+
+	// Which cell is open for editing has to outlive the frame, and this wrapper
+	// does not -- the declarative tree is rebuilt every time. ImGui's own
+	// ID-keyed storage is where that state lives, exactly as the TreeView's
+	// open/closed state does. Taken before BeginTable so the keys hash against
+	// the enclosing window rather than the table's inner one.
+	ImGuiStorage* state = ImGui::GetStateStorage();
+	const ImGuiID editRowKey = ImGui::GetID("##editRow");
+	const ImGuiID editColKey = ImGui::GetID("##editCol");
+	const ImGuiID editFocusKey = ImGui::GetID("##editFocus");
+	int editRow = state->GetInt(editRowKey, -1);
+	int editColumn = state->GetInt(editColKey, -1);
+	bool focusPending = state->GetInt(editFocusKey, 0) != 0;
+
+	// Committed after the table closes: commit()/commitCell() run the user's
+	// callback, which may open a message box or otherwise draw, and that must
+	// not land inside the table's own window.
+	std::vector<int> nextSelection;
+	bool selectionChanged = false;
+	int editedRow = -1;
+	int editedColumn = -1;
+	std::string editedText;
+
+	if (ImGui::BeginTable("##table", columnCount, tableFlags, box))
+	{
+		// The header stays put while the body scrolls.
+		ImGui::TableSetupScrollFreeze(0, 1);
+		const auto measureText = [](const std::string& text) {
+			return ceilInt(ImGui::CalcTextSize(text.c_str()).x);
+		};
+		for (int column = 0; column < columnCount; ++column)
+		{
+			const TableColumn& spec = m_columns[column];
+			ImGuiTableColumnFlags columnFlags = ImGuiTableColumnFlags_WidthFixed;
+			if (!spec.sortable)
+				columnFlags |= ImGuiTableColumnFlags_NoSort;
+			// The shared width policy, and only the content width: ImGui adds
+			// its own cell padding on top, which is exactly what
+			// measureIntrinsic() budgeted for above.
+			ImGui::TableSetupColumn(spec.label.c_str(), columnFlags,
+				(float)columnWidth(m_columns, rows, column, measureText));
+		}
+		ImGui::TableHeadersRow();
+
+		// ImGui reports which header the user clicked; the ordering itself is
+		// ours, so it is the same lexicographic compare on cell text that wx and
+		// Qt apply natively. Only the primary sort spec is honoured -- the
+		// public API has no way to ask for a secondary one.
+		int sortColumn = -1;
+		bool ascending = true;
+		if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsCount > 0)
+		{
+			sortColumn = specs->Specs[0].ColumnIndex;
+			ascending = specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending;
+		}
+		const std::vector<int> order = sortedOrder(rows, sortColumn, ascending);
+
+		for (int row : order)
+		{
+			ImGui::TableNextRow();
+			// Keyed by the ORIGINAL index, not the display position, so a cell's
+			// edit state follows its row across a re-sort.
+			ImGui::PushID(row);
+			for (int column = 0; column < columnCount; ++column)
+			{
+				ImGui::TableSetColumnIndex(column);
+				ImGui::PushID(column);
+
+				const std::string& text = cellText(rows, row, column);
+				if (editRow == row && editColumn == column)
+				{
+					char buffer[kCellEditBufferSize];
+					std::snprintf(buffer, sizeof(buffer), "%s", text.c_str());
+					if (focusPending)
+					{
+						ImGui::SetKeyboardFocusHere();
+						focusPending = false;
+					}
+					ImGui::SetNextItemWidth(-FLT_MIN);
+					const bool entered = ImGui::InputText("##edit", buffer, sizeof(buffer),
+						ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+					if (entered || ImGui::IsItemDeactivatedAfterEdit())
+					{
+						editedRow = row;
+						editedColumn = column;
+						editedText = buffer;
+						editRow = editColumn = -1;
+					}
+					else if (ImGui::IsItemDeactivated())
+					{
+						// Escape, or a click elsewhere without an edit. ImGui has
+						// already restored the original text, so there is nothing
+						// to write back -- just close the editor.
+						editRow = editColumn = -1;
+					}
+				}
+				else
+				{
+					if (column == 0)
+					{
+						// The row's selectable IS the key column's cell, spanning
+						// the whole row. AllowOverlap so the other columns' items
+						// still take hover, which is what lets them be
+						// double-clicked into an editor.
+						if (ImGui::Selectable(text.c_str(), isSelected(row),
+							ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
+						{
+							nextSelection = { row };
+							if constexpr (kMultiSelect)
+							{
+								// ImGui has no native multi-select: a plain click
+								// replaces the selection and ctrl/cmd-click toggles
+								// one row. Shift-click range selection is left to
+								// the retained backends, which get it from the
+								// platform for free.
+								const ImGuiIO& io = ImGui::GetIO();
+								if (io.KeyCtrl || io.KeySuper)
+								{
+									nextSelection = selection;
+									if (const auto it = std::find(nextSelection.begin(), nextSelection.end(), row);
+										it != nextSelection.end())
+										nextSelection.erase(it);
+									else
+										nextSelection.insert(
+											std::upper_bound(nextSelection.begin(), nextSelection.end(), row), row);
+								}
+							}
+							selectionChanged = true;
+						}
+					}
+					else
+					{
+						ImGui::TextUnformatted(text.c_str());
+					}
+
+					// Double-click opens the editor, matching the gesture wx and
+					// Qt use. Checked against the item just drawn, so it is the
+					// cell under the cursor that opens rather than the row's.
+					if (m_columns[column].editable
+						&& ImGui::IsItemHovered()
+						&& ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+					{
+						editRow = row;
+						editColumn = column;
+						focusPending = true;
+					}
+				}
+
+				ImGui::PopID();
+			}
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
+
+	state->SetInt(editRowKey, editRow);
+	state->SetInt(editColKey, editColumn);
+	state->SetInt(editFocusKey, focusPending ? 1 : 0);
+	ImGui::PopID();
+
+	if (editedRow >= 0)
+		commitCell(editedRow, editedColumn, editedText);
+	if (selectionChanged)
+		commit(nextSelection);
+}
+
+template class TableWrapper<int>;
+template class TableWrapper<std::string>;
+template class TableWrapper<std::vector<int>>;
+template class TableWrapper<std::vector<std::string>>;
 
 // ColorPickerWrapper -----------------------------------------------------------
 

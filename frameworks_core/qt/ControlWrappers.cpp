@@ -2,6 +2,7 @@
 #include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -24,7 +25,10 @@
 #include <QRadioButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QHeaderView>
+#include <QItemSelectionModel>
 #include <QStyle>
+#include <QTableWidget>
 #include <QTimeEdit>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
@@ -990,3 +994,257 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 
 template class TreeViewWrapper<std::string>;
 template class TreeViewWrapper<std::vector<std::string>>;
+
+// TableWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// An item's ORIGINAL row index, stashed on its column-0 item. QTableWidget's
+// sort moves whole rows, so the role travels with its row and stays correct
+// once the view order and the data order have parted company.
+constexpr int kTableRowRole = Qt::UserRole;
+
+// QTableWidget inherits QAbstractScrollArea's fixed ~256x192 sizeHint, which
+// ignores both the cell text and the row count, so it would size the same table
+// differently from wx and ImGui. This one reports the summed column widths
+// measured at realize time, and a header plus visibleRows of body -- a virtual
+// override, no Q_OBJECT.
+class SizedTableWidget : public QTableWidget
+{
+public:
+	using QTableWidget::QTableWidget;
+
+	int visibleRows = 1;
+	int contentWidth = 0;
+
+	QSize sizeHint() const override
+	{
+		const int rowHeight = rowCount() > 0 ? sizeHintForRow(0) : fontMetrics().height();
+		const int chrome = frameWidth() * 2;
+		// sizeHint() rather than height(): the header has not been laid out yet
+		// the first time the engine measures us.
+		const int headerHeight = horizontalHeader()->sizeHint().height();
+		return QSize(contentWidth + chrome + style()->pixelMetric(QStyle::PM_ScrollBarExtent),
+			headerHeight + rowHeight * visibleRows + chrome);
+	}
+};
+
+int tableRowIndex(const QTableWidget* table, int viewRow)
+{
+	const QTableWidgetItem* item = table->item(viewRow, 0);
+	return item ? item->data(kTableRowRole).toInt() : -1;
+}
+
+std::vector<int> tableSelection(const QTableWidget* table)
+{
+	std::vector<int> indices;
+	for (int viewRow = 0; viewRow < table->rowCount(); ++viewRow)
+	{
+		const QTableWidgetItem* item = table->item(viewRow, 0);
+		if (item && item->isSelected())
+		{
+			if (const int row = tableRowIndex(table, viewRow); row >= 0)
+				indices.push_back(row);
+		}
+	}
+	// Reported in original-index order rather than view order, so a multi-select
+	// binding reads the same on all three backends however the table is sorted.
+	std::sort(indices.begin(), indices.end());
+	return indices;
+}
+
+void setTableSelection(QTableWidget* table, const std::vector<int>& indices)
+{
+	QItemSelection selection;
+	const int lastColumn = table->columnCount() - 1;
+	for (int viewRow = 0; viewRow < table->rowCount(); ++viewRow)
+	{
+		const int row = tableRowIndex(table, viewRow);
+		if (row >= 0 && std::find(indices.begin(), indices.end(), row) != indices.end())
+		{
+			selection.select(table->model()->index(viewRow, 0),
+				table->model()->index(viewRow, lastColumn));
+		}
+	}
+	table->selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
+}
+
+} // unnamed namespace
+
+template <TableValue T>
+void TableWrapper<T>::realize(void* parentWindow)
+{
+	auto* table = new SizedTableWidget(static_cast<QWidget*>(parentWindow));
+	m_nativeWidget = table;
+
+	const TableRows& rows = m_rows.get();
+	const int columnCount = static_cast<int>(m_columns.size());
+	table->visibleRows = m_visibleRows;
+	table->setColumnCount(columnCount);
+	table->setRowCount(static_cast<int>(rows.size()));
+
+	// A table's rows are its identity, so the row header would only ever show a
+	// position the bindings deliberately do not use.
+	table->verticalHeader()->setVisible(false);
+	// Rows, not cells: a Table binds a row selection, and a cell-range selection
+	// would have nothing to report through it.
+	table->setSelectionBehavior(QAbstractItemView::SelectRows);
+	// ExtendedSelection is Qt's ctrl/shift-click mode; MultiSelection would
+	// toggle on a plain click, which is not what a desktop table does.
+	table->setSelectionMode(kMultiSelect
+		? QAbstractItemView::ExtendedSelection
+		: QAbstractItemView::SingleSelection);
+
+	QStringList headers;
+	for (const TableColumn& column : m_columns)
+		headers << qstr(column.label);
+	table->setHorizontalHeaderLabels(headers);
+
+	const QFontMetrics metrics = table->fontMetrics();
+	const auto measureText = [&metrics](const std::string& text) {
+		return metrics.horizontalAdvance(qstr(text));
+	};
+
+	constexpr int kCellPadding = 12; // Qt insets the cell's text on both sides
+	int contentWidth = 0;
+	for (int column = 0; column < columnCount; ++column)
+	{
+		const int width = columnWidth(m_columns, rows, column, measureText) + kCellPadding;
+		contentWidth += width;
+		table->setColumnWidth(column, width);
+	}
+	table->contentWidth = contentWidth;
+
+	const bool anyEditable = std::any_of(m_columns.begin(), m_columns.end(),
+		[](const TableColumn& column) { return column.editable; });
+	// Editability is per column, applied through each item's flags; the view's
+	// triggers only decide the gesture that opens whichever cells allow it.
+	table->setEditTriggers(anyEditable
+		? (QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed)
+		: QAbstractItemView::NoEditTriggers);
+
+	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+	{
+		for (int column = 0; column < columnCount; ++column)
+		{
+			auto* cell = new QTableWidgetItem(qstr(cellText(rows, row, column)));
+			Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+			if (m_columns[column].editable)
+				flags |= Qt::ItemIsEditable;
+			cell->setFlags(flags);
+			if (column == 0)
+				cell->setData(kTableRowRole, row);
+			table->setItem(row, column, cell);
+		}
+	}
+
+	setTableSelection(table, rowIndicesFor(rows, boundValue()));
+
+	// Rows the handlers read: the caller's own while bound, so an edit made
+	// anywhere is visible here, and a shared snapshot otherwise. Never the
+	// wrapper's -- wrapper and window teardown order is not fixed.
+	TableRows* editTarget = boundRows();
+	auto snapshot = std::make_shared<const TableRows>(rows);
+	const auto liveRows = [editTarget, snapshot]() -> const TableRows& {
+		return editTarget ? *editTarget : *snapshot;
+	};
+
+	// Held across a programmatic sort, which moves items and reselects rows.
+	// Without it the sort would look like a user edit and a user selection.
+	auto syncing = std::make_shared<bool>(false);
+
+	// Sorting is driven by hand rather than through setSortingEnabled(), which
+	// is all-or-nothing: every header would sort, and TableColumn::sortable is
+	// per column. sortItems() compares QTableWidgetItem text, the same
+	// lexicographic order wx sorts with and ImGui's sortedOrder() reproduces.
+	if (std::any_of(m_columns.begin(), m_columns.end(),
+		[](const TableColumn& column) { return column.sortable; }))
+	{
+		QHeaderView* header = table->horizontalHeader();
+		header->setSectionsClickable(true);
+		header->setSortIndicatorShown(true);
+		QObject::connect(header, &QHeaderView::sectionClicked, table,
+			[table, header, syncing, columns = m_columns](int section) {
+				if (section < 0 || section >= static_cast<int>(columns.size())
+					|| !columns[section].sortable)
+					return;
+
+				const bool wasAscendingHere = header->sortIndicatorSection() == section
+					&& header->sortIndicatorOrder() == Qt::AscendingOrder;
+				const Qt::SortOrder order = wasAscendingHere ? Qt::DescendingOrder : Qt::AscendingOrder;
+
+				// Qt reselects by view position while sorting, which would drag
+				// the binding onto whatever rows happen to land under the old
+				// selection. Carry it across by original index instead.
+				const std::vector<int> selected = tableSelection(table);
+				*syncing = true;
+				table->sortItems(section, order);
+				setTableSelection(table, selected);
+				*syncing = false;
+				header->setSortIndicator(section, order);
+			});
+	}
+
+	if (anyEditable)
+	{
+		// Connected only now that every cell exists: setItem() emits itemChanged
+		// for each one, and a handler bound earlier would take the whole
+		// population pass for a series of user edits.
+		QObject::connect(table, &QTableWidget::itemChanged, table,
+			[table, editTarget, syncing, cb = std::move(m_onCellChange)](QTableWidgetItem* item) {
+				if (*syncing || !item)
+					return;
+				const int row = tableRowIndex(table, item->row());
+				if (row < 0)
+					return;
+				const std::string text = item->text().toStdString();
+				applyCellEdit(editTarget, row, item->column(), text);
+				if (cb)
+					cb(row, item->column(), text);
+			});
+	}
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
+			[&value, table, syncing, liveRows, cb = std::move(m_onChange),
+				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+				if (*syncing)
+					return;
+				value = valueFor(liveRows(), tableSelection(table));
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		// select() emits itemSelectionChanged for programmatic writes too, but
+		// the ref sync already wraps every push in a QSignalBlocker on the
+		// widget, so mirroring never re-enters the handler above.
+		bindExternalRefSync(table,
+			[table] { return tableSelection(table); },
+			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
+			[table](const std::vector<int>& indices) { setTableSelection(table, indices); });
+	}
+	else if (m_onChange)
+	{
+		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
+			[table, syncing, liveRows, cb = std::move(m_onChange)]() {
+				if (!*syncing)
+					cb(valueFor(liveRows(), tableSelection(table)));
+			});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
+			[table, syncing, liveRows, cbw = std::move(m_onChangeWithWidget),
+				nw = m_nativeWidget]() {
+				if (!*syncing)
+					cbw(valueFor(liveRows(), tableSelection(table)), nw);
+			});
+	}
+}
+
+template class TableWrapper<int>;
+template class TableWrapper<std::string>;
+template class TableWrapper<std::vector<int>>;
+template class TableWrapper<std::vector<std::string>>;

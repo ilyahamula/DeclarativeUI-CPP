@@ -2,6 +2,7 @@
 #include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <tuple>
 #include <utility>
 
@@ -20,6 +21,7 @@
 #include <wx/statline.h>
 #include <wx/clrpicker.h>
 #include <wx/treectrl.h>
+#include <wx/dataview.h>
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -1068,3 +1070,218 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 
 template class TreeViewWrapper<std::string>;
 template class TreeViewWrapper<std::vector<std::string>>;
+
+// TableWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// wxDataViewListCtrl rather than wxListCtrl or wxGrid. wxListCtrl in report
+// mode can only edit its first column (wxLC_EDIT_LABELS), which rules it out
+// the moment a Table has an editable column further right; wxGrid is a
+// spreadsheet, with row headers and a cell-range selection model that looks
+// nothing like QTableWidget or an ImGui table. wxDataViewListCtrl is the one
+// wx control with per-column editability, per-column sorting and row
+// selection -- the same three axes the other two backends offer.
+
+// An item's ORIGINAL row index, which wx carries for us in the item data. It
+// stays with the row when a column sort reorders the view, so it survives
+// exactly what a view position does not.
+int dataViewRowIndex(const wxDataViewListCtrl* view, const wxDataViewItem& item)
+{
+	return item.IsOk() ? static_cast<int>(view->GetItemData(item)) : -1;
+}
+
+std::vector<int> dataViewSelection(wxDataViewListCtrl* view, bool multiSelect)
+{
+	std::vector<int> indices;
+	if (multiSelect)
+	{
+		wxDataViewItemArray items;
+		view->GetSelections(items);
+		indices.reserve(items.GetCount());
+		for (const auto& item : items)
+		{
+			if (const int row = dataViewRowIndex(view, item); row >= 0)
+				indices.push_back(row);
+		}
+	}
+	else if (const int row = dataViewRowIndex(view, view->GetSelection()); row >= 0)
+	{
+		indices.push_back(row);
+	}
+	// Reported in original-index order, not the order wx happens to hold the
+	// selection in, so a multi-select binding reads the same on all three
+	// backends however the view is currently sorted.
+	std::sort(indices.begin(), indices.end());
+	return indices;
+}
+
+// Programmatic selection. wx sends wxEVT_DATAVIEW_SELECTION_CHANGED for these
+// on the platforms whose native control notifies on selection (as wxTreeCtrl
+// does, and unlike the list-box setters), so every caller here has to hold the
+// re-entry guard the ref sync installs -- see realize().
+void setDataViewSelection(wxDataViewListCtrl* view, const std::vector<int>& indices, bool multiSelect)
+{
+	view->UnselectAll();
+	if (indices.empty())
+		return;
+
+	wxDataViewItemArray items;
+	for (int viewRow = 0; viewRow < static_cast<int>(view->GetItemCount()); ++viewRow)
+	{
+		const wxDataViewItem item = view->RowToItem(viewRow);
+		const int row = dataViewRowIndex(view, item);
+		if (row < 0)
+			continue;
+		if (multiSelect
+			? std::find(indices.begin(), indices.end(), row) != indices.end()
+			: row == indices.front())
+		{
+			items.Add(item);
+		}
+	}
+
+	if (multiSelect)
+		view->SetSelections(items);
+	else if (!items.IsEmpty())
+		view->Select(items[0]);
+}
+
+} // unnamed namespace
+
+template <TableValue T>
+void TableWrapper<T>::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("TableWrapper::realize()\t-> new wxDataViewListCtrl()\n");
+#endif
+	// wxDV_MULTIPLE is wx's ctrl/shift-click mode; wxDV_SINGLE is the default
+	// and is spelled out here so the two read as a pair.
+	const long selectionStyle = kMultiSelect ? wxDV_MULTIPLE : wxDV_SINGLE;
+	auto* view = new wxDataViewListCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		m_style | selectionStyle | wxDV_ROW_LINES);
+	m_nativeWidget = view;
+
+	const TableRows& rows = m_rows.get();
+	const auto measureText = [view](const std::string& text) {
+		return view->GetTextExtent(text).GetWidth();
+	};
+
+	// Columns are given the width the shared policy computes rather than wx's
+	// wxCOL_WIDTH_DEFAULT, so a measured column comes out the same width here as
+	// it does on Qt and ImGui.
+	constexpr int kCellPadding = 12; // wx draws the cell's text inset on both sides
+	int contentWidth = 0;
+	for (int column = 0; column < static_cast<int>(m_columns.size()); ++column)
+	{
+		const TableColumn& spec = m_columns[column];
+		const int width = columnWidth(m_columns, rows, column, measureText) + kCellPadding;
+		contentWidth += width;
+		view->AppendTextColumn(spec.label,
+			spec.editable ? wxDATAVIEW_CELL_EDITABLE : wxDATAVIEW_CELL_INERT,
+			width, wxALIGN_LEFT,
+			wxDATAVIEW_COL_RESIZABLE | (spec.sortable ? wxDATAVIEW_COL_SORTABLE : 0));
+	}
+
+	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+	{
+		wxVector<wxVariant> values;
+		values.reserve(m_columns.size());
+		for (int column = 0; column < static_cast<int>(m_columns.size()); ++column)
+			values.push_back(wxVariant(wxString(cellText(rows, row, column))));
+		// The original index rides along as item data -- see dataViewRowIndex().
+		view->AppendItem(values, static_cast<wxUIntPtr>(row));
+	}
+
+	// wxDataViewListCtrl's best size is its client area rather than its content,
+	// so it would ask the engine for whatever it happens to have been given.
+	// Compute the same shape the other two backends do: summed column widths,
+	// a header plus visibleRows of body.
+	constexpr int kViewFrame = 6;       // border the native control draws
+	constexpr int kScrollbarSlack = 20; // room for the vertical scrollbar
+	const int rowHeight = view->GetCharHeight() + 6;
+	view->CacheBestSize(wxSize(contentWidth + kViewFrame + kScrollbarSlack,
+		rowHeight * (m_visibleRows + 1) + kViewFrame));
+
+	setDataViewSelection(view, rowIndicesFor(rows, boundValue()), kMultiSelect);
+
+	// Rows the handlers read: the caller's own while bound, so an edit made
+	// anywhere is visible here, and a snapshot otherwise. Never the wrapper's --
+	// wrapper and window teardown order is not fixed (see wx/RefSync.hpp), and
+	// the snapshot is shared rather than copied into each lambda.
+	TableRows* editTarget = boundRows();
+	auto snapshot = std::make_shared<const TableRows>(rows);
+	const auto liveRows = [editTarget, snapshot]() -> const TableRows& {
+		return editTarget ? *editTarget : *snapshot;
+	};
+
+	if (std::any_of(m_columns.begin(), m_columns.end(),
+		[](const TableColumn& column) { return column.editable; }))
+	{
+		view->Bind(wxEVT_DATAVIEW_ITEM_EDITING_DONE, [view, editTarget,
+			cb = std::move(m_onCellChange)](wxDataViewEvent& evt) {
+			evt.Skip();
+			// Escape leaves the cell untouched, and wx says so here rather than
+			// by withholding the event.
+			if (evt.IsEditCancelled())
+				return;
+			const int row = dataViewRowIndex(view, evt.GetItem());
+			if (row < 0)
+				return;
+			const std::string text = evt.GetValue().GetString().ToStdString();
+			applyCellEdit(editTarget, row, evt.GetColumn(), text);
+			if (cb)
+				cb(row, evt.GetColumn(), text);
+		});
+	}
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		// The selection setters notify, so mirroring the ref into the control
+		// would re-enter this handler and echo the value straight back out. The
+		// guard is shared by both lambdas and lives as long as they do.
+		auto syncing = std::make_shared<bool>(false);
+		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [&value, view, syncing, liveRows,
+			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
+			nw = m_nativeWidget](wxDataViewEvent& evt) {
+			evt.Skip();
+			if (*syncing)
+				return;
+			value = valueFor(liveRows(), dataViewSelection(view, kMultiSelect));
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		bindExternalRefSync(view,
+			[view] { return dataViewSelection(view, kMultiSelect); },
+			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
+			[view, syncing](const std::vector<int>& indices) {
+				*syncing = true;
+				setDataViewSelection(view, indices, kMultiSelect);
+				*syncing = false;
+			});
+	}
+	else if (m_onChange)
+	{
+		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, liveRows,
+			cb = std::move(m_onChange)](wxDataViewEvent& evt) {
+			evt.Skip();
+			cb(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)));
+		});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, liveRows,
+			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDataViewEvent& evt) {
+			evt.Skip();
+			cbw(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)), nw);
+		});
+	}
+}
+
+template class TableWrapper<int>;
+template class TableWrapper<std::string>;
+template class TableWrapper<std::vector<int>>;
+template class TableWrapper<std::vector<std::string>>;

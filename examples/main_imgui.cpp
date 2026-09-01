@@ -14,20 +14,32 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // TreeView demo state. Bound by reference, so it has to outlive the frame
-    // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string selectedFile = "src/main.cpp";
-    std::vector<std::string> selectedModules { "include" };
-    bool treesDisabled = false;
+    // Table demo state. Bound by reference, so it has to outlive the frame loop
+    // -- ImGui rebuilds the tree every frame and reads these live.
+    // The Notes column is editable, which is the other half of why these are
+    // refs: an edit has to land somewhere the widgets do not own.
+    TableRows files {
+        { "main.cpp",      "12 KB", "entry point" },
+        { "layout.cpp",    "48 KB", "measure/arrange" },
+        { "measure.cpp",   "9 KB",  "" },
+        { "widgets.hpp",   "31 KB", "public API" },
+        { "stacks.hpp",    "7 KB",  "" },
+        { "buildable.hpp", "3 KB",  "concepts" },
+    };
+    int selectedRow = 0;
+    std::vector<int> checkedRows { 1, 3 };
+    bool tablesDisabled = false;
 
-    // The same widget bound the other way: one path shared by two trees.
-    std::string sharedPath = "src/engine";
+    // The same widget bound the other way: one rows vector and one key shared by
+    // two tables.
+    TableRows sharedFiles = files;
+    std::string sharedFile = "layout.cpp";
     bool mirrorDisabled = false;
 
     runImGuiApp([&]
     {
-        drawTreeUI(selectedFile, selectedModules, treesDisabled).show();
-        drawTreeViewMirror(sharedPath, mirrorDisabled).show();
+        drawTableUI(files, selectedRow, checkedRows, tablesDisabled).show();
+        drawTableMirror(sharedFiles, sharedFile, mirrorDisabled).show();
     });
 
     return 0;

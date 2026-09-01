@@ -209,6 +209,55 @@ inline auto drawTreeViewMirror(std::string& path, bool& disabled)
     };
 }
 
+// Two Tables over ONE rows vector and ONE selected-key value, both by reference.
+// Click a row in either and the other follows; sort one and the other keeps its
+// own view order, because sorting is a property of the view and the binding is a
+// property of the data.
+//
+// The key binding is on show here rather than the index one: `selected` holds
+// the text of the row's FIRST column, so the TextCtrl below can select a row by
+// typing its name. That readability is the whole point of a key binding -- at
+// the cost that two rows sharing a first column are indistinguishable through
+// it, which is why the File column is left uneditable here while Notes is not.
+//
+// `rows` is bound too, not just the selection, which is what makes the editable
+// Notes column write back: edit a note in the left table and the right one shows
+// it, because both are reading the caller's vector.
+inline auto drawTableMirror(TableRows& rows, std::string& selected, bool& disabled)
+{
+    const std::vector<TableColumn> columns {
+        { "File",  -1, /*sortable*/ true },
+        { "Size",  70, /*sortable*/ true },
+        { "Notes", -1, /*sortable*/ false, /*editable*/ true },
+    };
+
+    return Dialog {
+        "Two Tables (shared rows + key)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"Pick in either table, or type a file name:"}
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            HStack {
+                Table { columns, rows, selected }
+                    .withVisibleRows(5)
+                    .withSize({320, 150})
+                    .withFlags(LayoutFlags().Expand())
+                    .isDisabled(disabled),
+                Table { columns, rows, selected }
+                    .withVisibleRows(5)
+                    .withSize({320, 150})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Left, 8))
+                    .isDisabled(disabled)
+            },
+            TextCtrl{selected}
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+                .isDisabled(disabled),
+            CheckBox{disabled, "Disable both"}
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
 // One bool, three jobs: it is the CheckBox's own value, it disables the group
 // box holding the two mirrored spin boxes, and it disables the reset Button --
 // all by reference, so ticking the box updates every one of them at once. The

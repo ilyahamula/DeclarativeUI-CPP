@@ -790,6 +790,250 @@ TreeView(std::vector<TreeItem>, T&) -> TreeView<T>;
 template <TreeViewValue T>
 TreeView(std::vector<TreeItem>, const T&) -> TreeView<T>;
 
+// Table -----------------------------------------------------------
+// Multi-column tabular display, with optional per-column sorting and per-column
+// cell editing. Columns are a TableColumn list and rows a rectangular block of
+// text, so a table is described the same way on every backend:
+//
+//   Table { { {"File", -1, true}, {"Size", 80, true}, {"Note", -1, false, true} },
+//           rows, selectedRow }
+//
+// Selection binds either an original ROW INDEX (int / std::vector<int>) or the
+// text of the first column (std::string / std::vector<std::string>), and -- as
+// with ListBox -- the bound type is what picks single- vs multi-select. Index
+// bindings address the row's position in `rows`, never its position on screen,
+// so they survive sorting; see TableValue in Concepts.hpp for when to prefer
+// which.
+//
+// Passing `rows` as a non-const lvalue BINDS them, which is what makes an
+// editable column write back to the caller's data. A const or temporary rows
+// argument is a snapshot instead, and edits then reach the caller only through
+// onCellChange() -- on ImGui they do not even survive to the next frame, since
+// the tree is rebuilt from the caller's data every time.
+template <TableValue T>
+struct Table : Widget<Table<T>>
+{
+	using super = Widget<Table<T>>;
+
+	// Rows shown before the table scrolls. It drives the intrinsic height on all
+	// three backends for the reason ListBox and TreeView need the same knob:
+	// their native hints disagree far too much (wx sizes to its content, Qt
+	// returns a fixed ~192px and ImGui has no hint at all) for the same table to
+	// lay out identically otherwise.
+	static constexpr int kDefaultVisibleRows = 8;
+
+	Table(std::vector<TableColumn> columns, const TableRows& rows)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+	{
+		clearSelection();
+	}
+
+	Table(std::vector<TableColumn> columns, TableRows& rows)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+	{
+		clearSelection();
+	}
+
+	Table(std::vector<TableColumn> columns, const TableRows& rows, const T& selected)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(std::vector<TableColumn> columns, const TableRows& rows, T& selected)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(std::vector<TableColumn> columns, TableRows& rows, const T& selected)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(std::vector<TableColumn> columns, TableRows& rows, T& selected)
+		: super()
+		, m_columns(std::move(columns))
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	// The same six again without a column list, for the callers who describe
+	// their columns with addColumn() below. Passing an empty vector would do the
+	// same job, but `Table { {}, rows, picked }` puts a meaningless brace pair at
+	// the front of every such table.
+	explicit Table(const TableRows& rows)
+		: super()
+		, m_rows(rows)
+	{
+		clearSelection();
+	}
+
+	explicit Table(TableRows& rows)
+		: super()
+		, m_rows(rows)
+	{
+		clearSelection();
+	}
+
+	Table(const TableRows& rows, const T& selected)
+		: super()
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(const TableRows& rows, T& selected)
+		: super()
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(TableRows& rows, const T& selected)
+		: super()
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	Table(TableRows& rows, T& selected)
+		: super()
+		, m_rows(rows)
+		, m_value(selected)
+	{
+	}
+
+	// Append one column. Both overloads exist because a column is described two
+	// ways in practice: a TableColumn when the caller already holds one (or
+	// wants to name the fields), and the unpacked form when the interesting part
+	// is the label and everything else is a default.
+	//
+	// Appending, not replacing: a column list passed to the constructor and
+	// these calls compose, so a shared base set can be extended per table.
+	Table& addColumn(TableColumn column)
+	{
+		m_columns.push_back(std::move(column));
+		return *this;
+	}
+
+	// Parameters and defaults mirror TableColumn field for field, so the two
+	// overloads cannot drift apart in what an omitted argument means.
+	//
+	// The label is a constrained template rather than a plain std::string to
+	// keep addColumn({"File"}) unambiguous. Spelled that way it could init
+	// either overload's first parameter, and a braced list next to the
+	// addColumn({"File", 70, true}) that DOES work is too easy to write for the
+	// answer to be a compile error. A braced-init-list is a non-deduced context,
+	// so this candidate drops out and the TableColumn one takes it -- which is
+	// what the caller meant.
+	template <typename Label>
+		requires std::constructible_from<std::string, Label>
+	Table& addColumn(Label&& label, int width = -1, bool sortable = false, bool editable = false)
+	{
+		m_columns.push_back(TableColumn { std::string(std::forward<Label>(label)), width, sortable, editable });
+		return *this;
+	}
+
+	Table& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	Table& onChange(std::function<void(const T&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	Table& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+	// Fired after an editable column's cell is committed, with the row's
+	// ORIGINAL index, the column and the new text -- the same order the value
+	// binding uses, so a handler reading `rows` already sees the edit.
+	Table& onCellChange(std::function<void(int, int, const std::string&)> callback)
+	{
+		m_onCellChange = std::move(callback);
+		return *this;
+	}
+
+private:
+	// An unbound table starts with nothing selected. Spelled -1 rather than left
+	// default-constructed because a default-constructed int is 0, which is a
+	// perfectly good row: -1 is what valueFor() reports for "no selection", so
+	// this is the same state a user reaches by clicking nothing.
+	void clearSelection()
+	{
+		if constexpr (std::is_same_v<T, int>)
+			m_value.snapshot(-1);
+	}
+
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<TableWrapper<T>>(m_columns, m_rows, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget, m_onCellChange);
+	}
+
+private:
+	std::vector<TableColumn> m_columns;
+	BoundValue<TableRows> m_rows;
+	int m_visibleRows = kDefaultVisibleRows;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	std::function<void(int, int, const std::string&)> m_onCellChange;
+};
+
+// An unbound table reports its selection through onChange only, so the row
+// index binding is the one that costs nothing to default to.
+Table(std::vector<TableColumn>, const TableRows&) -> Table<int>;
+Table(std::vector<TableColumn>, TableRows&) -> Table<int>;
+Table(const TableRows&) -> Table<int>;
+Table(TableRows&) -> Table<int>;
+
+template <TableValue T>
+Table(const TableRows&, T&) -> Table<T>;
+
+template <TableValue T>
+Table(const TableRows&, const T&) -> Table<T>;
+
+template <TableValue T>
+Table(TableRows&, T&) -> Table<T>;
+
+template <TableValue T>
+Table(TableRows&, const T&) -> Table<T>;
+
+template <TableValue T>
+Table(std::vector<TableColumn>, const TableRows&, T&) -> Table<T>;
+
+template <TableValue T>
+Table(std::vector<TableColumn>, const TableRows&, const T&) -> Table<T>;
+
+template <TableValue T>
+Table(std::vector<TableColumn>, TableRows&, T&) -> Table<T>;
+
+template <TableValue T>
+Table(std::vector<TableColumn>, TableRows&, const T&) -> Table<T>;
+
 // Slider -----------------------------------------------------------
 template <SliderValue T>
 struct Slider : Widget<Slider<T>>

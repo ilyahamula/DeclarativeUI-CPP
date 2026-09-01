@@ -47,6 +47,47 @@ struct ListBoxItemTraits<std::vector<T>>
 template <ListBoxValue T>
 using ListBoxItem = typename ListBoxItemTraits<T>::Item;
 
+// A Table binds a row SELECTION and, exactly like ListBox, the bound type is
+// what picks single- vs multi-select -- there is one widget and no mode flag to
+// keep in step with the value. Two ways to name a row:
+//
+//   int / std::vector<int>                 the row's ORIGINAL index
+//   std::string / std::vector<std::string> the text of its first (key) column
+//
+// Original index, never display position: sorting reorders what is on screen,
+// and a binding that shifted underneath the caller every time a header was
+// clicked would be useless. Index bindings are therefore the robust ones. A key
+// binding reads better at the call site, but two rows sharing a column-0 value
+// are indistinguishable through it, and editing that column changes which row
+// the binding names -- prefer an index binding when column 0 is editable.
+template <typename T>
+concept TableSelection = std::same_as<T, int> || std::same_as<T, std::string>;
+
+template <typename T>
+concept TableValue = TableSelection<T>
+	|| std::same_as<T, std::vector<int>>
+	|| std::same_as<T, std::vector<std::string>>;
+
+template <typename T>
+concept MultiSelectTableValue = TableValue<T> && !TableSelection<T>;
+
+// Element type behind a Table binding: the bound type itself when single, the
+// vector's element when multi.
+template <typename T>
+struct TableKeyTraits
+{
+	using Key = T;
+};
+
+template <typename T>
+struct TableKeyTraits<std::vector<T>>
+{
+	using Key = T;
+};
+
+template <TableValue T>
+using TableKey = typename TableKeyTraits<T>::Key;
+
 // A TreeView addresses items by PATH -- the item's labels from the root joined
 // by '/' -- rather than by index: an index says nothing about where an item
 // sits in a tree, and the native item handles (wxTreeItemId, QTreeWidgetItem*)

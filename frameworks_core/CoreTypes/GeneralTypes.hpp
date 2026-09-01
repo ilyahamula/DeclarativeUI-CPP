@@ -123,6 +123,30 @@ struct TreeItem
 	bool expanded = false;
 };
 
+// One column of a Table. Framework-independent by design, exactly as TreeItem
+// is: every backend walks this same list to build (wx/Qt) or draw (ImGui) its
+// own header, so a table is described once and reads the same everywhere.
+//
+// `width` of -1 sizes the column from its widest cell, matching withSize()'s
+// "-1 means measure me" convention everywhere else in the framework.
+//
+// `sortable` and `editable` are per column rather than per table because
+// neither usually applies to all of them: an id column sorts where a free-text
+// note does not, and a computed column is shown but never typed into.
+struct TableColumn
+{
+	std::string label;
+	int width = -1;
+	bool sortable = false;
+	bool editable = false;
+};
+
+// A table's cells, as text. A row's index in this vector is its ORIGINAL
+// position -- what a Table's int binding reports, and the only row identity
+// that stays meaningful once the user sorts a column.
+using TableRow = std::vector<std::string>;
+using TableRows = std::vector<TableRow>;
+
 enum class Side : int
 {
 	Left   = 1 << 0,

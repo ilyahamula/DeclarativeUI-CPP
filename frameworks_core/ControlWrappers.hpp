@@ -3,8 +3,10 @@
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <functional>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <utility>
@@ -926,3 +928,253 @@ private:
 
 extern template class TreeViewWrapper<std::string>;
 extern template class TreeViewWrapper<std::vector<std::string>>;
+
+// TableWrapper -----------------------------------------------------------
+// Multi-column tabular display: a column list, a rectangular block of text
+// cells, row selection, optional per-column sorting and optional per-column
+// cell editing.
+//
+// Rows are identified by their ORIGINAL index -- their position in the TableRows
+// the caller passed -- and never by their position on screen. Sorting reorders
+// the display, so those two part company the moment a header is clicked, and a
+// binding that tracked the display would shift underneath the caller for free.
+// Every backend keeps the original index on the row it builds (wx in
+// SetItemData, Qt in a UserRole, ImGui in its own permutation) and decodes it
+// back through rowIndicesFor()/valueFor() -- the only two places the bound type
+// is interpreted, so all three share one reading of it, exactly as
+// ListBoxWrapper does with its indices.
+//
+// The ROWS are a BoundValue as well as the selection, which is what makes cell
+// editing work: bound, an edit writes through to the caller's data and is what
+// every backend redraws from; unbound, it lands in a snapshot this wrapper owns
+// and only onCellChange observes it. That distinction is invisible on wx and Qt
+// -- their native control retains the edited text either way -- but decides the
+// behaviour on ImGui, where the whole tree is rebuilt every frame and an edit
+// with nowhere caller-owned to live is gone by the next one.
+template <TableValue T>
+class TableWrapper : public ControlWrapper
+{
+public:
+	static constexpr bool kMultiSelect = MultiSelectTableValue<T>;
+
+	// The column a std::string binding reads its key from. First rather than
+	// configurable: a key column is a property of how the caller laid the table
+	// out, and every backend already treats column 0 as the row's identity.
+	static constexpr int kKeyColumn = 0;
+
+	TableWrapper(std::vector<TableColumn> columns,
+		BoundValue<TableRows> rows,
+		BoundValue<T> selected, int visibleRows,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {},
+		std::function<void(int, int, const std::string&)> onCellChange = {})
+		: ControlWrapper(pos, size, style)
+		, m_columns(std::move(columns))
+		, m_rows(std::move(rows))
+		, m_visibleRows(visibleRows)
+		, m_value(std::move(selected))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+		, m_onCellChange(std::move(onCellChange))
+	{
+	}
+
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
+
+	// A cell's text, or "" for a ragged row that is short of this column. Rows
+	// are not required to be the same length as the column list: a short row is
+	// read as trailing empty cells rather than rejected, so a table built from
+	// partial data still displays.
+	static const std::string& cellText(const TableRows& rows, int row, int column)
+	{
+		static const std::string kEmpty;
+		if (row < 0 || row >= static_cast<int>(rows.size()))
+			return kEmpty;
+		const TableRow& cells = rows[row];
+		if (column < 0 || column >= static_cast<int>(cells.size()))
+			return kEmpty;
+		return cells[column];
+	}
+
+	// Original row indices the control should show selected. Out-of-range
+	// indices and unmatched keys are dropped rather than clamped, for the reason
+	// ListBoxWrapper drops them: a stale row reference means "not in this table",
+	// and quietly selecting a neighbour would be worse than selecting nothing.
+	//
+	// Static, and taking the rows explicitly, because the retained backends call
+	// it from event handlers and idle syncs: those must not capture the wrapper
+	// (see the note in wx/RefSync.hpp -- wrapper and window teardown order is not
+	// fixed), only the data they copy.
+	static std::vector<int> rowIndicesFor(const TableRows& rows, const T& value)
+	{
+		std::vector<int> indices;
+		const int count = static_cast<int>(rows.size());
+		const auto addRow = [&](const TableKey<T>& key) {
+			if constexpr (std::is_same_v<TableKey<T>, int>)
+			{
+				if (key >= 0 && key < count)
+					indices.push_back(key);
+			}
+			else
+			{
+				// "" is how a key binding spells "nothing selected" -- it is what
+				// valueFor() reports for an empty selection -- so it must not
+				// match, or clearing the selection would land on the first row
+				// with an empty first cell.
+				if (key.empty())
+					return;
+				// First match wins: duplicate keys are the documented weakness
+				// of a key binding, not something to resolve arbitrarily here.
+				for (int i = 0; i < count; ++i)
+				{
+					if (cellText(rows, i, kKeyColumn) == key)
+					{
+						indices.push_back(i);
+						break;
+					}
+				}
+			}
+		};
+
+		if constexpr (kMultiSelect)
+		{
+			for (const auto& key : value)
+				addRow(key);
+		}
+		else
+		{
+			addRow(value);
+		}
+		return indices;
+	}
+
+	// The inverse. A single-select binding with nothing selected reports -1 / ""
+	// -- the same "no selection" spelling ListBoxWrapper uses, and the one
+	// rowIndicesFor() drops on the way back in.
+	static T valueFor(const TableRows& rows, const std::vector<int>& indices)
+	{
+		const auto keyAt = [&](int i) -> TableKey<T> {
+			if constexpr (std::is_same_v<TableKey<T>, int>)
+				return i;
+			else
+				return cellText(rows, i, kKeyColumn);
+		};
+
+		if constexpr (kMultiSelect)
+		{
+			T value;
+			value.reserve(indices.size());
+			for (int i : indices)
+				value.push_back(keyAt(i));
+			return value;
+		}
+		else
+		{
+			return indices.empty() ? keyAt(-1) : keyAt(indices.front());
+		}
+	}
+
+	// Original row indices in the order `column` sorts them, ascending or not.
+	// Only ImGui calls this -- wx and Qt sort natively -- but the comparison is
+	// deliberately the same one they use: a lexicographic compare of the cell
+	// TEXT. A table holds text, so "10" sorts before "9" on all three backends
+	// rather than only on the two that happen to share a collation.
+	//
+	// stable_sort so that equal cells keep their declaration order, which is the
+	// only tie-break a caller can predict.
+	static std::vector<int> sortedOrder(const TableRows& rows, int column, bool ascending)
+	{
+		std::vector<int> order(rows.size());
+		std::iota(order.begin(), order.end(), 0);
+		if (column < 0)
+			return order;
+
+		std::stable_sort(order.begin(), order.end(), [&](int lhs, int rhs) {
+			const std::string& a = cellText(rows, lhs, column);
+			const std::string& b = cellText(rows, rhs, column);
+			return ascending ? a < b : b < a;
+		});
+		return order;
+	}
+
+	// Column width policy, shared by all three backends: an explicit
+	// TableColumn::width wins, otherwise the column is as wide as the widest of
+	// its header and its cells. The policy belongs here; the metrics cannot --
+	// `measureText` is the backend's own text measurement.
+	template <typename MeasureText>
+	static int columnWidth(const std::vector<TableColumn>& columns, const TableRows& rows,
+		int column, const MeasureText& measureText)
+	{
+		if (columns[column].width > 0)
+			return columns[column].width;
+
+		int widest = measureText(columns[column].label);
+		for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+			widest = std::max(widest, measureText(cellText(rows, row, column)));
+		return widest;
+	}
+
+	// Write an edited cell back into caller-owned rows. Static and taking the
+	// target explicitly so a retained backend's edit handler can call it holding
+	// only the pointer from boundRows() -- never the wrapper.
+	//
+	// A short row is padded rather than skipped, matching cellText()'s reading
+	// of ragged rows as trailing empty cells.
+	static void applyCellEdit(TableRows* rows, int row, int column, const std::string& text)
+	{
+		if (!rows || row < 0 || row >= static_cast<int>(rows->size()) || column < 0)
+			return;
+		TableRow& cells = (*rows)[row];
+		if (column >= static_cast<int>(cells.size()))
+			cells.resize(column + 1);
+		cells[column] = text;
+	}
+
+	// Commit a new selection: the value first, then the user callback, so a
+	// handler reading the bound value sees the new one.
+	void commit(const std::vector<int>& indices)
+	{
+		m_value.set(valueFor(m_rows.get(), indices));
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+
+	// Commit a cell edit, in the same order and for the same reason: the data
+	// first, then the callback. `row` is an original index.
+	void commitCell(int row, int column, const std::string& text)
+	{
+		applyCellEdit(&m_rows.get(), row, column, text);
+		if (m_onCellChange)
+			m_onCellChange(row, column, text);
+	}
+
+	const T& boundValue() const { return m_value.get(); }
+
+	// Non-null only while the rows are bound: the caller-owned table an edit may
+	// write through to. A snapshot reports nullptr -- see the note above on what
+	// that costs on ImGui.
+	TableRows* boundRows() { return m_rows.isBound() ? &m_rows.get() : nullptr; }
+
+private:
+	std::vector<TableColumn> m_columns;
+	BoundValue<TableRows> m_rows;
+	int m_visibleRows = 1;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	std::function<void(int, int, const std::string&)> m_onCellChange;
+};
+
+extern template class TableWrapper<int>;
+extern template class TableWrapper<std::string>;
+extern template class TableWrapper<std::vector<int>>;
+extern template class TableWrapper<std::vector<std::string>>;
