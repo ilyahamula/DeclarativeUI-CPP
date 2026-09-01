@@ -825,3 +825,149 @@ private:
 
 extern template class ComboBoxWrapper<std::string>;
 extern template class ComboBoxWrapper<int>;
+
+// ListBoxWrapper -----------------------------------------------------------
+// Single- or multi-select depending on T (see ListBoxValue). The selection is
+// carried as item indices everywhere inside the wrapper -- indicesFor() and
+// valueFor() are the only two places the bound type is decoded, so all three
+// backends share one interpretation of it.
+template <ListBoxValue T>
+class ListBoxWrapper : public ControlWrapper
+{
+public:
+	static constexpr bool kMultiSelect = MultiSelectListBoxValue<T>;
+
+	ListBoxWrapper(std::vector<std::string> items,
+		T& selected, int visibleRows, const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_visibleRows(visibleRows)
+		, m_ownedSelected(selected)
+		, m_externalRef(selected)
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+	ListBoxWrapper(std::vector<std::string> items,
+		const T& selected, int visibleRows, const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_visibleRows(visibleRows)
+		, m_ownedSelected(selected)
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+#endif
+#ifdef USE_IMGUI
+	Size measureIntrinsic(const Constraints& c) override;
+	void render(const Rect& frame) override;
+#endif
+
+	// Item indices the control should show for `value`. Out-of-range entries
+	// are dropped rather than clamped: a stale index means "not in this list",
+	// and silently selecting a neighbour would be worse than selecting nothing.
+	//
+	// Static, and taking the items explicitly, because the retained backends call
+	// it from event handlers and idle syncs: those must not capture the wrapper
+	// (see the note in wx/RefSync.hpp -- wrapper and window teardown order is not
+	// fixed), only the item list they copy.
+	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
+	{
+		std::vector<int> indices;
+		const int count = static_cast<int>(items.size());
+		const auto addIndexOf = [&](const ListBoxItem<T>& item) {
+			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+			{
+				if (item >= 0 && item < count)
+					indices.push_back(item);
+			}
+			else
+			{
+				for (int i = 0; i < count; ++i)
+				{
+					if (items[i] == item)
+					{
+						indices.push_back(i);
+						break;
+					}
+				}
+			}
+		};
+
+		if constexpr (kMultiSelect)
+		{
+			for (const auto& item : value)
+				addIndexOf(item);
+		}
+		else
+		{
+			addIndexOf(value);
+		}
+		return indices;
+	}
+
+	// The inverse: the bound value for a set of selected indices. A single-select
+	// binding with nothing selected reports -1 / "" -- the same "no selection"
+	// wxNOT_FOUND spelling the retained backends use.
+	static T valueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
+	{
+		const auto itemAt = [&](int i) -> ListBoxItem<T> {
+			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+				return i;
+			else
+				return (i >= 0 && i < static_cast<int>(items.size())) ? items[i] : std::string{};
+		};
+
+		if constexpr (kMultiSelect)
+		{
+			T value;
+			value.reserve(indices.size());
+			for (int i : indices)
+				value.push_back(itemAt(i));
+			return value;
+		}
+		else
+		{
+			return indices.empty() ? itemAt(-1) : itemAt(indices.front());
+		}
+	}
+
+	// Commit a new selection: owned copy, bound ref, then the user callback --
+	// in that order, so a handler reading the bound value sees the new one.
+	void commit(const std::vector<int>& indices)
+	{
+		m_ownedSelected = valueFor(m_items, indices);
+		if (m_externalRef)
+			m_externalRef->get() = m_ownedSelected;
+		if (m_onChange)
+			m_onChange(m_ownedSelected);
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_ownedSelected, m_nativeWidget);
+	}
+
+	const T& boundValue() const
+	{
+		return m_externalRef ? m_externalRef->get() : m_ownedSelected;
+	}
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = 1;
+	T m_ownedSelected{};
+	std::optional<std::reference_wrapper<T>> m_externalRef;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+extern template class ListBoxWrapper<int>;
+extern template class ListBoxWrapper<std::string>;
+extern template class ListBoxWrapper<std::vector<int>>;
+extern template class ListBoxWrapper<std::vector<std::string>>;

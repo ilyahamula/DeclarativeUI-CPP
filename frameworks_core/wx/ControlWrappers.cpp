@@ -772,3 +772,112 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// ListBoxWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// wx spells "no selection" as wxNOT_FOUND for single-select boxes and as an
+// empty selection array for multi-select ones; both arrive here as an empty
+// index list.
+std::vector<int> listBoxSelection(const wxListBox* list, bool multiSelect)
+{
+	std::vector<int> indices;
+	if (multiSelect)
+	{
+		wxArrayInt selections;
+		list->GetSelections(selections);
+		indices.reserve(selections.GetCount());
+		for (int index : selections)
+			indices.push_back(index);
+	}
+	else if (const int selection = list->GetSelection(); selection != wxNOT_FOUND)
+	{
+		indices.push_back(selection);
+	}
+	return indices;
+}
+
+// Programmatic selection: wx setters do not fire wxEVT_LISTBOX, so this never
+// re-enters the user's onChange -- which is what the ref sync needs of a push.
+void setListBoxSelection(wxListBox* list, const std::vector<int>& indices, bool multiSelect)
+{
+	if (!multiSelect)
+	{
+		list->SetSelection(indices.empty() ? wxNOT_FOUND : indices.front());
+		return;
+	}
+
+	for (unsigned int i = 0; i < list->GetCount(); ++i)
+	{
+		if (std::find(indices.begin(), indices.end(), static_cast<int>(i)) != indices.end())
+			list->SetSelection(i);
+		else
+			list->Deselect(i);
+	}
+}
+
+} // unnamed namespace
+
+template <ListBoxValue T>
+void ListBoxWrapper<T>::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ListBoxWrapper::realize()\t-> new wxListBox()\n");
+#endif
+	wxArrayString items;
+	for (const auto& item : m_items)
+		items.Add(item);
+
+	// wxLB_EXTENDED gives ctrl/shift-click range selection; wxLB_MULTIPLE would
+	// toggle on a plain click, which is not what a desktop list does.
+	const long selectionStyle = kMultiSelect ? wxLB_EXTENDED : wxLB_SINGLE;
+	auto* list = new wxListBox(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items,
+		m_style | selectionStyle | wxLB_NEEDED_SB);
+	setListBoxSelection(list, indicesFor(m_items, boundValue()), kMultiSelect);
+	m_nativeWidget = list;
+
+	// wxListBox's own best height grows with the item count, so a long list would
+	// ask the engine for a window taller than the screen. Pin it to visibleRows --
+	// the same height the Qt and ImGui wrappers compute -- and keep wx's
+	// content-derived best width.
+	constexpr int kListBoxFrame = 6; // border the native box draws around its rows
+	const wxSize best = list->GetBestSize();
+	const int rowHeight = list->GetCharHeight() + 2;
+	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
+
+	if (m_externalRef)
+	{
+		auto& value = m_externalRef->get();
+		list->Bind(wxEVT_LISTBOX, [&value, list, items = m_items, cb = std::move(m_onChange),
+			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
+			value = valueFor(items, listBoxSelection(list, kMultiSelect));
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		bindExternalRefSync(list,
+			[list] { return listBoxSelection(list, kMultiSelect); },
+			[&value, items = m_items] { return indicesFor(items, value); },
+			[list](const std::vector<int>& indices) { setListBoxSelection(list, indices, kMultiSelect); });
+	}
+	else if (m_onChange)
+	{
+		list->Bind(wxEVT_LISTBOX, [list, items = m_items, cb = std::move(m_onChange)](wxCommandEvent&) {
+			cb(valueFor(items, listBoxSelection(list, kMultiSelect)));
+		});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		list->Bind(wxEVT_LISTBOX, [list, items = m_items, cbw = std::move(m_onChangeWithWidget),
+			nw = m_nativeWidget](wxCommandEvent&) {
+			cbw(valueFor(items, listBoxSelection(list, kMultiSelect)), nw);
+		});
+	}
+}
+
+template class ListBoxWrapper<int>;
+template class ListBoxWrapper<std::string>;
+template class ListBoxWrapper<std::vector<int>>;
+template class ListBoxWrapper<std::vector<std::string>>;

@@ -632,6 +632,91 @@ ComboBox(std::vector<std::string>, T&) -> ComboBox<T>;
 template <ComboBoxValue T>
 ComboBox(std::vector<std::string>, const T&) -> ComboBox<T>;
 
+// ListBox -----------------------------------------------------------
+// Scrollable list of selectable items. The bound type picks the mode:
+// int/std::string select one item, std::vector<int>/std::vector<std::string>
+// select many. Index bindings address items by position, string bindings by
+// item text -- exactly like ComboBox.
+template <ListBoxValue T>
+struct ListBox : Widget<ListBox<T>>
+{
+	using super = Widget<ListBox<T>>;
+
+	// Rows shown before the list scrolls. It drives the intrinsic height on all
+	// three backends: their native hints disagree far too much (wx sizes to the
+	// item count, Qt returns a fixed ~192px, ImGui has no hint at all) for the
+	// same tree to lay out identically otherwise.
+	static constexpr int kDefaultVisibleRows = 6;
+
+	explicit ListBox(std::vector<std::string> items)
+		: super()
+		, m_items(std::move(items))
+	{
+		// Single-select starts on the first item (as ComboBox does); multi-select
+		// starts empty -- "no rows selected" is the honest default for a list.
+		if constexpr (std::is_same_v<T, std::string>)
+			m_ownedSelected = m_items.empty() ? T{} : m_items.front();
+	}
+
+	ListBox(std::vector<std::string> items, const T& selected)
+		: super()
+		, m_items(std::move(items))
+		, m_ownedSelected(selected)
+	{
+	}
+
+	ListBox(std::vector<std::string> items, T& selected)
+		: super()
+		, m_items(std::move(items))
+		, m_ownedSelected(selected)
+		, m_externalRef(selected)
+	{
+	}
+
+	ListBox& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	ListBox& onChange(std::function<void(const T&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	ListBox& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		if (m_externalRef)
+			return std::make_unique<ListBoxWrapper<T>>(m_items, m_externalRef->get(), m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ListBoxWrapper<T>>(m_items, std::as_const(m_ownedSelected), m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = kDefaultVisibleRows;
+	T m_ownedSelected{};
+	std::optional<std::reference_wrapper<T>> m_externalRef;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+template <ListBoxValue T>
+ListBox(std::vector<std::string>, T&) -> ListBox<T>;
+
+template <ListBoxValue T>
+ListBox(std::vector<std::string>, const T&) -> ListBox<T>;
+
 // Slider -----------------------------------------------------------
 template <SliderValue T>
 struct Slider : Widget<Slider<T>>

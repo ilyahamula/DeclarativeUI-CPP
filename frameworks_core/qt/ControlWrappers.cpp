@@ -16,6 +16,7 @@
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QProgressBar>
@@ -23,6 +24,7 @@
 #include <QRadioButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStyle>
 #include <QTimeEdit>
 
 // realize() creates the QWidget under the given parent window and connects
@@ -742,3 +744,99 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// ListBoxWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// QListWidget's own sizeHint is a fixed ~256x192 that ignores both the item text
+// and the item count, so it would size the same tree differently from wx and
+// ImGui. This one reports content width and visibleRows of height instead --
+// a virtual override, no Q_OBJECT needed.
+class SizedListWidget : public QListWidget
+{
+public:
+	using QListWidget::QListWidget;
+
+	int visibleRows = 1;
+
+	QSize sizeHint() const override
+	{
+		const int rowHeight = count() > 0 ? sizeHintForRow(0) : fontMetrics().height();
+		const int contentWidth = count() > 0 ? sizeHintForColumn(0) : 0;
+		const int chrome = frameWidth() * 2;
+		return QSize(contentWidth + chrome + style()->pixelMetric(QStyle::PM_ScrollBarExtent),
+			rowHeight * visibleRows + chrome);
+	}
+};
+
+std::vector<int> listWidgetSelection(const QListWidget* list)
+{
+	std::vector<int> indices;
+	for (int i = 0; i < list->count(); ++i)
+	{
+		if (list->item(i)->isSelected())
+			indices.push_back(i);
+	}
+	return indices;
+}
+
+void setListWidgetSelection(QListWidget* list, const std::vector<int>& indices)
+{
+	for (int i = 0; i < list->count(); ++i)
+		list->item(i)->setSelected(std::find(indices.begin(), indices.end(), i) != indices.end());
+}
+
+} // unnamed namespace
+
+template <ListBoxValue T>
+void ListBoxWrapper<T>::realize(void* parentWindow)
+{
+	auto* list = new SizedListWidget(static_cast<QWidget*>(parentWindow));
+	list->visibleRows = m_visibleRows;
+	for (const auto& item : m_items)
+		list->addItem(qstr(item));
+	// ExtendedSelection is Qt's ctrl/shift-click mode; MultiSelection would
+	// toggle on a plain click, which is not what a desktop list does.
+	list->setSelectionMode(kMultiSelect
+		? QAbstractItemView::ExtendedSelection
+		: QAbstractItemView::SingleSelection);
+	setListWidgetSelection(list, indicesFor(m_items, boundValue()));
+	m_nativeWidget = list;
+
+	if (m_externalRef)
+	{
+		auto& value = m_externalRef->get();
+		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
+			[&value, list, items = m_items, cb = std::move(m_onChange),
+				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+				value = valueFor(items, listWidgetSelection(list));
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		bindExternalRefSync(list,
+			[list] { return listWidgetSelection(list); },
+			[&value, items = m_items] { return indicesFor(items, value); },
+			[list](const std::vector<int>& indices) { setListWidgetSelection(list, indices); });
+	}
+	else if (m_onChange)
+	{
+		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
+			[list, items = m_items, cb = std::move(m_onChange)]() {
+				cb(valueFor(items, listWidgetSelection(list)));
+			});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
+			[list, items = m_items, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+				cbw(valueFor(items, listWidgetSelection(list)), nw);
+			});
+	}
+}
+
+template class ListBoxWrapper<int>;
+template class ListBoxWrapper<std::string>;
+template class ListBoxWrapper<std::vector<int>>;
+template class ListBoxWrapper<std::vector<std::string>>;
