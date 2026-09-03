@@ -143,7 +143,7 @@ public:
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
-	const std::string& m_value;
+	std::string m_value;
 };
 
 // ClickableTextWrapper -----------------------------------------------------------
