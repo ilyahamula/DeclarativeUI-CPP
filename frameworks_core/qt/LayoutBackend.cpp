@@ -88,17 +88,30 @@ Rect QtLayoutBackend::toLocal(const Rect& frame) const
 	return { frame.x - scope.originX, frame.y - scope.originY, frame.width, frame.height };
 }
 
-Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
+Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 {
 	ControlWrapper* widget = leaf.widget;
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native widget + connect signals
-		applyDisabled(static_cast<QWidget*>(widget->nativeHandle()), leaf);
-		applyTooltip(static_cast<QWidget*>(widget->nativeHandle()), *widget);
+		// A windowless leaf (Spacer) creates nothing: there is no widget to
+		// carry the disabled state or the tooltip, and none to hang their
+		// polling timers on. Its realize() runs again on the next pass, which
+		// is why creating nothing has to stay idempotent.
+		if (auto* created = static_cast<QWidget*>(widget->nativeHandle()))
+		{
+			applyDisabled(created, leaf);
+			applyTooltip(created, *widget);
+		}
 	}
 
 	auto* window = static_cast<QWidget*>(widget->nativeHandle());
+	// Windowless: the wrapper's own measurement is the whole story. It already
+	// applies the explicit withSize() overrides, so nothing below is missed --
+	// the leaf is pure geometry the engine positions and Qt never draws.
+	if (window == nullptr)
+		return widget->measureContent(c);
+
 	const QSize hint = window->sizeHint();
 	Size size { hint.width(), hint.height() };
 

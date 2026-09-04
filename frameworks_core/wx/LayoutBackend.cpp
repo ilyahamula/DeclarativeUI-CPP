@@ -94,17 +94,30 @@ Rect WxLayoutBackend::toLocal(const Rect& frame) const
 	return { frame.x - scope.originX, frame.y - scope.originY, frame.width, frame.height };
 }
 
-Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
+Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 {
 	ControlWrapper* widget = leaf.widget;
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native control + bind events
-		applyDisabled(static_cast<wxWindow*>(widget->nativeHandle()), leaf);
-		applyTooltip(static_cast<wxWindow*>(widget->nativeHandle()), *widget);
+		// A windowless leaf (Spacer) creates nothing: there is no window to
+		// carry the disabled state or the tooltip, and none to hang their
+		// polling handlers on. Its realize() runs again on the next pass,
+		// which is why creating nothing has to stay idempotent.
+		if (auto* created = static_cast<wxWindow*>(widget->nativeHandle()))
+		{
+			applyDisabled(created, leaf);
+			applyTooltip(created, *widget);
+		}
 	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());
+	// Windowless: the wrapper's own measurement is the whole story. It already
+	// applies the explicit withSize() overrides, so nothing below is missed --
+	// the leaf is pure geometry the engine positions and wx never draws.
+	if (window == nullptr)
+		return widget->measureContent(c);
+
 	const wxSize best = window->GetBestSize();
 	Size size { best.x, best.y };
 

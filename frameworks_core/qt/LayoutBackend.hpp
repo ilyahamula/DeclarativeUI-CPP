@@ -11,7 +11,9 @@ class QWidget;
 // Qt adapter for the layout engine (retained widgets, absolute placement,
 // no QLayout). Leaves are realized (native widget created) on first measure,
 // measured with sizeHint() (plus content floors from QFontMetrics) and
-// placed with setGeometry(). GroupBox
+// placed with setGeometry(). A leaf whose realize() creates no widget is
+// legal: it measures through the wrapper and is never placed, disabled or
+// given a tooltip. GroupBox
 // chrome is a QGroupBox kept behind its sibling content; a TabPanel maps to
 // a QTabWidget whose pages become the parent and coordinate origin of their
 // subtree — widgets are reparented into pages at place time.

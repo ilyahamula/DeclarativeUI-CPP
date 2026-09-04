@@ -11,7 +11,9 @@ class wxWindow;
 // wx adapter for the layout engine (retained widgets, absolute placement,
 // no wxSizer). Leaves are realized (native control created) on first
 // measure, measured with GetBestSize (plus content floors) and placed with
-// SetSize. GroupBox
+// SetSize. A leaf whose realize() creates no window is legal: it measures
+// through the wrapper and is never placed, disabled or given a tooltip.
+// GroupBox
 // chrome is a wxStaticBox kept behind its sibling content; a TabPanel maps
 // to a wxNotebook whose wxPanel pages become the parent and coordinate
 // origin of their subtree — widgets are reparented into pages at place time.
