@@ -3,6 +3,7 @@
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/qt/EngineSession.hpp"
 #include "frameworks_core/qt/LayoutBackend.hpp"
 
 #ifdef USE_LOGGER
@@ -11,13 +12,8 @@
 
 #include <QDialog>
 #include <QGuiApplication>
-#include <QLineEdit>
-#include <QPlainTextEdit>
 #include <QScreen>
-#include <QTimer>
 #include <QWindow>
-
-#include <algorithm>
 
 DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
 {
@@ -52,93 +48,6 @@ protected:
 	}
 };
 
-// Retained engine state for one shown dialog; freed when the dialog is
-// destroyed (mirrors the wx session, T3.3).
-struct EngineSession
-{
-	EngineDialog* dialog = nullptr;
-	std::unique_ptr<QtLayoutBackend> backend;
-	std::unique_ptr<LayoutEngine> engine;
-	std::unique_ptr<LayoutNode> root;
-	bool autoFit = true;
-	bool resizable = false;
-	Size fixedContent { -1, -1 };
-	bool busy = false;
-
-	Size minClient() const
-	{
-		const EdgeInsets margin = root->flags.border();
-		return { root->desired.width + margin.left + margin.right,
-				 root->desired.height + margin.top + margin.bottom };
-	}
-
-	// Window size changed, measures still valid: arrange-only.
-	void rearrange()
-	{
-		if (busy)
-			return;
-		busy = true;
-		engine->render(*root, { dialog->width(), dialog->height() });
-		busy = false;
-	}
-
-	// Content or display metrics changed: full re-measure. Auto-fit windows
-	// follow their content; resizable ones keep the user's size but never
-	// below the new content floor.
-	void relayout()
-	{
-		if (busy)
-			return;
-		busy = true;
-
-		const Size content = engine->resolve(*root, autoFit ? Size { -1, -1 } : fixedContent);
-		if (autoFit && resizable)
-		{
-			const Size floor = minClient();
-			dialog->setMinimumSize(floor.width, floor.height);
-			const int width = std::max(dialog->width(), floor.width);
-			const int height = std::max(dialog->height(), floor.height);
-			if (width != dialog->width() || height != dialog->height())
-				dialog->resize(width, height);
-			engine->render(*root, { width, height });
-		}
-		else if (autoFit)
-		{
-			dialog->setFixedSize(content.width, content.height);
-			engine->render(*root, content);
-		}
-		else
-		{
-			engine->render(*root, { dialog->width(), dialog->height() });
-		}
-
-		busy = false;
-	}
-
-	// AutoGrow text fields re-measure their live content as it changes.
-	void bindAutoGrow(LayoutNode& node)
-	{
-		if (node.isLeaf())
-		{
-			if (!node.flags.autoGrow() || node.widget == nullptr)
-				return;
-			auto* window = static_cast<QWidget*>(node.widget->nativeHandle());
-			auto queueRelayout = [this] {
-				// after the control has applied the edit
-				QTimer::singleShot(0, dialog, [this] { relayout(); });
-			};
-			if (auto* line = qobject_cast<QLineEdit*>(window))
-				QObject::connect(line, &QLineEdit::textChanged, dialog,
-					[queueRelayout](const QString&) { queueRelayout(); });
-			else if (auto* edit = qobject_cast<QPlainTextEdit*>(window))
-				QObject::connect(edit, &QPlainTextEdit::textChanged, dialog, queueRelayout);
-			return;
-		}
-		for (auto& child : node.children)
-			bindAutoGrow(*child);
-	}
-};
-
 } // unnamed namespace
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
@@ -149,7 +58,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	dialog->setAttribute(Qt::WA_DeleteOnClose);
 
 	auto* session = new EngineSession;
-	session->dialog = dialog;
+	session->window = dialog;
 	session->backend = std::make_unique<QtLayoutBackend>(dialog);
 	session->engine = std::make_unique<LayoutEngine>(*session->backend);
 	session->root = std::move(root);
@@ -185,7 +94,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine->render(*session->root, content);
 
 	// invalidation wiring -------------------------------------------------
-	session->bindAutoGrow(*session->root);
+	session->bindInvalidation(*session->root);
 	dialog->onResize = [session] { session->rearrange(); };
 	QObject::connect(dialog, &QObject::destroyed, [session] { delete session; });
 
