@@ -2,6 +2,9 @@
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
+#ifdef __WXOSX__
+#include "frameworks_core/wx/OsxButtonBezel.hpp"
+#endif
 
 #include <wx/notebook.h>
 #include <wx/tooltip.h>
@@ -80,6 +83,17 @@ void applyTooltip(wxWindow* window, const ControlWrapper& widget)
 		push);
 }
 
+#ifdef __WXOSX__
+// The height measure() reported for a button: withSize() when set, else the
+// native best size (buttons carry no content floor). A frame taller than
+// that is the engine stretching the node, not the caller asking for it.
+int buttonMeasuredHeight(const wxWindow* button, const ControlWrapper& widget)
+{
+	const int explicitHeight = widget.explicitSize().height;
+	return explicitHeight > 0 ? explicitHeight : button->GetBestSize().y;
+}
+#endif
+
 } // unnamed namespace
 
 WxLayoutBackend::WxLayoutBackend(wxWindow* host)
@@ -94,17 +108,30 @@ Rect WxLayoutBackend::toLocal(const Rect& frame) const
 	return { frame.x - scope.originX, frame.y - scope.originY, frame.width, frame.height };
 }
 
-Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints&)
+Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 {
 	ControlWrapper* widget = leaf.widget;
 	if (widget->nativeHandle() == nullptr)
 	{
 		widget->realize(m_host); // create the native control + bind events
-		applyDisabled(static_cast<wxWindow*>(widget->nativeHandle()), leaf);
-		applyTooltip(static_cast<wxWindow*>(widget->nativeHandle()), *widget);
+		// A windowless leaf (Spacer) creates nothing: there is no window to
+		// carry the disabled state or the tooltip, and none to hang their
+		// polling handlers on. Its realize() runs again on the next pass,
+		// which is why creating nothing has to stay idempotent.
+		if (auto* created = static_cast<wxWindow*>(widget->nativeHandle()))
+		{
+			applyDisabled(created, leaf);
+			applyTooltip(created, *widget);
+		}
 	}
 
 	auto* window = static_cast<wxWindow*>(widget->nativeHandle());
+	// Windowless: the wrapper's own measurement is the whole story. It already
+	// applies the explicit withSize() overrides, so nothing below is missed --
+	// the leaf is pure geometry the engine positions and wx never draws.
+	if (window == nullptr)
+		return widget->measureContent(c);
+
 	const wxSize best = window->GetBestSize();
 	Size size { best.x, best.y };
 
@@ -146,6 +173,13 @@ void WxLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	if (window->GetParent() != currentParent())
 		window->Reparent(currentParent());
 	const Rect local = toLocal(frame);
+#ifdef __WXOSX__
+	// The rounded Cocoa bezel cannot grow in height; switch before SetSize,
+	// since wx re-derives the frame from the bezel's insets on that call.
+	if (wxDynamicCast(window, wxButton) != nullptr
+		&& local.height > buttonMeasuredHeight(window, *leaf.widget))
+		wxOsxAllowTallButton(window);
+#endif
 	window->SetSize(local.x, local.y, local.width, local.height);
 }
 

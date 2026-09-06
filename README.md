@@ -45,20 +45,32 @@ return Dialog {
 - **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
 - **Dialog sizing policy** — dialogs are not user-resizable by default; opt in with `Dialog::Resizable()`, where the auto-fit size becomes the initial *and minimum* size so content can never be clipped
 - **CRTP widget hierarchy** — `Widget<T>` base with fluent `.withFlags()`, `.withSize()`, `.withPosition()`, `.withStyle()` modifiers
-- **Two-way data binding** — widgets accept either owned values or external references that stay in sync
-- **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()` on supported widgets
+- **Two-way data binding** — how you pass the value decides: `Slider{range, 50}` takes a snapshot, `Slider{range, myValue}` *binds* to your variable and writes edits straight back to it. Two controls sharing one variable stay in step with no callback wiring, and a value changed from anywhere else is picked up live
+- **Selection mode from the bound type** — `ListBox<std::string>` selects one item, `ListBox<std::vector<int>>` selects many; `Table` binds either a row index or a key column. There is no mode flag to keep in step with the value
+- **Disable anything** — `.isDisabled(flag)` on any widget, or on a `VStack`/`GroupBox`/`TabPanel`/`Tab` to grey out its whole subtree. Bind it to a `bool&` and it flips live, without rebuilding the tree
+- **Tooltips** — `.withTooltip("…")` on any leaf widget, either fixed text or bound to a `std::string&` that can change at runtime
+- **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
 
 ## Widget Catalogue
 
-| Category       | Widgets |
-|----------------|---------|
-| Text           | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
-| Input          | `TextCtrl`, `PasswordInput`, `MultiLineTextCtrl` |
-| Numeric        | `SpinBox<T>`, `Slider<T>` |
-| Selection      | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
-| Date & Time    | `DatePicker`, `TimePicker` |
-| Media          | `Image` |
+| Category          | Widgets |
+|-------------------|---------|
+| Text              | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
+| Text input        | `TextCtrl`, `PasswordInput`, `MultiLineTextCtrl` |
+| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
+| Lists & tables    | `ListBox<T>`, `TreeView<T>`, `Table<T>` |
+| Numeric           | `SpinBox<T>`, `Slider<T>` |
+| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
+| Display           | `ProgressBar`, `Separator`, `Image` |
+| Containers        | `VStack` / `HStack`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
+| Top-level         | `Dialog`, `MessageBox` |
+
+`ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
+intrinsic height identically on every backend — the native hints disagree far too much
+for the same tree to lay out the same way otherwise. `TreeView` addresses items by path
+(`"src/engine"`) rather than index; `Table` columns are individually sortable and
+editable, and rows keep their original index so a binding survives sorting.
 
 ---
 

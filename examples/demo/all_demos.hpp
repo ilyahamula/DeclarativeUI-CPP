@@ -4,6 +4,7 @@
 // this one file so adding a demo never touches main_*.cpp.
 
 #include "controls_gallery.hpp"
+#include "text_gallery.hpp"
 #include "selection_gallery.hpp"
 #include "tree_gallery.hpp"
 #include "table_gallery.hpp"

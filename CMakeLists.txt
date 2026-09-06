@@ -64,6 +64,9 @@ if(UI_FRAMEWORK STREQUAL "WX")
     endif()
     target_link_libraries(DeclarativeUI PUBLIC ${WX_TARGET})
     target_compile_definitions(DeclarativeUI PUBLIC USE_WX)
+    if(APPLE)
+        enable_language(OBJCXX) # frameworks_core/wx/OsxButtonBezel.mm
+    endif()
 
 elseif(UI_FRAMEWORK STREQUAL "QT")
     find_package(Qt6 REQUIRED COMPONENTS Widgets)

@@ -331,7 +331,11 @@ private:
 	}
 
 private:
-	const std::string& m_text;
+	// Owned, like every other text widget's: the argument is usually a literal
+	// or a temporary, and this widget is itself a temporary that dies with the
+	// enclosing declarative expression -- so a reference here would dangle long
+	// before the backend realizes or renders the control.
+	std::string m_text;
 };
 
 // ClickableText -----------------------------------------------------------
