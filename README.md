@@ -62,7 +62,7 @@ return Dialog {
 | Lists & tables    | `ListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
-| Display           | `ProgressBar`, `Separator`, `Image` |
+| Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
 | Containers        | `VStack` / `HStack`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `MessageBox` |

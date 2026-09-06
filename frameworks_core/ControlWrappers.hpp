@@ -512,13 +512,17 @@ private:
 class SeparatorWrapper : public ControlWrapper
 {
 public:
-	SeparatorWrapper(
+	SeparatorWrapper(Orientation orient,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
+		, m_orient(orient)
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	Orientation m_orient;
 };
 
 // ProgressBarWrapper -----------------------------------------------------------

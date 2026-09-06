@@ -1,6 +1,6 @@
 #pragma once
 
-// Layout primitives: the gallery dialog for Spacer.
+// Layout primitives: the gallery dialog for Spacer and Separator.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // layout primitives land here instead, alongside a few already-implemented
@@ -21,6 +21,17 @@
 //
 // This replaces the StaticText{""} hack the other galleries used to open their
 // button rows with; every one of them now says Spacer{}.
+//
+// A Separator takes an Orientation. It measures a hairline on its own axis and
+// nothing on the other, so the cross-axis default (Start, for a leaf) would draw
+// a line of zero length -- which is why every divider below adds Expand(). That
+// is what makes a horizontal one run the width of its column and a vertical one
+// the height of its row.
+//
+// The hairline's thickness is the native one, and the three disagree: 1 px on
+// ImGui, 2 on wx, 3 on Qt. The dividers below therefore pin it with withSize(),
+// the same discipline the other galleries use on every leaf, so the frames come
+// out identical on all three backends.
 
 #include "declarative_ui.hpp"
 
@@ -74,10 +85,13 @@ inline auto drawLayoutPrimitivesUI(bool& rowsDisabled)
                         .isDisabled(rowsDisabled)
                 }
             },
-            // No Separator between the two boxes yet: ImGui::Separator() spans
-            // the window instead of the engine frame, so one here trips the
-            // drift guard. T1.2 gives the separator an orientation and a
-            // frame-bound draw, and brings its rows into this file.
+            // The native hairline differs per backend (1 px on ImGui, 2 on wx,
+            // 3 on Qt), so it is pinned here the way the galleries pin every
+            // other leaf -- otherwise the rows below it would sit 1-2 px apart
+            // across the three builds.
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
             VGroupBox { "Fixed spacer",
                 LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
                 StaticText{"A fixed gap does not flex; the row stays left-packed:"}
@@ -106,6 +120,35 @@ inline auto drawLayoutPrimitivesUI(bool& rowsDisabled)
                 Spacer{24},
                 CheckBox{rowsDisabled, "Disable the buttons above"}
                     .withSize({-1, kRowH})
+            },
+            VGroupBox { "Vertical divider",
+                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                HStack {
+                    LayoutFlags().Expand(),
+                    VStack {
+                        LayoutFlags().Proportion(1).Expand(),
+                        StaticText{"Left column"}
+                            .withSize({-1, kLabelH}),
+                        Button{"One"}
+                            .withSize(kButtonSize)
+                            .withFlags(LayoutFlags().Border(Side::Top, 6))
+                            .isDisabled(rowsDisabled)
+                    },
+                    // Expand() is what gives the line its length: without it the
+                    // leaf's Start cross-alignment would leave it 0 px tall.
+                    Separator{Orientation::Vertical}
+                        .withSize({1, -1})
+                        .withFlags(LayoutFlags().Expand().Border(Side::Left, 14).Border(Side::Right, 14)),
+                    VStack {
+                        LayoutFlags().Proportion(1).Expand(),
+                        StaticText{"Right column"}
+                            .withSize({-1, kLabelH}),
+                        Button{"Two"}
+                            .withSize(kButtonSize)
+                            .withFlags(LayoutFlags().Border(Side::Top, 6))
+                            .isDisabled(rowsDisabled)
+                    }
+                }
             },
             HStack {
                 LayoutFlags().Border(Side::Top, 10),

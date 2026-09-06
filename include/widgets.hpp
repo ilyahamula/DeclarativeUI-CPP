@@ -1390,11 +1390,19 @@ private:
 };
 
 // Separator -----------------------------------------------------------
+// A hairline divider. It measures thin on its own axis and nothing on the other,
+// so a divider that should span its parent asks for it: the cross-axis default
+// for a leaf is Start, and `.withFlags(LayoutFlags().Expand())` is what makes the
+// line run the width of a column or the height of a row.
 struct Separator : Widget<Separator>
 {
 	using super = Widget<Separator>;
 
-	Separator() : super() {}
+	explicit Separator(Orientation orient = Orientation::Horizontal)
+		: super()
+		, m_orient(orient)
+	{
+	}
 
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
@@ -1402,8 +1410,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SeparatorWrapper>(pos, size, style);
+		return std::make_unique<SeparatorWrapper>(m_orient, pos, size, style);
 	}
+
+private:
+	Orientation m_orient;
 };
 
 // ProgressBar -----------------------------------------------------------

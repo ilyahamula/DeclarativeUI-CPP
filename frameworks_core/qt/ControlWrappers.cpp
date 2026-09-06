@@ -653,7 +653,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 void SeparatorWrapper::realize(void* parentWindow)
 {
 	auto* line = new QFrame(static_cast<QWidget*>(parentWindow));
-	line->setFrameShape(QFrame::HLine);
+	line->setFrameShape(m_orient == Orientation::Vertical ? QFrame::VLine : QFrame::HLine);
 	line->setFrameShadow(QFrame::Sunken);
 	m_nativeWidget = line;
 

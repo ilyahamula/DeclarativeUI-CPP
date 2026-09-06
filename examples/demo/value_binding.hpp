@@ -331,7 +331,8 @@ inline auto drawGroupDisabledByCheckBox(int& value, bool& disabled)
     };
 }
 
-// Spacer under a bound isDisabled(). A Spacer carries no value of its own, so
+// Spacer and vertical Separator under a bound isDisabled(). Neither carries a
+// value of its own, so
 // there is nothing to share by reference the way the dialogs above do -- the
 // bindable half of it is the disable flag, and even that it only ever inherits:
 // a windowless leaf has nothing to grey out, and never asks for the flag.
@@ -355,6 +356,13 @@ inline auto drawSpacerDisableBinding(std::string& caption, bool& disabled)
                 TextCtrl{caption}
                     .withSize({150, 26})
                     .withFlags(LayoutFlags().CenterVertical()),
+                Spacer{},
+                // A vertical Separator between them: like the Spacer it carries
+                // no value of its own, and like every leaf it inherits the group
+                // box's bound disable flag rather than naming it.
+                Separator{Orientation::Vertical}
+                    .withSize({1, -1})
+                    .withFlags(LayoutFlags().Expand()),
                 Spacer{},
                 TextCtrl{caption}
                     .withSize({150, 26})

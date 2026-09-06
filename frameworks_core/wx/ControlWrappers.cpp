@@ -678,8 +678,9 @@ void SeparatorWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("SeparatorWrapper::realize()\t-> new wxStaticLine()\n");
 #endif
+	const long orientStyle = m_orient == Orientation::Vertical ? wxLI_VERTICAL : wxLI_HORIZONTAL;
 	m_nativeWidget = new wxStaticLine(static_cast<wxWindow*>(parentWindow), wxID_ANY,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxLI_HORIZONTAL);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | orientStyle);
 
 }
 

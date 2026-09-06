@@ -1181,13 +1181,38 @@ void SpacerWrapper::render(const Rect& frame)
 
 Size SeparatorWrapper::measureIntrinsic(const Constraints&)
 {
-	// a hairline; spans when stretched/expanded
-	return Size { 0, 1 };
+	// a hairline on its own axis and nothing on the other; spans when the caller
+	// adds Expand(), exactly as it does on wx and Qt
+	return m_orient == Orientation::Vertical ? Size { 1, 0 } : Size { 0, 1 };
 }
 
-void SeparatorWrapper::render(const Rect&)
+void SeparatorWrapper::render(const Rect& frame)
 {
-	ImGui::Separator();
+	// ImGui::Separator() draws across the whole window and ignores the frame it
+	// was given -- in a narrow column that overruns the engine's rectangle and
+	// trips the drift guard. The line is therefore drawn by hand, inside the
+	// frame, and a Dummy of the same size gives the leaf the item rect the
+	// guard (and hover) reads. place() has already put the cursor at the frame's
+	// top-left, so the cursor's screen position is the frame's origin.
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+	const float width = (float)std::max(frame.width, 0);
+	const float height = (float)std::max(frame.height, 0);
+	const ImU32 color = ImGui::GetColorU32(ImGuiCol_Separator);
+
+	if (m_orient == Orientation::Vertical)
+	{
+		const float x = origin.x + width * 0.5f;
+		ImGui::GetWindowDrawList()->AddLine(
+			ImVec2(x, origin.y), ImVec2(x, origin.y + height), color);
+	}
+	else
+	{
+		const float y = origin.y + height * 0.5f;
+		ImGui::GetWindowDrawList()->AddLine(
+			ImVec2(origin.x, y), ImVec2(origin.x + width, y), color);
+	}
+
+	ImGui::Dummy(ImVec2(width, height));
 }
 
 // ProgressBarWrapper -----------------------------------------------------------
