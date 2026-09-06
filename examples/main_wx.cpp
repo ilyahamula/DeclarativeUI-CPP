@@ -11,7 +11,8 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
-        drawTextUI(m_editableText, m_fieldsDisabled).show();
+        //drawTextUI(m_editableText, m_fieldsDisabled).show();
+        drawAlignmentProbe().show();
         return true;
     }
 };

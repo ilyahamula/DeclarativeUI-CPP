@@ -2,6 +2,9 @@
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
+#ifdef __WXOSX__
+#include "frameworks_core/wx/OsxButtonBezel.hpp"
+#endif
 
 #include <wx/notebook.h>
 #include <wx/tooltip.h>
@@ -79,6 +82,17 @@ void applyTooltip(wxWindow* window, const ControlWrapper& widget)
 		[bound] { return *bound; },
 		push);
 }
+
+#ifdef __WXOSX__
+// The height measure() reported for a button: withSize() when set, else the
+// native best size (buttons carry no content floor). A frame taller than
+// that is the engine stretching the node, not the caller asking for it.
+int buttonMeasuredHeight(const wxWindow* button, const ControlWrapper& widget)
+{
+	const int explicitHeight = widget.explicitSize().height;
+	return explicitHeight > 0 ? explicitHeight : button->GetBestSize().y;
+}
+#endif
 
 } // unnamed namespace
 
@@ -159,6 +173,13 @@ void WxLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	if (window->GetParent() != currentParent())
 		window->Reparent(currentParent());
 	const Rect local = toLocal(frame);
+#ifdef __WXOSX__
+	// The rounded Cocoa bezel cannot grow in height; switch before SetSize,
+	// since wx re-derives the frame from the bezel's insets on that call.
+	if (wxDynamicCast(window, wxButton) != nullptr
+		&& local.height > buttonMeasuredHeight(window, *leaf.widget))
+		wxOsxAllowTallButton(window);
+#endif
 	window->SetSize(local.x, local.y, local.width, local.height);
 }
 
