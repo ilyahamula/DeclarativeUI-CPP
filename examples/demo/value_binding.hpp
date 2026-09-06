@@ -330,3 +330,47 @@ inline auto drawGroupDisabledByCheckBox(int& value, bool& disabled)
         }
     };
 }
+
+// Spacer under a bound isDisabled(). A Spacer carries no value of its own, so
+// there is nothing to share by reference the way the dialogs above do -- the
+// bindable half of it is the disable flag, and even that it only ever inherits:
+// a windowless leaf has nothing to grey out, and never asks for the flag.
+//
+// So the binding on show is one bool doing three jobs around the spacers: it is
+// the CheckBox's own value, it disables the group box the flexible Spacer{}
+// pushes apart, and it disables the Button in the fixed row. Tick the box and
+// every one of them follows at once, while the gaps stay exactly where the
+// engine put them -- which is the point: geometry is not state.
+inline auto drawSpacerDisableBinding(std::string& caption, bool& disabled)
+{
+    return Dialog {
+        "Spacer in a bound row",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HGroupBox { "Pushed apart by one Spacer{}",
+                LayoutFlags().Expand().MinSize({380, -1}),
+                // Both fields are bound to the same string, so the spacer sits
+                // between two controls that already mirror each other: editing
+                // either one leaves the gap untouched.
+                TextCtrl{caption}
+                    .withSize({150, 26})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Spacer{},
+                TextCtrl{caption}
+                    .withSize({150, 26})
+                    .withFlags(LayoutFlags().CenterVertical())
+            }
+            .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 12),
+                CheckBox{disabled, "Lock the row"}
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Spacer{},
+                Button{"Reset"}
+                    .withSize({90, 28})
+                    .isDisabled(disabled)
+                    .onClick([&caption]() { caption = "shared"; })
+            }
+        }
+    };
+}

@@ -72,8 +72,7 @@ inline auto drawSelectionUI(
             },
             HStack {
                 LayoutFlags().Border(Side::Top, 8),
-                StaticText{""}
-                    .withFlags(LayoutFlags().Proportion(1)),
+                Spacer{},
                 Button{"Close"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())

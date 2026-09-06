@@ -102,8 +102,7 @@ inline auto drawHeaderBodyFooter()
             },
             HStack {
                 LayoutFlags().Border(Side::Top, 8),
-                StaticText{""}
-                    .withFlags(LayoutFlags().Proportion(1)),
+                Spacer{},
                 Button{"Cancel"}.withSize({100, 28}),
                 Button{"OK"}
                     .withSize({100, 28})
@@ -133,7 +132,7 @@ inline auto drawNestedSplit()
                     LayoutFlags().MinSize({240, 56}).Expand(),
                     Button{"A"}.withSize({48, 26}),
                     Button{"B"}.withSize({48, 26}).withFlags(LayoutFlags().Border(Side::Left, 6)),
-                    StaticText{""}.withFlags(LayoutFlags().Proportion(1))
+                    Spacer{}
                 },
                 VGroupBox { "Canvas (stretch both ways)",
                     LayoutFlags().Proportion(1).Expand().Border(Side::Top, 8),

@@ -6,12 +6,14 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Text gallery state: locals of main, so the bound refs outlive the
-    // modeless dialog that reads them for the whole of exec().
-    std::string editableText = "Type here -- this one is editable.";
-    bool fieldsDisabled = false;
+    // Spacer demo state: locals of main, so the bound refs outlive the
+    // modeless dialogs that read them for the whole of exec().
+    bool rowsDisabled = false;
+    std::string caption = "shared";
+    bool rowLocked = false;
 
-    drawTextUI(editableText, fieldsDisabled).show();
+    drawLayoutPrimitivesUI(rowsDisabled).show();
+    drawSpacerDisableBinding(caption, rowLocked).show();
 
     return app.exec();
 }

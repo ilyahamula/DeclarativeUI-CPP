@@ -3,16 +3,17 @@
 
 class DeclarativeApp : public wxApp
 {
-    // Text gallery state: members, so the bound refs outlive the modeless
-    // dialog that reads them.
-    std::string m_editableText = "Type here -- this one is editable.";
-    bool m_fieldsDisabled = false;
+    // Spacer demo state: members, so the bound refs outlive the modeless
+    // dialogs that read them.
+    bool m_rowsDisabled = false;
+    std::string m_caption = "shared";
+    bool m_rowLocked = false;
 
 public:
     bool OnInit() override
     {
-        //drawTextUI(m_editableText, m_fieldsDisabled).show();
-        drawAlignmentProbe().show();
+        drawLayoutPrimitivesUI(m_rowsDisabled).show();
+        drawSpacerDisableBinding(m_caption, m_rowLocked).show();
         return true;
     }
 };

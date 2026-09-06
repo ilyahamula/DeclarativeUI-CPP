@@ -10,6 +10,7 @@
 static_assert(NodeBuildable<Button>);
 static_assert(NodeBuildable<TextCtrl>);
 static_assert(NodeBuildable<StaticText>);
+static_assert(NodeBuildable<Spacer>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
 static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);

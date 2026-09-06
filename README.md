@@ -63,6 +63,7 @@ return Dialog {
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator`, `Image` |
+| Layout            | `Spacer` |
 | Containers        | `VStack` / `HStack`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `MessageBox` |
 

@@ -14,14 +14,16 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Text gallery state. Bound by reference, so it has to outlive the frame
+    // Spacer demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string editableText = "Type here -- this one is editable.";
-    bool fieldsDisabled = false;
+    bool rowsDisabled = false;
+    std::string caption = "shared";
+    bool rowLocked = false;
 
     runImGuiApp([&]
     {
-        drawTextUI(editableText, fieldsDisabled).show();
+        drawLayoutPrimitivesUI(rowsDisabled).show();
+        drawSpacerDisableBinding(caption, rowLocked).show();
     });
 
     return 0;

@@ -475,6 +475,39 @@ private:
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
 
+// SpacerWrapper -----------------------------------------------------------
+// The one windowless leaf: it creates nothing on any backend, so it declares no
+// realize() (the base's no-op is exactly right, and the retained backends fall
+// back to measureContent() while the native handle stays null) and it overrides
+// measureIntrinsic() for every backend rather than through
+// DECLARE_CONTROL_WRAPPER_OVERRIDES, whose ImGui half would leave wx and Qt
+// measuring the base's {0, 0}. Its extent is pure data, so one body serves all
+// three.
+class SpacerWrapper : public ControlWrapper
+{
+public:
+	SpacerWrapper(const Size& fixedSize,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_fixedSize(fixedSize)
+	{
+	}
+
+	// {0, 0} for a flexible spacer: its extent comes from the Proportion the
+	// widget defaults to, never from content.
+	Size measureIntrinsic(const Constraints&) override
+	{
+		return m_fixedSize;
+	}
+
+#ifdef USE_IMGUI
+	void render(const Rect& frame) override;
+#endif
+
+private:
+	Size m_fixedSize;
+};
+
 // SeparatorWrapper -----------------------------------------------------------
 class SeparatorWrapper : public ControlWrapper
 {

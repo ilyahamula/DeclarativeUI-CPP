@@ -1167,6 +1167,16 @@ void ColorPickerWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
+// SpacerWrapper -----------------------------------------------------------
+
+void SpacerWrapper::render(const Rect& frame)
+{
+	// Nothing is drawn, but an item of exactly the engine frame still has to be
+	// emitted: it keeps the group EndGroup() reads non-empty, so the leaf's
+	// item rect stays the frame the drift guard compares against.
+	ImGui::Dummy(ImVec2((float)std::max(frame.width, 0), (float)std::max(frame.height, 0)));
+}
+
 // SeparatorWrapper -----------------------------------------------------------
 
 Size SeparatorWrapper::measureIntrinsic(const Constraints&)

@@ -32,7 +32,7 @@ struct Widget
 		// a temporary that dies with the enclosing declarative expression.
 		wrapper->setDisabled(m_disabled);
 		wrapper->setTooltip(m_tooltip);
-		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(LayoutFlags{}));
+		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(defaultFlags()));
 
 		if (m_postCreateCallback)
 			m_postCreateCallback();
@@ -119,6 +119,14 @@ private:
 		const Position& pos,
 		const Size& size,
 		long style) = 0;
+
+	// The flags a node gets when the caller set none. Nearly every widget sits
+	// at its desired size; a widget that is pure geometry (Spacer) flexes
+	// instead, and says so here rather than making every caller repeat it.
+	virtual LayoutFlags defaultFlags() const
+	{
+		return LayoutFlags{};
+	}
 
 private: // callbacks
 	std::function<void()> m_preCreateCallback;
@@ -1328,6 +1336,57 @@ private:
 	BoundValue<Color> m_value;
 	std::function<void(const Color&)> m_onChange;
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+};
+
+// Spacer -----------------------------------------------------------
+// Pure geometry: no native window on any backend and nothing drawn, only a
+// rectangle the engine hands out. Default-constructed it is flexible -- it
+// measures {0, 0} and carries Proportion(1), so it swallows the parent's
+// leftover and pushes the siblings on either side of it apart. Given an extent
+// it is a fixed gap instead.
+struct Spacer : Widget<Spacer>
+{
+	using super = Widget<Spacer>;
+
+	Spacer() : super() {}
+
+	// A fixed gap of `px` on BOTH axes -- a widget cannot know which way its
+	// parent runs. The parent spends the main one; the cross one still asks the
+	// container for that much band, so Spacer{Size{px, 0}} is the spelling for a
+	// gap that leaves a row's height alone.
+	explicit Spacer(int px)
+		: super()
+		, m_fixedSize { px, px }
+	{
+	}
+
+	explicit Spacer(const Size& size)
+		: super()
+		, m_fixedSize(size)
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<SpacerWrapper>(m_fixedSize, pos, size, style);
+	}
+
+	// Flexible only while it has no extent of its own -- a fixed gap that also
+	// took the parent's leftover would not stay the size it was asked for.
+	// withFlags() replaces this outright, which is how a fixed spacer opts back
+	// into flexing.
+	LayoutFlags defaultFlags() const override
+	{
+		const bool flexible = m_fixedSize.width <= 0 && m_fixedSize.height <= 0;
+		return flexible ? LayoutFlags().Proportion(1) : LayoutFlags{};
+	}
+
+private:
+	Size m_fixedSize { 0, 0 };
 };
 
 // Separator -----------------------------------------------------------
