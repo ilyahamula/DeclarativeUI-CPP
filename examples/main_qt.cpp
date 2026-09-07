@@ -6,14 +6,17 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Spacer demo state: locals of main, so the bound refs outlive the
+    // Grid demo state: locals of main, so the bound refs outlive the
     // modeless dialogs that read them for the whole of exec().
-    bool rowsDisabled = false;
-    std::string caption = "shared";
-    bool rowLocked = false;
+    std::string name = "Ada Lovelace";
+    std::string email = "ada@example.com";
+    std::string password = "secret";
+    bool formDisabled = false;
+    std::string shared = "shared";
+    bool gridDisabled = false;
 
-    drawLayoutPrimitivesUI(rowsDisabled).show();
-    drawSpacerDisableBinding(caption, rowLocked).show();
+    drawAccountFormUI(name, email, password, formDisabled).show();
+    drawGridMirror(shared, gridDisabled).show();
 
     return app.exec();
 }

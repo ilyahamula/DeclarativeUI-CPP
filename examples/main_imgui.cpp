@@ -14,16 +14,19 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Spacer demo state. Bound by reference, so it has to outlive the frame
+    // Grid demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
-    bool rowsDisabled = false;
-    std::string caption = "shared";
-    bool rowLocked = false;
+    std::string name = "Ada Lovelace";
+    std::string email = "ada@example.com";
+    std::string password = "secret";
+    bool formDisabled = false;
+    std::string shared = "shared";
+    bool gridDisabled = false;
 
     runImGuiApp([&]
     {
-        drawLayoutPrimitivesUI(rowsDisabled).show();
-        drawSpacerDisableBinding(caption, rowLocked).show();
+        drawAccountFormUI(name, email, password, formDisabled).show();
+        drawGridMirror(shared, gridDisabled).show();
     });
 
     return 0;

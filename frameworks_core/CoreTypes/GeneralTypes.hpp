@@ -75,6 +75,7 @@ enum class NodeKind
     Box,
     GroupBox,
     TabPanel,
+    Grid,
     Leaf
 };
 

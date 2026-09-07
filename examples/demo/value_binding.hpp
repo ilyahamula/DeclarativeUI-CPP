@@ -382,3 +382,53 @@ inline auto drawSpacerDisableBinding(std::string& caption, bool& disabled)
         }
     };
 }
+
+// A Grid of TextCtrls over one string. Every field in column 1 is bound to the
+// same std::string, so typing in any one of them moves all the others -- the
+// same shared-ref sync as drawTextMirror, but arranged as a form so the labels
+// and fields line up in two bands rather than three independent rows.
+//
+// The Grid itself is bound to isDisabled(), which cascades to all six cells;
+// none of them names the flag. Note the CheckBox lives OUTSIDE the grid, or
+// locking the form would lock the control that unlocks it.
+inline auto drawGridMirror(std::string& shared, bool& disabled)
+{
+    constexpr int kLabelH = 22;
+    constexpr int kFieldH = 26;
+
+    return Dialog {
+        "Grid of fields (shared string)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"All three fields are bound to one std::string:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            Grid { 2, LayoutFlags().Expand().MinSize({420, -1}),
+                StaticText{"First:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand()),
+
+                StaticText{"Second:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand()),
+
+                StaticText{"Third:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand())
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock the grid"}
+                .withSize({-1, kFieldH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}

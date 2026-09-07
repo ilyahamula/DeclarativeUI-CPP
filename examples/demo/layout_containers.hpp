@@ -1,6 +1,6 @@
 #pragma once
 
-// Layout primitives: the gallery dialog for Spacer and Separator.
+// Layout primitives: the gallery dialogs for Spacer, Separator and Grid.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // layout primitives land here instead, alongside a few already-implemented
@@ -156,6 +156,94 @@ inline auto drawLayoutPrimitivesUI(bool& rowsDisabled)
                 Button{"Close"}
                     .withSize(kCloseSize)
                     .withFlags(LayoutFlags().CenterVertical())
+                    .onClick([]() {})
+            }
+        }
+    };
+}
+
+// The Account form: the gallery dialog for Grid.
+//
+// Three columns, three rows, nine cells in declaration order -- no HStack per
+// row and no SizeGroup per column. The labels line up because column 0 IS one
+// band sized to the widest of them, and the fields line up for the same reason;
+// change "E-mail:" to something longer and every field moves together.
+//
+// Column 1 carries Proportion(1) on its fields, so it takes all the spare width
+// when the dialog is wider than the form needs. Note that a Proportion weights
+// both bands its cell sits in -- the column and the row -- so the fields here
+// deliberately do not add Expand() on rows that should keep their height.
+//
+// The labels are CenterVertical() so they sit against the middle of the taller
+// field beside them; a cell's alignment resolves per axis, exactly as it does
+// on a Stack's cross axis.
+inline auto drawAccountFormUI(
+    std::string& name,
+    std::string& email,
+    std::string& password,
+    bool& formDisabled)
+{
+    constexpr int kLabelH = 22;
+    constexpr int kFieldH = 26;
+    constexpr Size kSideButton { 90, 26 };
+    constexpr Size kFootButton { 100, 28 };
+
+    return Dialog {
+        "Account",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            Grid { 3, LayoutFlags().Expand().MinSize({520, -1}),
+                StaticText{"Name:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{name}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand())
+                    .isDisabled(formDisabled),
+                Button{"Check"}
+                    .withSize(kSideButton)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(formDisabled),
+
+                StaticText{"E-mail:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{email}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand())
+                    .isDisabled(formDisabled),
+                Button{"Verify"}
+                    .withSize(kSideButton)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(formDisabled),
+
+                StaticText{"Password:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                PasswordInput{password}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand())
+                    .isDisabled(formDisabled),
+                Button{"Show"}
+                    .withSize(kSideButton)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(formDisabled)
+            },
+            CheckBox{formDisabled, "Lock the form"}
+                .withSize({-1, kFieldH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
+                Spacer{},
+                Button{"OK"}
+                    .withSize(kFootButton)
+                    .onClick([]() {}),
+                Button{"Cancel"}
+                    .withSize(kFootButton)
+                    .withFlags(LayoutFlags().Border(Side::Left, 8))
                     .onClick([]() {})
             }
         }

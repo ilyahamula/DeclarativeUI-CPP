@@ -41,6 +41,7 @@ struct Golden
 {
 	int labelTag = 0, inputTag = 0, spacerTag = 0, btn1Tag = 0, btn2Tag = 0;
 	int aTag = 0, bTag = 0, p1Tag = 0, p2Tag = 0;
+	int gl1Tag = 0, gf1Tag = 0, gl2Tag = 0, gf2Tag = 0;
 
 	MockLayoutBackend mock;
 	LayoutEngine engine { mock };
@@ -59,6 +60,11 @@ struct Golden
 	LayoutNode* spacer = nullptr;
 	LayoutNode* btn1 = nullptr;
 	LayoutNode* btn2 = nullptr;
+	LayoutNode* form = nullptr;
+	LayoutNode* formLabel1 = nullptr;
+	LayoutNode* formField1 = nullptr;
+	LayoutNode* formLabel2 = nullptr;
+	LayoutNode* formField2 = nullptr;
 	Size window { 0, 0 };
 
 	ControlWrapper* fake(int& tag) { return reinterpret_cast<ControlWrapper*>(&tag); }
@@ -74,6 +80,11 @@ struct Golden
 		mock.setSize(fake(bTag), p.contentB);
 		mock.setSize(fake(p1Tag), p.contentA);
 		mock.setSize(fake(p2Tag), p.contentA);
+		// the grid's first column is driven by the WIDER of the two labels
+		mock.setSize(fake(gl1Tag), p.label);
+		mock.setSize(fake(gf1Tag), p.input);
+		mock.setSize(fake(gl2Tag), Size { p.label.width * 2, p.label.height });
+		mock.setSize(fake(gf2Tag), p.input);
 		mock.chromeFn = [p](const LayoutNode& node) -> EdgeInsets {
 			if (node.kind == NodeKind::GroupBox)
 				return p.groupChrome;
@@ -101,6 +112,13 @@ struct Golden
 		page2 = &tabs->add(makeBox(Orientation::Vertical));
 		page2->label = "About";
 		page2->add(makeLeaf(fake(p2Tag)));
+
+		// a 2-column form: labels in column 0, Proportion(1) fields in column 1
+		form = &root->add(makeGrid(2));
+		formLabel1 = &form->add(makeLeaf(fake(gl1Tag), LayoutFlags().CenterVertical()));
+		formField1 = &form->add(makeLeaf(fake(gf1Tag), LayoutFlags().Proportion(1).Expand()));
+		formLabel2 = &form->add(makeLeaf(fake(gl2Tag), LayoutFlags().CenterVertical()));
+		formField2 = &form->add(makeLeaf(fake(gf2Tag), LayoutFlags().Expand()));
 
 		buttons = &root->add(makeBox(Orientation::Horizontal));
 		spacer = &buttons->add(makeLeaf(fake(spacerTag), LayoutFlags().Proportion(1)));
@@ -131,6 +149,7 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(g.tabs->frame.width, band);
 	CHECK_EQ(g.row->frame.width, band);
 	CHECK_EQ(g.buttons->frame.width, band);
+	CHECK_EQ(g.form->frame.width, band);
 	// ...and the band is driven by the widest content (box B) plus chrome
 	CHECK_EQ(band, p.contentB.width + p.groupChrome.left + p.groupChrome.right);
 
@@ -156,6 +175,20 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(rightEdge(*g.btn2), rightEdge(*g.buttons));
 	CHECK_EQ(g.btn2->frame.x, rightEdge(*g.btn1) + 8); // explicit border gap
 
+	// grid form: the two rows share one column line, so the fields start at the
+	// same x however wide each label is; the Proportion(1) column absorbs the
+	// leftover out to the grid's right edge; the shorter label is centred in the
+	// column band while its row keeps the taller label's height
+	CHECK_EQ(g.formField1->frame.x, g.formField2->frame.x);
+	CHECK_EQ(g.formLabel1->frame.x, g.formLabel2->frame.x);
+	CHECK_EQ(rightEdge(*g.formField1), rightEdge(*g.form));
+	CHECK_EQ(rightEdge(*g.formField2), rightEdge(*g.form));
+	// column 0 is the widest label; the narrower one keeps its intrinsic width
+	CHECK_EQ(g.formLabel1->frame.width, p.label.width);
+	CHECK_EQ(g.formLabel2->frame.width, p.label.width * 2);
+	CHECK_EQ(g.formField1->frame.x - g.form->frame.x,
+		p.label.width * 2 + 8); // widest label + kDefaultGap gutter
+
 	// tab pages overlap: both pages get the panel frame inset by the chrome
 	const Rect pageArea {
 		g.tabs->frame.x + p.tabChrome.left,
@@ -171,11 +204,13 @@ void checkGoldenInvariants(const Profile& p)
 	const Rect rowFrame = g.row->frame;
 	const Rect inputFrame = g.input->frame;
 	const Rect boxBFrame = g.boxB->frame;
+	const Rect formFieldFrame = g.formField1->frame;
 	const Size window2 = g.engine.run(*g.root);
 	CHECK(window2 == g.window);
 	CHECK(g.row->frame == rowFrame);
 	CHECK(g.input->frame == inputFrame);
 	CHECK(g.boxB->frame == boxBFrame);
+	CHECK(g.formField1->frame == formFieldFrame);
 }
 
 } // unnamed namespace

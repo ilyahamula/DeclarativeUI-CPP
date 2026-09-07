@@ -4,6 +4,7 @@
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
 #include "frameworks_core/LayoutFlags.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,6 +20,10 @@ struct LayoutNode
 	Orientation orientation = Orientation::Vertical; // for Box/GroupBox
 	LayoutFlags flags;                               // how THIS node sits in its parent
 	std::string label;                               // GroupBox title / Tab title
+	int columns = 0;                                 // Grid only: cells fill rows
+	                                                 // left-to-right, so a cell's
+	                                                 // column is index % columns and
+	                                                 // its row index / columns
 
 	std::vector<std::unique_ptr<LayoutNode>> children;
 	const LayoutNode* parent = nullptr;              // set by add(); disabling walks it
@@ -109,6 +114,17 @@ inline std::unique_ptr<LayoutNode> makeGroupBox(Orientation orient, std::string 
 	node->kind = NodeKind::GroupBox;
 	node->orientation = orient;
 	node->label = std::move(label);
+	node->flags = flags;
+	return node;
+}
+
+// A grid has no chrome and no backend scope -- it is a Box that happens to
+// arrange its children in `columns` columns, so every backend treats it as one.
+inline std::unique_ptr<LayoutNode> makeGrid(int columns, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Grid;
+	node->columns = std::max(1, columns);
 	node->flags = flags;
 	return node;
 }

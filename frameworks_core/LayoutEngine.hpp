@@ -71,8 +71,10 @@ private:
 	static constexpr int kMaxReconcilePasses = 8;
 
 	Size measureBox(LayoutNode& node, const Constraints& c);
+	Size measureGrid(LayoutNode& node, const Constraints& c);
 	Size measureTabPanel(LayoutNode& node, const Constraints& c);
 	void arrangeBox(LayoutNode& node);
+	void arrangeGrid(LayoutNode& node);
 	void arrangeTabPanel(LayoutNode& node);
 	void traverse(LayoutNode& node);
 

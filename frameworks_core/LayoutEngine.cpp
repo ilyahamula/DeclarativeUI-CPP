@@ -161,6 +161,199 @@ Size boxContentExtent(const LayoutNode& node)
 	return horizontal ? Size { main, cross } : Size { cross, main };
 }
 
+// The column/row bands of a grid, derived purely from the children's already
+// filled `desired` -- so arrange can rerun it after the SizeGroup re-sum without
+// touching the backend, exactly as boxContentExtent is rerun for a Box.
+//
+// A cell's Border is BOTH its padding inside its band and the source of the
+// gutter beside it (requirements.md R2.1): the band is the widest cell plus its
+// own margins, and the line between two bands is `max` of the facing margins,
+// falling back to kDefaultGap. That is deliberately more generous than a Box,
+// where a margin only ever becomes the gap -- in a grid, a margin has to hold
+// the cell off its own band edge as well, since neighbouring rows may set
+// different ones.
+struct GridBands
+{
+	std::vector<int> colWidths;
+	std::vector<int> rowHeights;
+	std::vector<int> colGaps;  // colGaps[c] follows column c
+	std::vector<int> rowGaps;  // rowGaps[r] follows row r
+};
+
+int gridColumns(const LayoutNode& node)
+{
+	return std::max(1, node.columns);
+}
+
+int gridRows(const LayoutNode& node)
+{
+	const int cols = gridColumns(node);
+	return ((int)node.children.size() + cols - 1) / cols; // ragged last row allowed
+}
+
+// Cell at (row, col), or nullptr when a ragged last row stops short.
+const LayoutNode* gridCell(const LayoutNode& node, int row, int col)
+{
+	const size_t index = (size_t)row * gridColumns(node) + (size_t)col;
+	return index < node.children.size() ? node.children[index].get() : nullptr;
+}
+
+GridBands gridBands(const LayoutNode& node)
+{
+	const int cols = gridColumns(node);
+	const int rows = gridRows(node);
+
+	GridBands bands;
+	bands.colWidths.assign((size_t)cols, 0);
+	bands.rowHeights.assign((size_t)rows, 0);
+	bands.colGaps.assign((size_t)std::max(0, cols - 1), 0);
+	bands.rowGaps.assign((size_t)std::max(0, rows - 1), 0);
+
+	for (int r = 0; r < rows; ++r)
+	{
+		for (int c = 0; c < cols; ++c)
+		{
+			const LayoutNode* cell = gridCell(node, r, c);
+			if (cell == nullptr)
+				continue;
+			const EdgeInsets margin = cell->flags.border();
+			bands.colWidths[(size_t)c] = std::max(bands.colWidths[(size_t)c],
+				cell->desired.width + margin.left + margin.right);
+			bands.rowHeights[(size_t)r] = std::max(bands.rowHeights[(size_t)r],
+				cell->desired.height + margin.top + margin.bottom);
+		}
+	}
+
+	// One gutter per grid line: the widest facing margin found anywhere along it
+	// wins, so a column line stays straight down the whole grid. The kDefaultGap
+	// fallback is applied ONCE, to that maximum -- folding it in per pair (as
+	// gapBetween does for a Box) would let the default override a deliberately
+	// tighter margin somewhere along the line.
+	const auto lineGap = [](int widestMargin) {
+		return widestMargin > 0 ? widestMargin : LayoutEngine::kDefaultGap;
+	};
+	for (int c = 0; c + 1 < cols; ++c)
+	{
+		int widest = 0;
+		for (int r = 0; r < rows; ++r)
+		{
+			const LayoutNode* left = gridCell(node, r, c);
+			const LayoutNode* right = gridCell(node, r, c + 1);
+			if (left != nullptr && right != nullptr)
+				widest = std::max(widest,
+					std::max(left->flags.border().right, right->flags.border().left));
+		}
+		bands.colGaps[(size_t)c] = lineGap(widest);
+	}
+	for (int r = 0; r + 1 < rows; ++r)
+	{
+		int widest = 0;
+		for (int c = 0; c < cols; ++c)
+		{
+			const LayoutNode* above = gridCell(node, r, c);
+			const LayoutNode* below = gridCell(node, r + 1, c);
+			if (above != nullptr && below != nullptr)
+				widest = std::max(widest,
+					std::max(above->flags.border().bottom, below->flags.border().top));
+		}
+		bands.rowGaps[(size_t)r] = lineGap(widest);
+	}
+	return bands;
+}
+
+int sumOf(const std::vector<int>& values)
+{
+	int total = 0;
+	for (int value : values)
+		total += value;
+	return total;
+}
+
+Size gridContentExtent(const LayoutNode& node)
+{
+	if (node.children.empty())
+		return Size { 0, 0 };
+	const GridBands bands = gridBands(node);
+	return Size {
+		sumOf(bands.colWidths) + sumOf(bands.colGaps),
+		sumOf(bands.rowHeights) + sumOf(bands.rowGaps),
+	};
+}
+
+// Flex weight of each band: the largest Proportion any cell in it asked for.
+// A cell weights the column it sits in and the row it sits in independently,
+// which is what lets one Proportion(1) field widen its whole column.
+std::vector<int> bandWeights(const LayoutNode& node, bool columns)
+{
+	const int cols = gridColumns(node);
+	const int rows = gridRows(node);
+	std::vector<int> weights((size_t)(columns ? cols : rows), 0);
+	for (int r = 0; r < rows; ++r)
+	{
+		for (int c = 0; c < cols; ++c)
+		{
+			const LayoutNode* cell = gridCell(node, r, c);
+			if (cell == nullptr)
+				continue;
+			int& weight = weights[(size_t)(columns ? c : r)];
+			weight = std::max(weight, cell->flags.proportion());
+		}
+	}
+	return weights;
+}
+
+// Positive leftover across weighted bands, exact to the pixel: the last
+// weighted band absorbs the rounding residue, as growProportioned does for a Box.
+void growBands(std::vector<int>& bands, const std::vector<int>& weights, int leftover)
+{
+	int totalWeight = 0;
+	int lastWeighted = -1;
+	for (size_t i = 0; i < weights.size(); ++i)
+	{
+		if (weights[i] > 0)
+		{
+			totalWeight += weights[i];
+			lastWeighted = (int)i;
+		}
+	}
+	if (totalWeight == 0)
+		return; // no cell asked to flex: the grid keeps its measured size
+
+	int given = 0;
+	for (size_t i = 0; i < weights.size(); ++i)
+	{
+		if (weights[i] <= 0)
+			continue;
+		const int share = (int)i == lastWeighted
+			? leftover - given
+			: (int)((long long)leftover * weights[i] / totalWeight);
+		bands[i] += share;
+		given += share;
+	}
+}
+
+// Resolve one axis of a cell inside its band. Stretch fills the band; the rest
+// keep the measured extent and only move within it.
+void applyBandAlign(Align align, int bandOrigin, int bandExtent, int& extent, int& pos)
+{
+	switch (align)
+	{
+	case Align::Stretch:
+		extent = bandExtent;
+		pos = bandOrigin;
+		break;
+	case Align::Center:
+		pos = bandOrigin + (bandExtent - extent) / 2;
+		break;
+	case Align::End:
+		pos = bandOrigin + (bandExtent - extent);
+		break;
+	case Align::Start:
+		pos = bandOrigin;
+		break;
+	}
+}
+
 Size tabPanelContentExtent(const LayoutNode& node)
 {
 	Size desired { 0, 0 };
@@ -176,8 +369,13 @@ Size tabPanelContentExtent(const LayoutNode& node)
 // Content extent plus the container's chrome (filled during measure).
 Size containerExtent(const LayoutNode& node)
 {
-	const Size content = node.kind == NodeKind::TabPanel ? tabPanelContentExtent(node)
-														 : boxContentExtent(node);
+	Size content;
+	switch (node.kind)
+	{
+	case NodeKind::TabPanel: content = tabPanelContentExtent(node); break;
+	case NodeKind::Grid:     content = gridContentExtent(node); break;
+	default:                 content = boxContentExtent(node); break;
+	}
 	return Size {
 		content.width + node.chrome.left + node.chrome.right,
 		content.height + node.chrome.top + node.chrome.bottom,
@@ -261,8 +459,12 @@ Size LayoutEngine::measure(LayoutNode& node, const Constraints& c)
 			std::max(0, c.maxWidth - node.chrome.left - node.chrome.right),
 			std::max(0, c.maxHeight - node.chrome.top - node.chrome.bottom),
 		};
-		node.kind == NodeKind::TabPanel ? measureTabPanel(node, inner)
-										: measureBox(node, inner);
+		switch (node.kind)
+		{
+		case NodeKind::TabPanel: measureTabPanel(node, inner); break;
+		case NodeKind::Grid:     measureGrid(node, inner); break;
+		default:                 measureBox(node, inner); break;
+		}
 		desired = containerExtent(node);
 	}
 
@@ -275,6 +477,16 @@ Size LayoutEngine::measureBox(LayoutNode& node, const Constraints& c)
 	for (const auto& child : node.children)
 		measure(*child, childConstraints(c, *child));
 	return boxContentExtent(node);
+}
+
+Size LayoutEngine::measureGrid(LayoutNode& node, const Constraints& c)
+{
+	// Cells are measured with the grid's own constraints minus their margins,
+	// like a Box's children: a cell does not know its column's width until the
+	// bands below are folded, and nothing here depends on that.
+	for (const auto& child : node.children)
+		measure(*child, childConstraints(c, *child));
+	return gridContentExtent(node);
 }
 
 Size LayoutEngine::measureTabPanel(LayoutNode& node, const Constraints& c)
@@ -297,6 +509,9 @@ void LayoutEngine::arrange(LayoutNode& node, const Rect& area)
 	case NodeKind::Box:
 	case NodeKind::GroupBox:
 		arrangeBox(node);
+		break;
+	case NodeKind::Grid:
+		arrangeGrid(node);
 		break;
 	case NodeKind::TabPanel:
 		arrangeTabPanel(node);
@@ -378,6 +593,78 @@ void LayoutEngine::arrangeBox(LayoutNode& node)
 		arrange(child, childArea);
 
 		cursor += mains[i] + (i + 1 < n ? gaps[i] : 0);
+	}
+}
+
+void LayoutEngine::arrangeGrid(LayoutNode& node)
+{
+	if (node.children.empty())
+		return;
+
+	const Rect area = contentArea(node);
+	const int cols = gridColumns(node);
+	const int rows = gridRows(node);
+	GridBands bands = gridBands(node);
+
+	// Positive leftover goes to bands by the largest Proportion any cell in that
+	// band asked for; a band no cell weighted keeps its measured size. Negative
+	// leftover is not redistributed in v1 -- it overflows and the backend clips,
+	// exactly as a Box's residue does once every floor is spent.
+	const int widthLeftover = area.width - sumOf(bands.colWidths) - sumOf(bands.colGaps);
+	if (widthLeftover > 0)
+		growBands(bands.colWidths, bandWeights(node, true), widthLeftover);
+	const int heightLeftover = area.height - sumOf(bands.rowHeights) - sumOf(bands.rowGaps);
+	if (heightLeftover > 0)
+		growBands(bands.rowHeights, bandWeights(node, false), heightLeftover);
+
+	// Band origins, walked once so every cell in a column shares an x.
+	std::vector<int> colX((size_t)cols, 0);
+	int cursor = area.x;
+	for (int c = 0; c < cols; ++c)
+	{
+		colX[(size_t)c] = cursor;
+		cursor += bands.colWidths[(size_t)c] + (c + 1 < cols ? bands.colGaps[(size_t)c] : 0);
+	}
+	std::vector<int> rowY((size_t)rows, 0);
+	cursor = area.y;
+	for (int r = 0; r < rows; ++r)
+	{
+		rowY[(size_t)r] = cursor;
+		cursor += bands.rowHeights[(size_t)r] + (r + 1 < rows ? bands.rowGaps[(size_t)r] : 0);
+	}
+
+	for (int r = 0; r < rows; ++r)
+	{
+		for (int c = 0; c < cols; ++c)
+		{
+			const size_t index = (size_t)r * (size_t)cols + (size_t)c;
+			if (index >= node.children.size())
+				continue; // ragged last row
+			LayoutNode& cell = *node.children[index];
+
+			// The band minus the cell's own margins is what the cell may use;
+			// both axes then resolve independently through the same crossAlign
+			// rules a Box applies to its cross axis. A row's cross axis is
+			// vertical and a column's is horizontal, which is why the two calls
+			// pass opposite orientations.
+			const EdgeInsets margin = cell.flags.border();
+			const int bandX = colX[(size_t)c] + margin.left;
+			const int bandY = rowY[(size_t)r] + margin.top;
+			const int bandW = std::max(0, bands.colWidths[(size_t)c] - margin.left - margin.right);
+			const int bandH = std::max(0, bands.rowHeights[(size_t)r] - margin.top - margin.bottom);
+
+			const Align hAlign = cell.flags.crossAlign(cell.kind, Orientation::Vertical);
+			const Align vAlign = cell.flags.crossAlign(cell.kind, Orientation::Horizontal);
+
+			int width = cell.desired.width;
+			int x = bandX;
+			applyBandAlign(hAlign, bandX, bandW, width, x);
+			int height = cell.desired.height;
+			int y = bandY;
+			applyBandAlign(vAlign, bandY, bandH, height, y);
+
+			arrange(cell, Rect { x, y, width, height });
+		}
 	}
 }
 
