@@ -863,11 +863,11 @@ extern template class TreeViewWrapper<std::vector<std::string>>;
 //
 // The ROWS are a BoundValue as well as the selection, which is what makes cell
 // editing work: bound, an edit writes through to the caller's data and is what
-// every backend redraws from; unbound, it lands in a snapshot this wrapper owns
-// and only onCellChange observes it. That distinction is invisible on wx and Qt
-// -- their native control retains the edited text either way -- but decides the
-// behaviour on ImGui, where the whole tree is rebuilt every frame and an edit
-// with nowhere caller-owned to live is gone by the next one.
+// every backend redraws from; unbound, it lands in a snapshot and only
+// onCellChange observes it. The edit survives either way on every backend --
+// the native control retains it on wx and Qt, and on ImGui, where the whole
+// tree is rebuilt every frame, an unbound snapshot lives in the per-widget
+// store (frameworks_core/imgui/SnapshotStore.hpp) rather than in this wrapper.
 template <TableValue T>
 class TableWrapper : public ControlWrapper
 {
@@ -1071,8 +1071,8 @@ public:
 	const T& boundValue() const { return m_value.get(); }
 
 	// Non-null only while the rows are bound: the caller-owned table an edit may
-	// write through to. A snapshot reports nullptr -- see the note above on what
-	// that costs on ImGui.
+	// write through to. A snapshot reports nullptr -- an edit still sticks, but
+	// it is the framework's copy that keeps it.
 	TableRows* boundRows() { return m_rows.isBound() ? &m_rows.get() : nullptr; }
 
 private:

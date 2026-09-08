@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include <cstdint>
 #include <unordered_map>
 
 // Per-ImGui-scope sequential ID manager (USE_IMGUI only).
@@ -19,6 +20,19 @@ public:
     // Sequential integer for naming BeginChild windows (GroupBoxes) —
     // unique within the current parent scope (called before BeginChild).
     static int nextGroupBoxId() { return next(s_groupBoxIds); }
+
+    // Key for framework-owned state that has to outlive the frame the way
+    // ImGui's own does (see SnapshotStore.hpp). Built from the same scope seed
+    // as the widget id, so it must be taken in the scope the id was drawn from —
+    // before any PushID() the wrapper makes. `slot` (0..15) separates the
+    // several values of a control that carries more than one.
+    static std::uint64_t stateKey(int widgetId, int slot = 0)
+    {
+        const std::uint64_t scope = ImGui::GetID("__dui_scope__");
+        return (scope << 32)
+            | (static_cast<std::uint32_t>(widgetId) << 4)
+            | static_cast<std::uint32_t>(slot & 0xF);
+    }
 
 private:
     struct ScopeState { int counter = 0; int lastFrame = -1; };
