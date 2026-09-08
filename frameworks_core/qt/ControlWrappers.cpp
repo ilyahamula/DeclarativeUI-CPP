@@ -75,6 +75,10 @@ protected:
 void ButtonWrapper::realize(void* parentWindow)
 {
 	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	// QPushButton is autoDefault inside a QDialog, so the first one built would come
+	// up drawn as the dialog's default button (blue on macOS) and keep that highlight
+	// for the life of the dialog. wx and ImGui highlight nothing, so neither do we.
+	button->setAutoDefault(false);
 	m_nativeWidget = button;
 
 	if (m_onClick)
@@ -544,6 +548,7 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
 	button->setCheckable(true);
 	button->setChecked(toggled);
+	button->setAutoDefault(false);
 	m_nativeWidget = button;
 
 	if (m_value.isBound())
@@ -604,6 +609,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 {
 	const Color initial = m_value.get();
 	auto* button = new QPushButton(static_cast<QWidget*>(parentWindow));
+	button->setAutoDefault(false);
 	auto sheetFor = [](const Color& c) {
 		return QStringLiteral("background-color: rgba(%1,%2,%3,%4);")
 			.arg((int)(c.r * 255)).arg((int)(c.g * 255)).arg((int)(c.b * 255)).arg((int)(c.a * 255));
