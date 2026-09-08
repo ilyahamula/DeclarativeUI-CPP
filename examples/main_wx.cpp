@@ -3,20 +3,17 @@
 
 class DeclarativeApp : public wxApp
 {
-    // Grid demo state: members, so the bound refs outlive the modeless
+    // ScrollPanel demo state: members, so the bound refs outlive the modeless
     // dialogs that read them.
-    std::string m_name = "Ada Lovelace";
-    std::string m_email = "ada@example.com";
-    std::string m_password = "secret";
-    bool m_formDisabled = false;
-    std::string m_shared = "shared";
-    bool m_gridDisabled = false;
+    bool m_optionsDisabled = false;
+    bool m_sharedOption = false;
+    bool m_listDisabled = false;
 
 public:
     bool OnInit() override
     {
-        drawAccountFormUI(m_name, m_email, m_password, m_formDisabled).show();
-        drawGridMirror(m_shared, m_gridDisabled).show();
+        drawScrollPanelUI(m_optionsDisabled).show();
+        drawScrollPanelBinding(m_sharedOption, m_listDisabled).show();
         return true;
     }
 };

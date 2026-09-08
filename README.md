@@ -64,7 +64,7 @@ return Dialog {
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
-| Containers        | `VStack` / `HStack`, `Grid`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
+| Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `MessageBox` |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their

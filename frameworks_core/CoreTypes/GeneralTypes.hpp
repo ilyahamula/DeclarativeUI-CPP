@@ -76,8 +76,29 @@ enum class NodeKind
     GroupBox,
     TabPanel,
     Grid,
+    ScrollPanel,
     Leaf
 };
+
+// Which axes a ScrollPanel scrolls. An axis that scrolls is measured against
+// the viewport cap rather than its content; an axis that does not behaves like
+// a Box's.
+enum class ScrollAxis
+{
+    Vertical,
+    Horizontal,
+    Both
+};
+
+inline bool scrollsHorizontally(ScrollAxis axis)
+{
+    return axis == ScrollAxis::Horizontal || axis == ScrollAxis::Both;
+}
+
+inline bool scrollsVertically(ScrollAxis axis)
+{
+    return axis == ScrollAxis::Vertical || axis == ScrollAxis::Both;
+}
 
 template <SliderValue T>
 struct Range

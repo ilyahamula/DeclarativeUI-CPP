@@ -24,6 +24,7 @@ struct LayoutNode
 	                                                 // left-to-right, so a cell's
 	                                                 // column is index % columns and
 	                                                 // its row index / columns
+	ScrollAxis scroll = ScrollAxis::Vertical;        // ScrollPanel only
 
 	std::vector<std::unique_ptr<LayoutNode>> children;
 	const LayoutNode* parent = nullptr;              // set by add(); disabling walks it
@@ -125,6 +126,18 @@ inline std::unique_ptr<LayoutNode> makeGrid(int columns, LayoutFlags flags = {})
 	auto node = std::make_unique<LayoutNode>();
 	node->kind = NodeKind::Grid;
 	node->columns = std::max(1, columns);
+	node->flags = flags;
+	return node;
+}
+
+// A scroll panel has exactly one content child. The backend turns it into a
+// parent+origin scope with native scrollbars (T1.4b); the engine only decides
+// how big the viewport is and how big a virtual rect the content gets inside it.
+inline std::unique_ptr<LayoutNode> makeScrollPanel(ScrollAxis axis, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::ScrollPanel;
+	node->scroll = axis;
 	node->flags = flags;
 	return node;
 }

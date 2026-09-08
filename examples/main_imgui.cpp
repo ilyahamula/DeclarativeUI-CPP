@@ -14,19 +14,16 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Grid demo state. Bound by reference, so it has to outlive the frame
-    // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string name = "Ada Lovelace";
-    std::string email = "ada@example.com";
-    std::string password = "secret";
-    bool formDisabled = false;
-    std::string shared = "shared";
-    bool gridDisabled = false;
+    // ScrollPanel demo state. Bound by reference, so it has to outlive the
+    // frame loop -- ImGui rebuilds the tree every frame and reads these live.
+    bool optionsDisabled = false;
+    bool sharedOption = false;
+    bool listDisabled = false;
 
     runImGuiApp([&]
     {
-        drawAccountFormUI(name, email, password, formDisabled).show();
-        drawGridMirror(shared, gridDisabled).show();
+        drawScrollPanelUI(optionsDisabled).show();
+        drawScrollPanelBinding(sharedOption, listDisabled).show();
     });
 
     return 0;

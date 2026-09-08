@@ -1,6 +1,7 @@
 #pragma once
 
-// Layout primitives: the gallery dialogs for Spacer, Separator and Grid.
+// Layout primitives: the gallery dialogs for Spacer, Separator, Grid and
+// ScrollPanel.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // layout primitives land here instead, alongside a few already-implemented
@@ -244,6 +245,106 @@ inline auto drawAccountFormUI(
                 Button{"Cancel"}
                     .withSize(kFootButton)
                     .withFlags(LayoutFlags().Border(Side::Left, 8))
+                    .onClick([]() {})
+            }
+        }
+    };
+}
+
+// The scrollable option list: the gallery dialog for ScrollPanel.
+//
+// 600 px of options inside a 240 px viewport. The panel's own height is
+// min(content, MaxSize, LayoutEngine::kDefaultScrollViewport), which is the
+// whole point: the dialog auto-fits to everything EXCEPT the list, and the list
+// scrolls inside whatever is left.
+//
+// The scrollbar gutter is reserved on every backend and reserved always, so the
+// three compute the same content frames and nothing is ever drawn underneath a
+// scrollbar. The second panel scrolls the other way to show that the rules are
+// per axis: a horizontal panel caps its width and leaves its height alone.
+inline auto drawScrollPanelUI(bool& optionsDisabled)
+{
+    constexpr int kRowH = 30;
+    constexpr int kPanelW = 340;
+
+    return Dialog {
+        "Scrollable Options",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"600 px of options in a 240 px viewport (scroll it):"}
+                .withSize({-1, 20}),
+            ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6).MinSize({kPanelW, -1}),
+                VStack {
+                    // MinSize pins the content extent, so the demo really is
+                    // 600 px of content on all three backends however tall each
+                    // one draws a check box.
+                    LayoutFlags().Expand().MinSize({-1, 600}),
+                    CheckBox{false, "Option 1"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 2"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{true, "Option 3"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 4"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 5"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{true, "Option 6"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 7"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 8"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{true, "Option 9"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 10"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{false, "Option 11"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{true, "Option 12"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+                .isDisabled(optionsDisabled)
+            },
+            CheckBox{optionsDisabled, "Disable the whole list"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"A wide row in a horizontal panel: the width caps, the height does not."}
+                .withSize({-1, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6),
+                HStack {
+                    LayoutFlags().Expand(),
+                    Button{"One"}.withSize({120, 28}),
+                    Button{"Two"}.withSize({120, 28}),
+                    Button{"Three"}.withSize({120, 28}),
+                    Button{"Four"}.withSize({120, 28}),
+                    Button{"Five"}.withSize({120, 28}),
+                    Button{"Six"}.withSize({120, 28})
+                }
+            }
+            .withScroll(ScrollAxis::Horizontal),
+            HStack {
+                LayoutFlags().Border(Side::Top, 12),
+                Spacer{},
+                Button{"Close"}
+                    .withSize({110, 28})
+                    .withFlags(LayoutFlags().CenterVertical())
                     .onClick([]() {})
             }
         }

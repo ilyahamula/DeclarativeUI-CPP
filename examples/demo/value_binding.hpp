@@ -432,3 +432,65 @@ inline auto drawGridMirror(std::string& shared, bool& disabled)
         }
     };
 }
+
+// Ten CheckBoxes inside a ScrollPanel, all bound to ONE bool that lives outside
+// it -- and a CheckBox outside the panel bound to the same one. Tick any of
+// them and every other follows, including the ones currently scrolled out of
+// sight: a bound value is polled, not captured at build time, so being off
+// screen changes nothing.
+//
+// That is also the point of the second flag. It disables the panel, and the
+// cascade reaches the whole scrolled subtree -- none of the rows names it.
+inline auto drawScrollPanelBinding(bool& shared, bool& disabled)
+{
+    constexpr int kRowH = 28;
+
+    return Dialog {
+        "Scrolled checkboxes (shared bool)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({360, -1}),
+            CheckBox{shared, "Outside the panel -- bound to the same bool"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            ScrollPanel { LayoutFlags().Expand(),
+                VStack {
+                    LayoutFlags().Expand(),
+                    CheckBox{shared, "Bound copy 1"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 2"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 3"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 4"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 5"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 6"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 7"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 8"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 9"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 10"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock the scrolled list"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

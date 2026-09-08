@@ -354,6 +354,43 @@ void applyBandAlign(Align align, int bandOrigin, int bandExtent, int& extent, in
 	}
 }
 
+// The viewport a scrolling axis is capped to: the caller's MaxSize on that axis
+// when they set a usable one, else the engine default. MaxSize is also applied
+// to the whole node by clampToFlags afterwards -- capping here as well is
+// deliberate and harmless (min is idempotent), and it keeps the rule readable
+// in one place. A non-positive component reads as "not set on this axis", the
+// same convention withSize() uses.
+int scrollViewportCap(const LayoutNode& node, bool horizontal)
+{
+	if (const auto maxSize = node.flags.maxSize())
+	{
+		const int cap = horizontal ? maxSize->width : maxSize->height;
+		if (cap > 0)
+			return cap;
+	}
+	return LayoutEngine::kDefaultScrollViewport;
+}
+
+// A scroll panel is one child plus a decision per axis: a scrolling axis takes
+// the viewport (capped), a non-scrolling one behaves exactly like a Box's.
+Size scrollContentExtent(const LayoutNode& node)
+{
+	if (node.children.empty())
+		return Size { 0, 0 };
+
+	const LayoutNode& child = *node.children.front();
+	const EdgeInsets margin = child.flags.border();
+	Size content {
+		child.desired.width + margin.left + margin.right,
+		child.desired.height + margin.top + margin.bottom,
+	};
+	if (scrollsHorizontally(node.scroll))
+		content.width = std::min(content.width, scrollViewportCap(node, true));
+	if (scrollsVertically(node.scroll))
+		content.height = std::min(content.height, scrollViewportCap(node, false));
+	return content;
+}
+
 Size tabPanelContentExtent(const LayoutNode& node)
 {
 	Size desired { 0, 0 };
@@ -372,9 +409,10 @@ Size containerExtent(const LayoutNode& node)
 	Size content;
 	switch (node.kind)
 	{
-	case NodeKind::TabPanel: content = tabPanelContentExtent(node); break;
-	case NodeKind::Grid:     content = gridContentExtent(node); break;
-	default:                 content = boxContentExtent(node); break;
+	case NodeKind::TabPanel:    content = tabPanelContentExtent(node); break;
+	case NodeKind::Grid:        content = gridContentExtent(node); break;
+	case NodeKind::ScrollPanel: content = scrollContentExtent(node); break;
+	default:                    content = boxContentExtent(node); break;
 	}
 	return Size {
 		content.width + node.chrome.left + node.chrome.right,
@@ -461,9 +499,10 @@ Size LayoutEngine::measure(LayoutNode& node, const Constraints& c)
 		};
 		switch (node.kind)
 		{
-		case NodeKind::TabPanel: measureTabPanel(node, inner); break;
-		case NodeKind::Grid:     measureGrid(node, inner); break;
-		default:                 measureBox(node, inner); break;
+		case NodeKind::TabPanel:    measureTabPanel(node, inner); break;
+		case NodeKind::Grid:        measureGrid(node, inner); break;
+		case NodeKind::ScrollPanel: measureScrollPanel(node, inner); break;
+		default:                    measureBox(node, inner); break;
 		}
 		desired = containerExtent(node);
 	}
@@ -489,6 +528,26 @@ Size LayoutEngine::measureGrid(LayoutNode& node, const Constraints& c)
 	return gridContentExtent(node);
 }
 
+Size LayoutEngine::measureScrollPanel(LayoutNode& node, const Constraints& c)
+{
+	if (node.children.empty())
+		return Size { 0, 0 };
+
+	// The content is measured as if it had all the room it wants on every
+	// scrolling axis -- that measurement IS the virtual extent the panel will
+	// scroll over. A non-scrolling axis keeps the panel's own constraint, so
+	// wrapping content still wraps to the available width.
+	LayoutNode& child = *node.children.front();
+	Constraints inner = childConstraints(c, child);
+	if (scrollsHorizontally(node.scroll))
+		inner.maxWidth = kUnbounded;
+	if (scrollsVertically(node.scroll))
+		inner.maxHeight = kUnbounded;
+	measure(child, inner);
+
+	return scrollContentExtent(node);
+}
+
 Size LayoutEngine::measureTabPanel(LayoutNode& node, const Constraints& c)
 {
 	// Pages overlap, so the panel needs the largest page on both axes.
@@ -512,6 +571,9 @@ void LayoutEngine::arrange(LayoutNode& node, const Rect& area)
 		break;
 	case NodeKind::Grid:
 		arrangeGrid(node);
+		break;
+	case NodeKind::ScrollPanel:
+		arrangeScrollPanel(node);
 		break;
 	case NodeKind::TabPanel:
 		arrangeTabPanel(node);
@@ -666,6 +728,34 @@ void LayoutEngine::arrangeGrid(LayoutNode& node)
 			arrange(cell, Rect { x, y, width, height });
 		}
 	}
+}
+
+void LayoutEngine::arrangeScrollPanel(LayoutNode& node)
+{
+	if (node.children.empty())
+		return;
+
+	// The content gets a VIRTUAL rect: the viewport on a non-scrolling axis
+	// (R3.3 -- content fills it, so a short list still spans the width), and
+	// max(viewport, desired) on a scrolling one, which is what there is to
+	// scroll over. Its origin is the panel's content origin, so the whole
+	// subtree is laid out in the panel's own space and the backend's scope
+	// translates it (T1.4b). Until that scope exists the frames are simply
+	// absolute, which is why a ScrollPanel currently draws like a Box.
+	LayoutNode& child = *node.children.front();
+	const Rect area = contentArea(node);
+	const EdgeInsets margin = child.flags.border();
+	const int viewportWidth = std::max(0, area.width - margin.left - margin.right);
+	const int viewportHeight = std::max(0, area.height - margin.top - margin.bottom);
+
+	const int width = scrollsHorizontally(node.scroll)
+		? std::max(viewportWidth, child.desired.width)
+		: viewportWidth;
+	const int height = scrollsVertically(node.scroll)
+		? std::max(viewportHeight, child.desired.height)
+		: viewportHeight;
+
+	arrange(child, Rect { area.x + margin.left, area.y + margin.top, width, height });
 }
 
 void LayoutEngine::arrangeTabPanel(LayoutNode& node)
