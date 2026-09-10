@@ -77,6 +77,7 @@ enum class NodeKind
     TabPanel,
     Grid,
     ScrollPanel,
+    Splitter,
     Leaf
 };
 

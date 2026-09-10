@@ -4,6 +4,7 @@
 #include "stacks.hpp"
 #include "grid.hpp"
 #include "scrollpanel.hpp"
+#include "splitter.hpp"
 #include "groupboxes.hpp"
 #include "dialog.hpp"
 #include "tabpanel.hpp"
@@ -27,6 +28,9 @@ static_assert(NodeBuildable<Table<std::vector<int>>>);
 static_assert(NodeBuildable<Table<std::vector<std::string>>>);
 static_assert(NodeBuildable<Grid<StaticText, TextCtrl>>);
 static_assert(NodeBuildable<ScrollPanel<VStack<Button>>>);
+static_assert(NodeBuildable<Splitter<VStack<Button>, VStack<Button>>>);
+static_assert(NodeBuildable<HSplitter<VStack<Button>, VStack<TextCtrl>>>);
+static_assert(NodeBuildable<VSplitter<VStack<Button>, VStack<TextCtrl>>>);
 static_assert(NodeBuildable<HStack<Button, TextCtrl>>);
 static_assert(NodeBuildable<VStack<StaticText, Button>>);
 

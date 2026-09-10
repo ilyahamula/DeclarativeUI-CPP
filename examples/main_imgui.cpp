@@ -14,16 +14,24 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // ScrollPanel demo state. Bound by reference, so it has to outlive the
-    // frame loop -- ImGui rebuilds the tree every frame and reads these live.
-    bool optionsDisabled = false;
-    bool sharedOption = false;
-    bool listDisabled = false;
+    // Splitter demo state. Bound by reference, so it has to outlive the frame
+    // loop -- ImGui rebuilds the tree every frame and reads these live.
+    std::string selectedFile;
+    TableRows rows {
+        { "layout.cpp",  "18 KB", "engine" },
+        { "measure.cpp", "9 KB",  "engine" },
+        { "splitter.hpp","6 KB",  "new"    },
+    };
+    int selectedRow = -1;
+    std::string notes = "Notes for the selected file.";
+    bool shellDisabled = false;
+    int divider = 200;
+    bool splittersDisabled = false;
 
     runImGuiApp([&]
     {
-        drawScrollPanelUI(optionsDisabled).show();
-        drawScrollPanelBinding(sharedOption, listDisabled).show();
+        drawAppShellUI(selectedFile, rows, selectedRow, notes, shellDisabled).show();
+        drawSplitterBinding(divider, splittersDisabled).show();
     });
 
     return 0;

@@ -3,6 +3,7 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/LayoutBackend.hpp"
+#include "frameworks_core/wx/RefSync.hpp"
 
 #include <wx/wx.h>
 
@@ -96,14 +97,25 @@ struct EngineSession
 	// Arms a re-measure for every source of engine-visible change in the tree.
 	//
 	// Today that is AutoGrow text fields, whose live content the measure pass
-	// reads. The other sources are node-level BoundValues the engine reads the
-	// same way and which the user drives directly: a Splitter's sash position
-	// (T1.5) and an Expander's collapsed state (T1.6). Both join here as a
-	// check on the container node before the recursion below, polling the value
-	// with bindExternalRefSync on `window` and calling relayout() when it moves
-	// -- they cannot be written yet because neither NodeKind exists.
+	// reads, and Splitter sash positions. The remaining source is an Expander's
+	// collapsed state (T1.6), which joins here on the same terms.
 	void bindInvalidation(LayoutNode& node)
 	{
+		// A sash drag (or anything else writing the bound int) changes a value
+		// the engine reads, and wx has no notification for that -- so it is
+		// polled like any other external ref. `resolved` is what the layout
+		// currently shows and `position` what it should show, which makes this
+		// the ordinary RefSync shape rather than a special case: a full
+		// re-measure, because the pane widths decide table columns and text
+		// wrapping, not just where the rectangles land.
+		if (node.kind == NodeKind::Splitter)
+		{
+			SplitterState* split = &node.split;
+			bindExternalRefSync(window,
+				[split] { return split->resolved; },
+				[split] { return split->position.get(); },
+				[this](int) { relayout(); });
+		}
 		if (node.isLeaf())
 		{
 			if (node.flags.autoGrow() && node.widget != nullptr)

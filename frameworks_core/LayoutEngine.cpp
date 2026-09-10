@@ -161,6 +161,95 @@ Size boxContentExtent(const LayoutNode& node)
 	return horizontal ? Size { main, cross } : Size { cross, main };
 }
 
+// Cross-axis extent, and offset from the area's cross origin, of one child of a
+// main-axis run, per its crossAlign. Shared by every container that lays its
+// children out along an axis: a Box and a Splitter differ only in how they
+// spend the MAIN one.
+struct CrossPlacement
+{
+	int extent;
+	int offset;
+};
+
+CrossPlacement crossPlacement(const LayoutNode& child, Orientation parentOrient, int areaCross)
+{
+	const bool horizontal = parentOrient == Orientation::Horizontal;
+	const EdgeInsets margin = child.flags.border();
+	const int leading = horizontal ? margin.top : margin.left;
+	const int trailing = horizontal ? margin.bottom : margin.right;
+	const int band = std::max(0, areaCross - leading - trailing);
+	const int desired = horizontal ? child.desired.height : child.desired.width;
+
+	CrossPlacement placement { desired, leading };
+	switch (child.flags.crossAlign(child.kind, parentOrient))
+	{
+	case Align::Stretch:
+		placement.extent = band;
+		break;
+	case Align::Center:
+		placement.offset = leading + (band - desired) / 2;
+		break;
+	case Align::End:
+		placement.offset = leading + (band - desired);
+		break;
+	case Align::Start:
+		break;
+	}
+	return placement;
+}
+
+// Main-axis gap beside a splitter's sash: the widest facing margin, with NO
+// kDefaultGap fallback. The sash is the divider, so flush against both panes is
+// the right default -- a Box needs a gap because nothing else separates its
+// children, and a splitter already has 6 px of one.
+int splitterGap(const LayoutNode& prev, const LayoutNode& next, Orientation orient)
+{
+	const EdgeInsets p = prev.flags.border();
+	const EdgeInsets n = next.flags.border();
+	return orient == Orientation::Horizontal
+		? std::max(p.right, n.left)
+		: std::max(p.bottom, n.top);
+}
+
+// Splitter desired extent: the two panes and the sash end to end on the main
+// axis, the widest of the three on the cross one. The sash position does not
+// enter into it -- it decides how the AREA is divided, never how much the
+// splitter asks for.
+Size splitterContentExtent(const LayoutNode& node)
+{
+	// A splitter is built with exactly three children (pane, sash, pane). Any
+	// other shape is a degenerate tree, and both passes fall back to a Box so
+	// measure and arrange can never disagree about what it is.
+	if (node.children.size() != 3)
+		return boxContentExtent(node);
+
+	const bool horizontal = node.orientation == Orientation::Horizontal;
+	int main = 0;
+	int cross = 0;
+	const LayoutNode* prev = nullptr;
+	for (const auto& child : node.children)
+	{
+		const EdgeInsets margin = child->flags.border();
+		const int childMain = horizontal ? child->desired.width : child->desired.height;
+		const int childCross = horizontal ? child->desired.height : child->desired.width;
+		const int crossMargins = horizontal ? margin.top + margin.bottom
+											: margin.left + margin.right;
+
+		if (prev != nullptr)
+			main += splitterGap(*prev, *child, node.orientation);
+		main += childMain;
+		cross = std::max(cross, childCross + crossMargins);
+		prev = child.get();
+	}
+
+	const EdgeInsets first = node.children.front()->flags.border();
+	const EdgeInsets last = node.children.back()->flags.border();
+	main += horizontal ? first.left + last.right
+					   : first.top + last.bottom;
+
+	return horizontal ? Size { main, cross } : Size { cross, main };
+}
+
 // The column/row bands of a grid, derived purely from the children's already
 // filled `desired` -- so arrange can rerun it after the SizeGroup re-sum without
 // touching the backend, exactly as boxContentExtent is rerun for a Box.
@@ -412,6 +501,7 @@ Size containerExtent(const LayoutNode& node)
 	case NodeKind::TabPanel:    content = tabPanelContentExtent(node); break;
 	case NodeKind::Grid:        content = gridContentExtent(node); break;
 	case NodeKind::ScrollPanel: content = scrollContentExtent(node); break;
+	case NodeKind::Splitter:    content = splitterContentExtent(node); break;
 	default:                    content = boxContentExtent(node); break;
 	}
 	return Size {
@@ -502,6 +592,7 @@ Size LayoutEngine::measure(LayoutNode& node, const Constraints& c)
 		case NodeKind::TabPanel:    measureTabPanel(node, inner); break;
 		case NodeKind::Grid:        measureGrid(node, inner); break;
 		case NodeKind::ScrollPanel: measureScrollPanel(node, inner); break;
+		case NodeKind::Splitter:    measureSplitter(node, inner); break;
 		default:                    measureBox(node, inner); break;
 		}
 		desired = containerExtent(node);
@@ -548,6 +639,16 @@ Size LayoutEngine::measureScrollPanel(LayoutNode& node, const Constraints& c)
 	return scrollContentExtent(node);
 }
 
+Size LayoutEngine::measureSplitter(LayoutNode& node, const Constraints& c)
+{
+	// Panes are measured against the splitter's whole constraint, exactly as a
+	// Box measures its children: what each pane WANTS is independent of where
+	// the sash happens to sit, and arrange is where the area is divided.
+	for (const auto& child : node.children)
+		measure(*child, childConstraints(c, *child));
+	return splitterContentExtent(node);
+}
+
 Size LayoutEngine::measureTabPanel(LayoutNode& node, const Constraints& c)
 {
 	// Pages overlap, so the panel needs the largest page on both axes.
@@ -574,6 +675,9 @@ void LayoutEngine::arrange(LayoutNode& node, const Rect& area)
 		break;
 	case NodeKind::ScrollPanel:
 		arrangeScrollPanel(node);
+		break;
+	case NodeKind::Splitter:
+		arrangeSplitter(node);
 		break;
 	case NodeKind::TabPanel:
 		arrangeTabPanel(node);
@@ -626,32 +730,10 @@ void LayoutEngine::arrangeBox(LayoutNode& node)
 	for (size_t i = 0; i < n; ++i)
 	{
 		LayoutNode& child = *node.children[i];
-		const EdgeInsets margin = child.flags.border();
-		const int crossLeading = horizontal ? margin.top : margin.left;
-		const int crossTrailing = horizontal ? margin.bottom : margin.right;
-		const int band = std::max(0, areaCross - crossLeading - crossTrailing);
-		const int desiredCross = horizontal ? child.desired.height : child.desired.width;
-
-		int crossExtent = desiredCross;
-		int crossOffset = crossLeading;
-		switch (child.flags.crossAlign(child.kind, node.orientation))
-		{
-		case Align::Stretch:
-			crossExtent = band;
-			break;
-		case Align::Center:
-			crossOffset = crossLeading + (band - desiredCross) / 2;
-			break;
-		case Align::End:
-			crossOffset = crossLeading + (band - desiredCross);
-			break;
-		case Align::Start:
-			break;
-		}
-
+		const CrossPlacement cross = crossPlacement(child, node.orientation, areaCross);
 		const Rect childArea = horizontal
-			? Rect { cursor, area.y + crossOffset, mains[i], crossExtent }
-			: Rect { area.x + crossOffset, cursor, crossExtent, mains[i] };
+			? Rect { cursor, area.y + cross.offset, mains[i], cross.extent }
+			: Rect { area.x + cross.offset, cursor, cross.extent, mains[i] };
 		arrange(child, childArea);
 
 		cursor += mains[i] + (i + 1 < n ? gaps[i] : 0);
@@ -756,6 +838,73 @@ void LayoutEngine::arrangeScrollPanel(LayoutNode& node)
 		: viewportHeight;
 
 	arrange(child, Rect { area.x + margin.left, area.y + margin.top, width, height });
+}
+
+void LayoutEngine::arrangeSplitter(LayoutNode& node)
+{
+	if (node.children.size() != 3)
+	{
+		arrangeBox(node); // degenerate tree: measured as a Box, so arranged as one
+		return;
+	}
+
+	const Rect area = contentArea(node);
+	const bool horizontal = node.orientation == Orientation::Horizontal;
+
+	LayoutNode& first = *node.children[0];
+	LayoutNode& sash = *node.children[1];
+	LayoutNode& second = *node.children[2];
+
+	const EdgeInsets firstMargin = first.flags.border();
+	const EdgeInsets lastMargin = second.flags.border();
+	const int leading = horizontal ? firstMargin.left : firstMargin.top;
+	const int trailing = horizontal ? lastMargin.right : lastMargin.bottom;
+	const int gapBefore = splitterGap(first, sash, node.orientation);
+	const int gapAfter = splitterGap(sash, second, node.orientation);
+	const int sashMain = horizontal ? sash.desired.width : sash.desired.height;
+
+	// What the two panes have to share once the sash and every margin is spent.
+	const int areaMain = horizontal ? area.width : area.height;
+	const int panesMain = std::max(0,
+		areaMain - leading - trailing - gapBefore - gapAfter - sashMain);
+
+	// withMinPaneSize() and a pane's own MinSize say the same thing, so the
+	// larger of the two is the floor. Floors are honoured only while they fit:
+	// a splitter squeezed below both of them hands the first pane what there is
+	// rather than overflowing one pane off the end.
+	const int firstFloor = std::max(node.split.minFirst, mainFloorOf(first, horizontal));
+	const int secondFloor = std::max(node.split.minSecond, mainFloorOf(second, horizontal));
+	const int lower = std::min(firstFloor, panesMain);
+	const int upper = std::max(lower, panesMain - secondFloor);
+
+	int pos = node.split.position.get();
+	if (pos < 0)
+		pos = panesMain / 2; // "half" -- resolvable only now that the area is known
+	pos = std::clamp(pos, lower, upper);
+
+	// Published for the sash (which clamps its drag against them, so dragging
+	// past a floor cannot bank up a value the user has to drag back through)
+	// and for the wx/Qt relayout poll, which compares them with `position`.
+	node.split.resolved = pos;
+	node.split.lowerBound = lower;
+	node.split.upperBound = upper;
+
+	const int mains[3] = { pos, sashMain, std::max(0, panesMain - pos) };
+	const int gaps[3] = { gapBefore, gapAfter, 0 };
+
+	int cursor = (horizontal ? area.x : area.y) + leading;
+	const int areaCross = horizontal ? area.height : area.width;
+	for (size_t i = 0; i < 3; ++i)
+	{
+		LayoutNode& child = *node.children[i];
+		const CrossPlacement cross = crossPlacement(child, node.orientation, areaCross);
+		const Rect childArea = horizontal
+			? Rect { cursor, area.y + cross.offset, mains[i], cross.extent }
+			: Rect { area.x + cross.offset, cursor, cross.extent, mains[i] };
+		arrange(child, childArea);
+
+		cursor += mains[i] + gaps[i];
+	}
 }
 
 void LayoutEngine::arrangeTabPanel(LayoutNode& node)

@@ -494,3 +494,88 @@ inline auto drawScrollPanelBinding(bool& shared, bool& disabled)
         }
     };
 }
+
+// Two splitters and a spin box on ONE int: drag either sash and the other one
+// follows, and typing a number into the spin box moves them both.
+//
+// This is the same shared-ref idiom the dialogs above use, applied to a value
+// the user drives by dragging rather than by typing -- and it is the honest test
+// of a Splitter's binding, because it exercises both directions at once. The
+// sash writes the first pane's new width through to `divider`; anything else
+// writing `divider` moves the sash. Neither splitter knows the other exists.
+//
+// Note that a bound position is CLAMPED by each splitter against its own floors
+// but written back unclamped by neither: the engine only ever reads the int, so
+// the spin box shows exactly what the user last committed. What each splitter
+// then draws is that value pinned into its own legal range -- which is why the
+// two sashes can briefly disagree if you type a number one of them cannot honour.
+inline auto drawSplitterBinding(int& divider, bool& disabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kPaneH = 110;
+
+    return Dialog {
+        "Two splitters (shared int)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({520, -1}),
+            StaticText{"Both sashes and the spin box are bound to the same int:"}
+                .withSize({-1, kLabelH}),
+            HSplitter { LayoutFlags().Expand().Border(Side::Top, 8).MinSize({-1, kPaneH}),
+                divider,
+                VGroupBox { "Left",
+                    LayoutFlags().Expand(),
+                    // T is the binding type and cannot be deduced from items
+                    // alone, so an unbound list spells it out.
+                    ListBox<std::string> { { "Alpha", "Beta", "Gamma" } }
+                        .withVisibleRows(4)
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(disabled)
+                },
+                VGroupBox { "Right",
+                    LayoutFlags().Expand(),
+                    MultiLineTextCtrl{"Drag the sash above or below."}
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(disabled)
+                }
+            }
+            .isDisabled(disabled),
+            HSplitter { LayoutFlags().Expand().Border(Side::Top, 10).MinSize({-1, kPaneH}),
+                divider,
+                // Read-only fields rather than StaticText: a pane's width is
+                // whatever the user last dragged it to, and wrapping text pinned
+                // to one line's height would overflow its own frame the moment
+                // the pane narrowed. A single-line field clips instead.
+                VGroupBox { "Same int, second splitter",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"This sash mirrors the one above."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                },
+                VGroupBox { "Remainder",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"...and this pane takes what is left."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
+                StaticText{"Sash position:"}
+                    .withSize({100, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                // Writes the same int the two sashes do: type into it and both
+                // move, drag either sash and it follows.
+                SpinBox { Range<int>{ .min = 40, .max = 460 }, divider }
+                    .withSize({90, kRowH})
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .isDisabled(disabled),
+                Spacer{},
+                CheckBox{disabled, "Lock both splitters"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+            }
+        }
+    };
+}

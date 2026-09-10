@@ -13,6 +13,7 @@ add_executable(layout_tests
     layout_engine_arrange_test.cpp
     layout_engine_grid_test.cpp
     layout_engine_scroll_test.cpp
+    layout_engine_splitter_test.cpp
     golden_cross_backend_test.cpp
     # Engine sources under test are compiled directly (not linked from
     # DeclarativeUI) so they provably build without any backend.

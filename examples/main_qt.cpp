@@ -6,14 +6,22 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // ScrollPanel demo state: locals of main, so the bound refs outlive the
+    // Splitter demo state: locals of main, so the bound refs outlive the
     // modeless dialogs that read them for the whole of exec().
-    bool optionsDisabled = false;
-    bool sharedOption = false;
-    bool listDisabled = false;
+    std::string selectedFile;
+    TableRows rows {
+        { "layout.cpp",  "18 KB", "engine" },
+        { "measure.cpp", "9 KB",  "engine" },
+        { "splitter.hpp","6 KB",  "new"    },
+    };
+    int selectedRow = -1;
+    std::string notes = "Notes for the selected file.";
+    bool shellDisabled = false;
+    int divider = 200;
+    bool splittersDisabled = false;
 
-    drawScrollPanelUI(optionsDisabled).show();
-    drawScrollPanelBinding(sharedOption, listDisabled).show();
+    drawAppShellUI(selectedFile, rows, selectedRow, notes, shellDisabled).show();
+    drawSplitterBinding(divider, splittersDisabled).show();
 
     return app.exec();
 }

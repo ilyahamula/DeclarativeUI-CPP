@@ -21,6 +21,22 @@ public:
     // unique within the current parent scope (called before BeginChild).
     static int nextGroupBoxId() { return next(s_groupBoxIds); }
 
+    // Sequential integer for state a wrapper has to reach during the MEASURE
+    // pass (an unbound Splitter position). It needs its own counter because the
+    // engine resolves before ImGui::Begin, so measure runs in a different ImGui
+    // scope than render — sharing the widget counter would desync every
+    // PushID() after the first measured widget. Measure visits each leaf exactly
+    // once per frame in tree order, so the sequence is as stable as the widget
+    // one: a tree whose shape shifts renumbers both alike.
+    static int nextMeasureId() { return next(s_measureIds); }
+
+    // Slot stateKey() reserves for measure-phase state. Measure ids and widget
+    // ids are separate sequences, so without it the two could hash to the same
+    // key in a SnapshotStore<T> they happen to share (SnapshotStore<int> holds
+    // every SpinBox<int> as well as every unbound sash position). No wrapper
+    // uses this slot.
+    static constexpr int kMeasureSlot = 15;
+
     // Key for framework-owned state that has to outlive the frame the way
     // ImGui's own does (see SnapshotStore.hpp). Built from the same scope seed
     // as the widget id, so it must be taken in the scope the id was drawn from —
@@ -48,4 +64,5 @@ private:
 
     static inline std::unordered_map<ImGuiID, ScopeState> s_widgetIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_groupBoxIds;
+    static inline std::unordered_map<ImGuiID, ScopeState> s_measureIds;
 };

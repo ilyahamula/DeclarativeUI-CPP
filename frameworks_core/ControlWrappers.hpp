@@ -2,8 +2,10 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/SplitterState.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <numeric>
@@ -523,6 +525,41 @@ public:
 
 private:
 	Orientation m_orient;
+};
+
+// SplitterSashWrapper -----------------------------------------------------------
+// The draggable divider between a Splitter's two panes, and the one wrapper a
+// caller never declares: Splitter::buildNode() creates it and hands it a pointer
+// to the SplitterState living in its own node, which outlives every wrapper in
+// the tree.
+//
+// There is no native splitter behind it on any backend -- wxSplitterWindow and
+// QSplitter own their children's geometry and would fight the engine, which is
+// the very thing the layout engine removed. What is left is a 6 px leaf that
+// knows how to be dragged: it writes the first pane's new extent into the state
+// (clamped against the bounds the arrange pass published there) and the engine
+// re-divides the area on the next pass.
+class SplitterSashWrapper : public ControlWrapper
+{
+public:
+	SplitterSashWrapper(SplitterState* state,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_state(state)
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	SplitterState* m_state;
+
+	// Where this sash's position is parked between ImGui frames. Taken during
+	// measureIntrinsic() and reused by render(), which runs in a different
+	// ImGui scope and could not derive the same key -- see the ImGui half of
+	// ControlWrappers.cpp. Unused on the retained backends, where the wrapper
+	// lives as long as the native window does.
+	std::uint64_t m_snapshotKey = 0;
 };
 
 // ProgressBarWrapper -----------------------------------------------------------

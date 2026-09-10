@@ -2,6 +2,7 @@
 
 #include "frameworks_core/ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
+#include "frameworks_core/CoreTypes/SplitterState.hpp"
 #include "frameworks_core/LayoutFlags.hpp"
 
 #include <algorithm>
@@ -25,6 +26,9 @@ struct LayoutNode
 	                                                 // column is index % columns and
 	                                                 // its row index / columns
 	ScrollAxis scroll = ScrollAxis::Vertical;        // ScrollPanel only
+	SplitterState split;                             // Splitter only: the sash
+	                                                 // position and its floors,
+	                                                 // shared with the sash leaf
 
 	std::vector<std::unique_ptr<LayoutNode>> children;
 	const LayoutNode* parent = nullptr;              // set by add(); disabling walks it
@@ -138,6 +142,21 @@ inline std::unique_ptr<LayoutNode> makeScrollPanel(ScrollAxis axis, LayoutFlags 
 	auto node = std::make_unique<LayoutNode>();
 	node->kind = NodeKind::ScrollPanel;
 	node->scroll = axis;
+	node->flags = flags;
+	return node;
+}
+
+// A splitter has exactly three children in this order: the first pane, a leaf
+// owning the sash, and the second pane. The sash is a leaf like any other --
+// the backends measure, place, disable and (not) tooltip it without knowing
+// what it is -- which is why no backend needs a Splitter case at all: like a
+// Grid, the node itself is a box with no chrome and no scope.
+inline std::unique_ptr<LayoutNode> makeSplitter(Orientation orient, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Splitter;
+	node->orientation = orient;
+	node->split.orientation = orient;
 	node->flags = flags;
 	return node;
 }

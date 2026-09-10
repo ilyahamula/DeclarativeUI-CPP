@@ -68,6 +68,68 @@ protected:
 	}
 };
 
+// The Splitter's sash: a sunken line the user drags, with the mouse handling
+// done by virtual overrides (no Q_OBJECT). Deliberately not a QSplitter, which
+// would own its children's geometry and fight the layout engine.
+class SashFrame : public QFrame
+{
+public:
+	using QFrame::QFrame;
+
+	SplitterState* state = nullptr;
+	bool horizontal = true;
+
+	// QFrame's own hint for a bare line is not the 6 px the engine budgeted, and
+	// the cross axis must ask for nothing -- the engine stretches the sash
+	// across both panes there.
+	QSize sizeHint() const override
+	{
+		return horizontal ? QSize(SplitterState::kSashThickness, 0)
+						  : QSize(0, SplitterState::kSashThickness);
+	}
+
+protected:
+	// The drag anchors on the position arrange RESOLVED when the gesture began,
+	// so a long drag cannot accumulate rounding the way a per-event delta would,
+	// and global coordinates are used because the frame itself moves underneath
+	// the pointer as the layout follows it.
+	void mousePressEvent(QMouseEvent* event) override
+	{
+		if (event->button() == Qt::LeftButton && state != nullptr)
+		{
+			m_anchorScreen = globalMain(event);
+			m_anchorPos = state->resolved;
+			m_dragging = true;
+		}
+		QFrame::mousePressEvent(event);
+	}
+
+	void mouseMoveEvent(QMouseEvent* event) override
+	{
+		if (m_dragging && state != nullptr)
+			state->position.set(std::clamp(m_anchorPos + globalMain(event) - m_anchorScreen,
+				state->lowerBound, state->upperBound));
+		QFrame::mouseMoveEvent(event);
+	}
+
+	void mouseReleaseEvent(QMouseEvent* event) override
+	{
+		m_dragging = false;
+		QFrame::mouseReleaseEvent(event);
+	}
+
+private:
+	int globalMain(const QMouseEvent* event) const
+	{
+		const QPointF global = event->globalPosition();
+		return static_cast<int>(horizontal ? global.x() : global.y());
+	}
+
+	int m_anchorScreen = 0;
+	int m_anchorPos = 0;
+	bool m_dragging = false;
+};
+
 } // unnamed namespace
 
 // ButtonWrapper -----------------------------------------------------------
@@ -662,6 +724,22 @@ void SeparatorWrapper::realize(void* parentWindow)
 	line->setFrameShape(m_orient == Orientation::Vertical ? QFrame::VLine : QFrame::HLine);
 	line->setFrameShadow(QFrame::Sunken);
 	m_nativeWidget = line;
+
+}
+
+// SplitterSashWrapper -----------------------------------------------------------
+
+void SplitterSashWrapper::realize(void* parentWindow)
+{
+	const bool horizontal = m_state->orientation == Orientation::Horizontal;
+
+	auto* sash = new SashFrame(static_cast<QWidget*>(parentWindow));
+	sash->state = m_state;
+	sash->horizontal = horizontal;
+	sash->setFrameShape(horizontal ? QFrame::VLine : QFrame::HLine);
+	sash->setFrameShadow(QFrame::Sunken);
+	sash->setCursor(horizontal ? Qt::SplitHCursor : Qt::SplitVCursor);
+	m_nativeWidget = sash;
 
 }
 

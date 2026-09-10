@@ -3,17 +3,25 @@
 
 class DeclarativeApp : public wxApp
 {
-    // ScrollPanel demo state: members, so the bound refs outlive the modeless
+    // Splitter demo state: members, so the bound refs outlive the modeless
     // dialogs that read them.
-    bool m_optionsDisabled = false;
-    bool m_sharedOption = false;
-    bool m_listDisabled = false;
+    std::string m_selectedFile;
+    TableRows m_rows {
+        { "layout.cpp",  "18 KB", "engine"   },
+        { "measure.cpp", "9 KB",  "engine"   },
+        { "splitter.hpp","6 KB",  "new"      },
+    };
+    int m_selectedRow = -1;
+    std::string m_notes = "Notes for the selected file.";
+    bool m_shellDisabled = false;
+    int m_divider = 200;
+    bool m_splittersDisabled = false;
 
 public:
     bool OnInit() override
     {
-        drawScrollPanelUI(m_optionsDisabled).show();
-        drawScrollPanelBinding(m_sharedOption, m_listDisabled).show();
+        drawAppShellUI(m_selectedFile, m_rows, m_selectedRow, m_notes, m_shellDisabled).show();
+        drawSplitterBinding(m_divider, m_splittersDisabled).show();
         return true;
     }
 };

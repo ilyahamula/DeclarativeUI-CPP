@@ -1244,6 +1244,82 @@ void SeparatorWrapper::render(const Rect& frame)
 	ImGui::Dummy(ImVec2(width, height));
 }
 
+// SplitterSashWrapper -----------------------------------------------------------
+
+Size SplitterSashWrapper::measureIntrinsic(const Constraints&)
+{
+	// An UNBOUND position has no home in the wrapper -- the tree is rebuilt every
+	// frame, so the caller's literal would win before every arrange and the sash
+	// could never be moved. It is parked in the snapshot store instead, and
+	// restored HERE rather than in render(): measure runs before arrange, so a
+	// value restored now is the one this frame actually lays out at, where one
+	// restored during render would always be a frame late and never converge.
+	//
+	// The key comes from the measure-phase counter because the engine resolves
+	// BEFORE ImGui::Begin -- render() therefore draws in a different ImGui scope
+	// than the one measure ran in, and the two sequences must not be shared.
+	m_snapshotKey = WidgetIdManager::stateKey(
+		WidgetIdManager::nextMeasureId(), WidgetIdManager::kMeasureSlot);
+	SnapshotStore<int>::restore(m_snapshotKey, m_state->position);
+
+	// A hairline's worth of grip on its own axis and nothing on the other, where
+	// the engine stretches the sash across both panes.
+	return m_state->orientation == Orientation::Horizontal
+		? Size { SplitterState::kSashThickness, 0 }
+		: Size { 0, SplitterState::kSashThickness };
+}
+
+void SplitterSashWrapper::render(const Rect& frame)
+{
+	const bool horizontal = m_state->orientation == Orientation::Horizontal;
+	const ImVec2 size((float)std::max(frame.width, 0), (float)std::max(frame.height, 0));
+	// place() has already put the cursor at the frame's top-left, so the
+	// cursor's screen position IS the frame origin (as SeparatorWrapper uses it).
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	// InvisibleButton asserts on a zero extent, and a splitter with no cross
+	// band is legal (an empty pane in a collapsed row) -- draw nothing, but
+	// still emit the item the drift guard reads.
+	if (size.x <= 0.0f || size.y <= 0.0f)
+	{
+		ImGui::Dummy(size);
+		SnapshotStore<int>::commit(m_snapshotKey, m_state->position);
+		return;
+	}
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	ImGui::InvisibleButton("##sash", size);
+	const bool active = ImGui::IsItemActive();
+	const bool hovered = ImGui::IsItemHovered();
+	if (active || hovered)
+		ImGui::SetMouseCursor(horizontal ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+
+	// The drag anchors on the position arrange RESOLVED when the gesture began
+	// -- accumulating per-frame mouse deltas instead would drift by a pixel
+	// every time a fractional delta was truncated. The anchor outlives the frame
+	// in ImGui's own storage, keyed inside this sash's PushID.
+	ImGuiStorage* store = ImGui::GetStateStorage();
+	const ImGuiID anchorKey = ImGui::GetID("##anchor");
+	if (ImGui::IsItemActivated())
+		store->SetInt(anchorKey, m_state->resolved);
+	if (active)
+	{
+		const ImVec2 dragged = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left, 0.0f);
+		const int moved = (int)(horizontal ? dragged.x : dragged.y);
+		m_state->position.set(std::clamp(store->GetInt(anchorKey, m_state->resolved) + moved,
+			m_state->lowerBound, m_state->upperBound));
+	}
+
+	const ImU32 color = ImGui::GetColorU32(active
+		? ImGuiCol_SeparatorActive
+		: (hovered ? ImGuiCol_SeparatorHovered : ImGuiCol_Separator));
+	ImGui::GetWindowDrawList()->AddRectFilled(origin,
+		ImVec2(origin.x + size.x, origin.y + size.y), color);
+	ImGui::PopID();
+
+	SnapshotStore<int>::commit(m_snapshotKey, m_state->position);
+}
+
 // ProgressBarWrapper -----------------------------------------------------------
 
 Size ProgressBarWrapper::measureIntrinsic(const Constraints&)

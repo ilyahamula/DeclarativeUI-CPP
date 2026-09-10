@@ -42,6 +42,7 @@ struct Golden
 	int labelTag = 0, inputTag = 0, spacerTag = 0, btn1Tag = 0, btn2Tag = 0;
 	int aTag = 0, bTag = 0, p1Tag = 0, p2Tag = 0;
 	int gl1Tag = 0, gf1Tag = 0, gl2Tag = 0, gf2Tag = 0;
+	int sp1Tag = 0, sashTag = 0, sp2Tag = 0;
 
 	MockLayoutBackend mock;
 	LayoutEngine engine { mock };
@@ -65,6 +66,10 @@ struct Golden
 	LayoutNode* formField1 = nullptr;
 	LayoutNode* formLabel2 = nullptr;
 	LayoutNode* formField2 = nullptr;
+	LayoutNode* panes = nullptr;
+	LayoutNode* paneLeft = nullptr;
+	LayoutNode* sash = nullptr;
+	LayoutNode* paneRight = nullptr;
 	Size window { 0, 0 };
 
 	ControlWrapper* fake(int& tag) { return reinterpret_cast<ControlWrapper*>(&tag); }
@@ -85,6 +90,13 @@ struct Golden
 		mock.setSize(fake(gf1Tag), p.input);
 		mock.setSize(fake(gl2Tag), Size { p.label.width * 2, p.label.height });
 		mock.setSize(fake(gf2Tag), p.input);
+		// The splitter's panes: profile-shaped, but deliberately narrow enough
+		// that the splitter never becomes the widest thing in the column --
+		// what is under test is how it DIVIDES the band, not how it sets it.
+		const Size pane { p.contentA.width / 3, 30 };
+		mock.setSize(fake(sp1Tag), pane);
+		mock.setSize(fake(sashTag), Size { SplitterState::kSashThickness, 0 });
+		mock.setSize(fake(sp2Tag), pane);
 		mock.chromeFn = [p](const LayoutNode& node) -> EdgeInsets {
 			if (node.kind == NodeKind::GroupBox)
 				return p.groupChrome;
@@ -120,6 +132,13 @@ struct Golden
 		formLabel2 = &form->add(makeLeaf(fake(gl2Tag), LayoutFlags().CenterVertical()));
 		formField2 = &form->add(makeLeaf(fake(gf2Tag), LayoutFlags().Expand()));
 
+		// a splitter with the sash left where it defaults: at half the pane space
+		panes = &root->add(makeSplitter(Orientation::Horizontal,
+			LayoutFlags().Expand().MinSize({ -1, 60 })));
+		paneLeft = &panes->add(makeLeaf(fake(sp1Tag), LayoutFlags().Expand()));
+		sash = &panes->add(makeLeaf(fake(sashTag), LayoutFlags().Expand()));
+		paneRight = &panes->add(makeLeaf(fake(sp2Tag), LayoutFlags().Expand()));
+
 		buttons = &root->add(makeBox(Orientation::Horizontal));
 		spacer = &buttons->add(makeLeaf(fake(spacerTag), LayoutFlags().Proportion(1)));
 		btn1 = &buttons->add(makeLeaf(fake(btn1Tag)));
@@ -150,6 +169,7 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(g.row->frame.width, band);
 	CHECK_EQ(g.buttons->frame.width, band);
 	CHECK_EQ(g.form->frame.width, band);
+	CHECK_EQ(g.panes->frame.width, band);
 	// ...and the band is driven by the widest content (box B) plus chrome
 	CHECK_EQ(band, p.contentB.width + p.groupChrome.left + p.groupChrome.right);
 
@@ -189,6 +209,22 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(g.formField1->frame.x - g.form->frame.x,
 		p.label.width * 2 + 8); // widest label + kDefaultGap gutter
 
+	// splitter: the sash is the divider and nothing else separates the panes, so
+	// the three frames are flush and span the band exactly. The default position
+	// halves whatever the panes have left once the sash is spent, which makes
+	// the two panes equal on every profile even though the band is not.
+	const int sashWidth = SplitterState::kSashThickness;
+	CHECK_EQ(g.sash->frame.width, sashWidth);
+	CHECK_EQ(g.sash->frame.x, rightEdge(*g.paneLeft));
+	CHECK_EQ(g.paneRight->frame.x, rightEdge(*g.sash));
+	CHECK_EQ(rightEdge(*g.paneRight), rightEdge(*g.panes));
+	CHECK_EQ(g.paneLeft->frame.width, (band - sashWidth) / 2);
+	CHECK_EQ(g.panes->split.resolved, (band - sashWidth) / 2);
+	// Expand() on all three: every one of them spans the splitter's height
+	CHECK_EQ(g.paneLeft->frame.height, g.panes->frame.height);
+	CHECK_EQ(g.sash->frame.height, g.panes->frame.height);
+	CHECK_EQ(g.paneRight->frame.height, g.panes->frame.height);
+
 	// tab pages overlap: both pages get the panel frame inset by the chrome
 	const Rect pageArea {
 		g.tabs->frame.x + p.tabChrome.left,
@@ -205,12 +241,14 @@ void checkGoldenInvariants(const Profile& p)
 	const Rect inputFrame = g.input->frame;
 	const Rect boxBFrame = g.boxB->frame;
 	const Rect formFieldFrame = g.formField1->frame;
+	const Rect sashFrame = g.sash->frame;
 	const Size window2 = g.engine.run(*g.root);
 	CHECK(window2 == g.window);
 	CHECK(g.row->frame == rowFrame);
 	CHECK(g.input->frame == inputFrame);
 	CHECK(g.boxB->frame == boxBFrame);
 	CHECK(g.formField1->frame == formFieldFrame);
+	CHECK(g.sash->frame == sashFrame);
 }
 
 } // unnamed namespace
