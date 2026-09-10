@@ -30,7 +30,7 @@ void DialogWrapper::show()
 }
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable)
+	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position)
 {
 	long style = wxDEFAULT_DIALOG_STYLE; // not user-resizable by default
 	if (resizable)
@@ -97,6 +97,11 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 			delete session;
 		event.Skip();
 	});
+
+	// after sizing, so a window sized from the engine still opens where the
+	// caller asked rather than where the platform put the default-positioned one
+	if (position)
+		dialog->Move(position->x, position->y);
 
 	dialog->Show();
 }

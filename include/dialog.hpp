@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "frameworks_core/DialogWrapper.hpp"
@@ -31,16 +32,33 @@ struct Dialog
 		return *this;
 	}
 
+	// Place the window's top-left corner. Unset (the default) leaves the
+	// placement to the platform. Not a Size-style {-1,-1} sentinel: {0,0} is
+	// a legal position and negative coordinates are legal on a multi-monitor
+	// desktop, so "unset" needs to be its own state.
+	//
+	// The user can still move the window afterwards -- this is where it opens,
+	// not where it is pinned. Coordinates are desktop-absolute on wx and Qt;
+	// on ImGui a dialog is a window inside the host window, so they are
+	// relative to the host viewport.
+	Dialog& setPosition(const Position& pos)
+	{
+		m_position = pos;
+		return *this;
+	}
+
 	void show()
 	{
 		// build the node tree first (no rendering), then the backend sizes
 		// the window from the engine result and draws
-		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable);
+		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
+			m_position);
 	}
 
 private:
 	std::string m_title;
 	Size m_size { -1, -1 };
+	std::optional<Position> m_position;
 	bool m_resizable = false;
 	Content m_content;
 };

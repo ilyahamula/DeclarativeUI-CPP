@@ -36,7 +36,7 @@ void DialogWrapper::show()
 }
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> rootPtr, bool resizable)
+	std::unique_ptr<LayoutNode> rootPtr, bool resizable, const std::optional<Position>& position)
 {
 	// immediate mode: the tree lives for this frame only
 	LayoutNode& root = *rootPtr;
@@ -78,6 +78,13 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		ImGui::SetNextWindowSize(winSize, ImGuiCond_Always);
 		winFlags |= ImGuiWindowFlags_NoResize;
 	}
+
+	// Once, not Always: this is where the window opens, so the user can still
+	// drag it afterwards as they can on wx and Qt. Not FirstUseEver either --
+	// that would defer to a position remembered in imgui.ini and silently
+	// ignore the caller.
+	if (position)
+		ImGui::SetNextWindowPos(ImVec2((float)position->x, (float)position->y), ImGuiCond_Once);
 
 	if (ImGui::Begin(title.c_str(), nullptr, winFlags))
 	{

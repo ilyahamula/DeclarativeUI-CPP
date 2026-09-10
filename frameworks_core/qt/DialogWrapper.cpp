@@ -51,7 +51,7 @@ protected:
 } // unnamed namespace
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable)
+	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position)
 {
 	auto* dialog = new EngineDialog(nullptr);
 	dialog->setWindowTitle(QString::fromStdString(title));
@@ -97,6 +97,11 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->bindInvalidation(*session->root);
 	dialog->onResize = [session] { session->rearrange(); };
 	QObject::connect(dialog, &QObject::destroyed, [session] { delete session; });
+
+	// after sizing, so a window sized from the engine still opens where the
+	// caller asked rather than where the platform put the default-positioned one
+	if (position)
+		dialog->move(position->x, position->y);
 
 	dialog->show();
 

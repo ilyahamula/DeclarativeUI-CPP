@@ -19,9 +19,12 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
+        // setPosition places where the window opens; the user can still move
+        // it afterwards. On ImGui these are host-window-relative, on wx and Qt
+        // desktop-absolute -- the two dialogs land side by side either way.
         drawExpanderUI(m_basicOpen, m_advancedOpen, m_networkOpen, m_logging,
-            m_level, m_retries, m_proxy, m_sectionsDisabled).show();
-        drawExpanderBinding(m_detailsOpen, m_bindingDisabled).show();
+            m_level, m_retries, m_proxy, m_sectionsDisabled).setPosition({ 40, 40 }).show();
+        drawExpanderBinding(m_detailsOpen, m_bindingDisabled).setPosition({ 500, 40 }).show();
         return true;
     }
 };

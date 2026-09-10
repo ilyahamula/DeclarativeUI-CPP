@@ -29,9 +29,12 @@ int main(int argc, char** argv)
 
     runImGuiApp([&]
     {
+        // setPosition places where the window opens; the user can still move
+        // it afterwards. On ImGui these are host-window-relative, on wx and Qt
+        // desktop-absolute -- the two dialogs land side by side either way.
         drawExpanderUI(basicOpen, advancedOpen, networkOpen, logging,
-            level, retries, proxy, sectionsDisabled).show();
-        drawExpanderBinding(detailsOpen, bindingDisabled).show();
+            level, retries, proxy, sectionsDisabled).setPosition({ 40, 40 }).show();
+        drawExpanderBinding(detailsOpen, bindingDisabled).setPosition({ 500, 40 }).show();
     });
 
     return 0;
