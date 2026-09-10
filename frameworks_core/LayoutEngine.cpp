@@ -250,6 +250,28 @@ Size splitterContentExtent(const LayoutNode& node)
 	return horizontal ? Size { main, cross } : Size { cross, main };
 }
 
+// Expander desired extent: a vertical Box of header + content while open, and
+// of the header alone while closed. Collapsed, the content contributes NOTHING
+// -- not its size, not its margins and not the gap that would sit above it --
+// so the section shrinks to exactly its header and an auto-fit dialog follows.
+Size expanderContentExtent(const LayoutNode& node)
+{
+	// An expander is built with exactly two children (header, content). Any
+	// other shape is a degenerate tree, and both passes fall back to a Box so
+	// measure and arrange can never disagree about what it is.
+	if (node.children.size() != 2)
+		return boxContentExtent(node);
+	if (node.expander.applied)
+		return boxContentExtent(node);
+
+	const LayoutNode& header = *node.children.front();
+	const EdgeInsets margin = header.flags.border();
+	return Size {
+		header.desired.width + margin.left + margin.right,
+		header.desired.height + margin.top + margin.bottom,
+	};
+}
+
 // The column/row bands of a grid, derived purely from the children's already
 // filled `desired` -- so arrange can rerun it after the SizeGroup re-sum without
 // touching the backend, exactly as boxContentExtent is rerun for a Box.
@@ -502,6 +524,7 @@ Size containerExtent(const LayoutNode& node)
 	case NodeKind::Grid:        content = gridContentExtent(node); break;
 	case NodeKind::ScrollPanel: content = scrollContentExtent(node); break;
 	case NodeKind::Splitter:    content = splitterContentExtent(node); break;
+	case NodeKind::Expander:    content = expanderContentExtent(node); break;
 	default:                    content = boxContentExtent(node); break;
 	}
 	return Size {
@@ -593,6 +616,7 @@ Size LayoutEngine::measure(LayoutNode& node, const Constraints& c)
 		case NodeKind::Grid:        measureGrid(node, inner); break;
 		case NodeKind::ScrollPanel: measureScrollPanel(node, inner); break;
 		case NodeKind::Splitter:    measureSplitter(node, inner); break;
+		case NodeKind::Expander:    measureExpander(node, inner); break;
 		default:                    measureBox(node, inner); break;
 		}
 		desired = containerExtent(node);
@@ -649,6 +673,33 @@ Size LayoutEngine::measureSplitter(LayoutNode& node, const Constraints& c)
 	return splitterContentExtent(node);
 }
 
+Size LayoutEngine::measureExpander(LayoutNode& node, const Constraints& c)
+{
+	if (node.children.size() != 2)
+	{
+		measureBox(node, c); // degenerate tree: measured as a Box, arranged as one
+		return boxContentExtent(node);
+	}
+
+	LayoutNode& header = *node.children.front();
+	LayoutNode& content = *node.children.back();
+
+	// The header is measured FIRST and the open state latched only afterwards,
+	// because measuring the header is where an unbound state comes back on
+	// ImGui: the tree is rebuilt every frame, so the header's measure pass is
+	// the one chance to restore what the user last clicked before this pass
+	// decides whether there is any content to measure at all.
+	measure(header, childConstraints(c, header));
+	node.expander.applied = node.expander.expanded.get();
+
+	if (node.expander.applied)
+		measure(content, childConstraints(c, content));
+	else
+		content.desired = Size { 0, 0 }; // collapsed: nothing is asked of it
+
+	return expanderContentExtent(node);
+}
+
 Size LayoutEngine::measureTabPanel(LayoutNode& node, const Constraints& c)
 {
 	// Pages overlap, so the panel needs the largest page on both axes.
@@ -678,6 +729,9 @@ void LayoutEngine::arrange(LayoutNode& node, const Rect& area)
 		break;
 	case NodeKind::Splitter:
 		arrangeSplitter(node);
+		break;
+	case NodeKind::Expander:
+		arrangeExpander(node);
 		break;
 	case NodeKind::TabPanel:
 		arrangeTabPanel(node);
@@ -905,6 +959,39 @@ void LayoutEngine::arrangeSplitter(LayoutNode& node)
 
 		cursor += mains[i] + gaps[i];
 	}
+}
+
+void LayoutEngine::arrangeExpander(LayoutNode& node)
+{
+	if (node.children.size() != 2)
+	{
+		arrangeBox(node); // degenerate tree: measured as a Box, so arranged as one
+		return;
+	}
+
+	// Open, an expander IS a vertical Box of two children -- same gap rule,
+	// same cross alignment, same leftover distribution -- so it is arranged by
+	// exactly that code rather than by a second copy of it.
+	if (node.expander.applied)
+	{
+		arrangeBox(node);
+		return;
+	}
+
+	// Closed, only the header is placed, as the single child of that same Box.
+	// The content keeps a zero frame at the fold: the backend never traverses
+	// into it, and a stale rectangle there would be a rectangle something could
+	// still be drawn at.
+	const Rect area = contentArea(node);
+	LayoutNode& header = *node.children.front();
+	LayoutNode& content = *node.children.back();
+
+	const EdgeInsets margin = header.flags.border();
+	const CrossPlacement cross = crossPlacement(header, Orientation::Vertical, area.width);
+	arrange(header, Rect { area.x + cross.offset, area.y + margin.top,
+		cross.extent, header.desired.height });
+
+	content.frame = Rect { area.x, area.y + margin.top + header.desired.height, 0, 0 };
 }
 
 void LayoutEngine::arrangeTabPanel(LayoutNode& node)

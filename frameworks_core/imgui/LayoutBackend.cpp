@@ -37,6 +37,13 @@ int ceilInt(float v)
 	return (int)std::ceil(v);
 }
 
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
+}
+
 } // unnamed namespace
 
 Size ImGuiLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
@@ -132,6 +139,13 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 	// it: BeginDisabled nests by OR, so no child can opt back in. The scope is
 	// popped in endContainer, and on every early-out below.
 	const bool disabled = node.isDisabledEffective();
+
+	// A collapsed section draws nothing at all -- no chrome, no disabled scope,
+	// no child window -- so it reports invisible before any of that is opened,
+	// exactly as an inactive tab page does. Nothing else is needed on ImGui:
+	// there are no retained windows here to take back out of view.
+	if (isExpanderContent(node) && !node.parent->expander.applied)
+		return false;
 
 	// a container whose open parent is a TabPanel is a tab page
 	const bool isTabPage = !m_containerStack.empty()

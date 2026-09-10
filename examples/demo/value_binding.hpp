@@ -579,3 +579,66 @@ inline auto drawSplitterBinding(int& divider, bool& disabled)
         }
     };
 }
+
+
+// A CheckBox, a ToggleButton and an Expander on ONE bool: tick the box and the
+// section opens, click the header and the box ticks itself.
+//
+// This is the same shared-ref idiom the dialogs above use, applied to a value
+// the user drives by clicking a container's chrome rather than a control. The
+// header writes the new state through to `open`; anything else writing `open`
+// folds or unfolds the section, and the dialog re-fits around it -- a section
+// closing is a re-measure, not just a move, which is why the window follows.
+//
+// The second expander is bound to the SAME bool, so the two open and close
+// together and neither knows the other exists.
+inline auto drawExpanderBinding(bool& open, bool& disabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+
+    return Dialog {
+        "Two expanders (shared bool)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({420, -1}),
+            StaticText{"Both headers, the check box and the toggle share one bool:"}
+                .withSize({-1, kLabelH}),
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                CheckBox{open, "Show details"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    .isDisabled(disabled),
+                ToggleButton{open, "Details"}
+                    .withSize({110, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(disabled)
+            },
+            Expander { "Details",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                open,
+                VGroupBox { "Bound to the same bool",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"Fold me from the check box, the toggle or my own header."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            Expander { "Details, again",
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                open,
+                VGroupBox { "Same bool, second expander",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"...and this one follows the first."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock both sections"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}

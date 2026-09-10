@@ -1320,6 +1320,106 @@ void SplitterSashWrapper::render(const Rect& frame)
 	SnapshotStore<int>::commit(m_snapshotKey, m_state->position);
 }
 
+// ExpanderHeaderWrapper -----------------------------------------------------------
+
+Size ExpanderHeaderWrapper::measureIntrinsic(const Constraints&)
+{
+	// An UNBOUND open state has no home in the wrapper -- the tree is rebuilt
+	// every frame, so the caller's literal would win before every measure and a
+	// section the user opened would close itself again. It is parked in the
+	// snapshot store instead, and restored HERE rather than in render(): this
+	// pass is the one that decides whether the content is measured at all, so a
+	// value restored during render would always be a frame late.
+	//
+	// The key comes from the measure-phase counter because the engine resolves
+	// BEFORE ImGui::Begin -- render() therefore draws in a different ImGui scope
+	// than the one measure ran in, and the two sequences must not be shared.
+	m_snapshotKey = WidgetIdManager::stateKey(
+		WidgetIdManager::nextMeasureId(), WidgetIdManager::kMeasureSlot);
+	SnapshotStore<bool>::restore(m_snapshotKey, m_state->expanded);
+
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float height = ImGui::GetFrameHeight();
+	const ImVec2 text = ImGui::CalcTextSize(m_label.c_str());
+	// arrow column (a square the height of the row) + the label, framed
+	return Size {
+		(int)std::ceil(height + style.ItemInnerSpacing.x + text.x + style.FramePadding.x * 2.0f),
+		(int)std::ceil(height),
+	};
+}
+
+void ExpanderHeaderWrapper::render(const Rect& frame)
+{
+	// ImGui::CollapsingHeader always spans to the window's work rect, whatever
+	// rectangle the engine assigned it, so in a narrow column it would overrun
+	// its frame exactly as ImGui::Separator() does. The row is therefore an
+	// InvisibleButton of the engine's own size with the arrow and label drawn on
+	// the window draw list -- one item, always inside the frame. place() has
+	// already put the cursor at the frame's top-left, so the cursor's screen
+	// position is the frame origin.
+	const ImVec2 size((float)std::max(frame.width, 0), (float)std::max(frame.height, 0));
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	// InvisibleButton asserts on a zero extent, and a header squeezed to nothing
+	// is legal -- draw nothing, but still emit the item the drift guard reads.
+	if (size.x <= 0.0f || size.y <= 0.0f)
+	{
+		ImGui::Dummy(size);
+		SnapshotStore<bool>::commit(m_snapshotKey, m_state->expanded);
+		return;
+	}
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	if (ImGui::InvisibleButton("##header", size))
+		m_state->expanded.set(!m_state->expanded.get());
+	const bool hovered = ImGui::IsItemHovered();
+	const bool active = ImGui::IsItemActive();
+	const bool open = m_state->expanded.get();
+
+	const ImGuiStyle& style = ImGui::GetStyle();
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	const ImVec2 max(origin.x + size.x, origin.y + size.y);
+	drawList->AddRectFilled(origin, max, ImGui::GetColorU32(active
+		? ImGuiCol_HeaderActive
+		: (hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header)));
+
+	// The disclosure triangle: pointing down while open, right while closed --
+	// the same two states wxCollapsibleHeaderCtrl and the Qt tool button show.
+	const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
+	const float glyph = ImGui::GetFontSize();
+	const ImVec2 centre(origin.x + style.FramePadding.x + glyph * 0.5f,
+		origin.y + size.y * 0.5f);
+	const float radius = glyph * 0.35f;
+	if (open)
+	{
+		drawList->AddTriangleFilled(
+			ImVec2(centre.x - radius, centre.y - radius * 0.6f),
+			ImVec2(centre.x + radius, centre.y - radius * 0.6f),
+			ImVec2(centre.x, centre.y + radius * 0.7f), textColor);
+	}
+	else
+	{
+		drawList->AddTriangleFilled(
+			ImVec2(centre.x - radius * 0.6f, centre.y - radius),
+			ImVec2(centre.x - radius * 0.6f, centre.y + radius),
+			ImVec2(centre.x + radius * 0.7f, centre.y), textColor);
+	}
+
+	if (!m_label.empty())
+	{
+		const float textX = origin.x + style.FramePadding.x + glyph + style.ItemInnerSpacing.x;
+		const float textY = origin.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
+		// Clipped to the frame: a title longer than the section must not spill
+		// out of the rectangle the engine budgeted for it.
+		const ImVec4 clip(origin.x, origin.y, max.x, max.y);
+		drawList->AddText(nullptr, 0.0f, ImVec2(textX, textY), textColor,
+			m_label.c_str(), nullptr, 0.0f, &clip);
+	}
+	ImGui::PopID();
+
+	SnapshotStore<bool>::commit(m_snapshotKey, m_state->expanded);
+}
+
 // ProgressBarWrapper -----------------------------------------------------------
 
 Size ProgressBarWrapper::measureIntrinsic(const Constraints&)

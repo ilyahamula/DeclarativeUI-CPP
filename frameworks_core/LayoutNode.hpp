@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frameworks_core/ControlWrapper.hpp"
+#include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
 #include "frameworks_core/LayoutFlags.hpp"
@@ -29,6 +30,9 @@ struct LayoutNode
 	SplitterState split;                             // Splitter only: the sash
 	                                                 // position and its floors,
 	                                                 // shared with the sash leaf
+	ExpanderState expander;                          // Expander only: the open
+	                                                 // state, shared with the
+	                                                 // header leaf
 
 	std::vector<std::unique_ptr<LayoutNode>> children;
 	const LayoutNode* parent = nullptr;              // set by add(); disabling walks it
@@ -157,6 +161,22 @@ inline std::unique_ptr<LayoutNode> makeSplitter(Orientation orient, LayoutFlags 
 	node->kind = NodeKind::Splitter;
 	node->orientation = orient;
 	node->split.orientation = orient;
+	node->flags = flags;
+	return node;
+}
+
+// An expander has exactly two children in this order: a leaf owning the header
+// and the content container. It is a vertical Box whose second child comes and
+// goes -- so, like a Grid or a Splitter, no backend needs an Expander case at
+// all: the node itself has no chrome and opens no scope. What the backends do
+// learn is the CONTENT child, which is a parent scope they can hide in one call
+// (the tab-page pattern) and which reports itself invisible while collapsed.
+inline std::unique_ptr<LayoutNode> makeExpander(std::string label, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Expander;
+	node->orientation = Orientation::Vertical;
+	node->label = std::move(label);
 	node->flags = flags;
 	return node;
 }

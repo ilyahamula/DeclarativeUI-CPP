@@ -5,6 +5,7 @@
 #include "grid.hpp"
 #include "scrollpanel.hpp"
 #include "splitter.hpp"
+#include "expander.hpp"
 #include "groupboxes.hpp"
 #include "dialog.hpp"
 #include "tabpanel.hpp"
@@ -31,6 +32,8 @@ static_assert(NodeBuildable<ScrollPanel<VStack<Button>>>);
 static_assert(NodeBuildable<Splitter<VStack<Button>, VStack<Button>>>);
 static_assert(NodeBuildable<HSplitter<VStack<Button>, VStack<TextCtrl>>>);
 static_assert(NodeBuildable<VSplitter<VStack<Button>, VStack<TextCtrl>>>);
+static_assert(NodeBuildable<Expander<VStack<Button>>>);
+static_assert(NodeBuildable<Expander<CheckBox>>);
 static_assert(NodeBuildable<HStack<Button, TextCtrl>>);
 static_assert(NodeBuildable<VStack<StaticText, Button>>);
 

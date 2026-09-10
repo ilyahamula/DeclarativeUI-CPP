@@ -64,7 +64,7 @@ return Dialog {
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
-| Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
+| Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `MessageBox` |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
@@ -78,6 +78,12 @@ splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, w
 is exactly what the layout engine takes back — so the same tree divides the same
 way on all three backends. Bind the sash position to an `int&` and dragging writes
 through to it; writing it from anywhere else moves the sash.
+
+`Expander` folds a section away behind a clickable header. Collapsed, the content
+costs the layout *nothing at all* — not its size, not its margins, not even the gap
+above it — so an auto-fit dialog shrinks and grows as sections close and open. Bind
+the open state to a `bool&` and clicking the header writes through to it, exactly as
+the splitter's sash does with its `int&`.
 
 ---
 

@@ -79,11 +79,13 @@ private:
 	Size measureGrid(LayoutNode& node, const Constraints& c);
 	Size measureScrollPanel(LayoutNode& node, const Constraints& c);
 	Size measureSplitter(LayoutNode& node, const Constraints& c);
+	Size measureExpander(LayoutNode& node, const Constraints& c);
 	Size measureTabPanel(LayoutNode& node, const Constraints& c);
 	void arrangeBox(LayoutNode& node);
 	void arrangeGrid(LayoutNode& node);
 	void arrangeScrollPanel(LayoutNode& node);
 	void arrangeSplitter(LayoutNode& node);
+	void arrangeExpander(LayoutNode& node);
 	void arrangeTabPanel(LayoutNode& node);
 	void traverse(LayoutNode& node);
 

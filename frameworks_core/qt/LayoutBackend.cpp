@@ -76,6 +76,14 @@ void applyTooltip(QWidget* window, const ControlWrapper& widget)
 		push);
 }
 
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it. Read from the node's own parent rather than from
+// the scope stack, so it holds wherever the subtree is entered from.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
+}
+
 } // unnamed namespace
 
 QtLayoutBackend::QtLayoutBackend(QWidget* host)
@@ -183,6 +191,13 @@ QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)
 		window = new QGroupBox(labelText(node.label), m_host);
 	else if (node.kind == NodeKind::TabPanel)
 		window = new QTabWidget(m_host);
+	else if (isExpanderContent(node))
+	{
+		// A collapsed section has to take its whole subtree out of view, and a
+		// widget scope is the one handle that does it in a single call however
+		// deep that subtree runs -- the same trick a tab page relies on.
+		window = new QWidget(m_host);
+	}
 	else if (node.kind == NodeKind::ScrollPanel)
 	{
 		auto* area = new QScrollArea(m_host);
@@ -239,6 +254,28 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 	Scope scope { &node, currentParent(), m_stack.back().originX, m_stack.back().originY };
 	const bool isTabPage = m_stack.back().node != nullptr
 		&& m_stack.back().node->kind == NodeKind::TabPanel;
+
+	if (isExpanderContent(node))
+	{
+		// The panel becomes the parent and coordinate origin of the section's
+		// subtree, exactly as a tab page does -- so hiding it hides everything
+		// in it, whatever was realized while the section was open.
+		QWidget* panel = ensureContainer(node);
+		if (panel->parentWidget() != scope.parent)
+			panel->setParent(scope.parent); // setParent hides the widget
+		const bool expanded = node.parent->expander.applied;
+		panel->setVisible(expanded);
+		if (!expanded)
+			return false; // collapsed: engine skips the subtree, as for an inactive tab page
+
+		const Rect local = toLocal(frame);
+		panel->setGeometry(local.x, local.y, local.width, local.height);
+		scope.parent = panel;
+		scope.originX = frame.x;
+		scope.originY = frame.y;
+		m_stack.push_back(scope);
+		return true;
+	}
 
 	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel
 		|| node.kind == NodeKind::ScrollPanel)

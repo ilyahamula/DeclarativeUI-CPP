@@ -43,6 +43,7 @@ struct Golden
 	int aTag = 0, bTag = 0, p1Tag = 0, p2Tag = 0;
 	int gl1Tag = 0, gf1Tag = 0, gl2Tag = 0, gf2Tag = 0;
 	int sp1Tag = 0, sashTag = 0, sp2Tag = 0;
+	int hdrOpenTag = 0, secOpenTag = 0, hdrShutTag = 0, secShutTag = 0;
 
 	MockLayoutBackend mock;
 	LayoutEngine engine { mock };
@@ -70,6 +71,12 @@ struct Golden
 	LayoutNode* paneLeft = nullptr;
 	LayoutNode* sash = nullptr;
 	LayoutNode* paneRight = nullptr;
+	LayoutNode* openSection = nullptr;
+	LayoutNode* openHeader = nullptr;
+	LayoutNode* openBody = nullptr;
+	LayoutNode* shutSection = nullptr;
+	LayoutNode* shutHeader = nullptr;
+	LayoutNode* shutBody = nullptr;
 	Size window { 0, 0 };
 
 	ControlWrapper* fake(int& tag) { return reinterpret_cast<ControlWrapper*>(&tag); }
@@ -97,6 +104,12 @@ struct Golden
 		mock.setSize(fake(sp1Tag), pane);
 		mock.setSize(fake(sashTag), Size { SplitterState::kSashThickness, 0 });
 		mock.setSize(fake(sp2Tag), pane);
+		// The two expanders share a header size and a body size, so the only
+		// thing separating them is the flag on the node.
+		mock.setSize(fake(hdrOpenTag), p.label);
+		mock.setSize(fake(hdrShutTag), p.label);
+		mock.setSize(fake(secOpenTag), p.contentA);
+		mock.setSize(fake(secShutTag), p.contentA);
 		mock.chromeFn = [p](const LayoutNode& node) -> EdgeInsets {
 			if (node.kind == NodeKind::GroupBox)
 				return p.groupChrome;
@@ -139,6 +152,19 @@ struct Golden
 		sash = &panes->add(makeLeaf(fake(sashTag), LayoutFlags().Expand()));
 		paneRight = &panes->add(makeLeaf(fake(sp2Tag), LayoutFlags().Expand()));
 
+		// two expanders over identical content: one open, one closed
+		openSection = &root->add(makeExpander("Open"));
+		openSection->expander.expanded.snapshot(true);
+		openHeader = &openSection->add(makeLeaf(fake(hdrOpenTag), LayoutFlags().Expand()));
+		openBody = &openSection->add(makeBox(Orientation::Vertical));
+		openBody->add(makeLeaf(fake(secOpenTag)));
+
+		shutSection = &root->add(makeExpander("Shut"));
+		shutSection->expander.expanded.snapshot(false);
+		shutHeader = &shutSection->add(makeLeaf(fake(hdrShutTag), LayoutFlags().Expand()));
+		shutBody = &shutSection->add(makeBox(Orientation::Vertical));
+		shutBody->add(makeLeaf(fake(secShutTag)));
+
 		buttons = &root->add(makeBox(Orientation::Horizontal));
 		spacer = &buttons->add(makeLeaf(fake(spacerTag), LayoutFlags().Proportion(1)));
 		btn1 = &buttons->add(makeLeaf(fake(btn1Tag)));
@@ -170,6 +196,8 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(g.buttons->frame.width, band);
 	CHECK_EQ(g.form->frame.width, band);
 	CHECK_EQ(g.panes->frame.width, band);
+	CHECK_EQ(g.openSection->frame.width, band);
+	CHECK_EQ(g.shutSection->frame.width, band);
 	// ...and the band is driven by the widest content (box B) plus chrome
 	CHECK_EQ(band, p.contentB.width + p.groupChrome.left + p.groupChrome.right);
 
@@ -225,6 +253,22 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK_EQ(g.sash->frame.height, g.panes->frame.height);
 	CHECK_EQ(g.paneRight->frame.height, g.panes->frame.height);
 
+	// expanders: open, the section is its header plus its body one default gap
+	// below; closed, it is EXACTLY its header -- no body, no margins, and no gap
+	// where the body would have been -- and the body keeps a zero frame. Both
+	// headers span the section, so the whole row is clickable on every backend.
+	CHECK_EQ(g.openSection->frame.height,
+		p.label.height + LayoutEngine::kDefaultGap + p.contentA.height);
+	CHECK_EQ(g.shutSection->frame.height, p.label.height);
+	CHECK_EQ(g.openHeader->frame.width, band);
+	CHECK_EQ(g.shutHeader->frame.width, band);
+	CHECK_EQ(g.openBody->frame.y,
+		g.openHeader->frame.y + p.label.height + LayoutEngine::kDefaultGap);
+	CHECK_EQ(g.shutBody->frame.width, 0);
+	CHECK_EQ(g.shutBody->frame.height, 0);
+	CHECK(g.openSection->expander.applied);
+	CHECK(!g.shutSection->expander.applied);
+
 	// tab pages overlap: both pages get the panel frame inset by the chrome
 	const Rect pageArea {
 		g.tabs->frame.x + p.tabChrome.left,
@@ -242,6 +286,7 @@ void checkGoldenInvariants(const Profile& p)
 	const Rect boxBFrame = g.boxB->frame;
 	const Rect formFieldFrame = g.formField1->frame;
 	const Rect sashFrame = g.sash->frame;
+	const Rect openBodyFrame = g.openBody->frame;
 	const Size window2 = g.engine.run(*g.root);
 	CHECK(window2 == g.window);
 	CHECK(g.row->frame == rowFrame);
@@ -249,6 +294,7 @@ void checkGoldenInvariants(const Profile& p)
 	CHECK(g.boxB->frame == boxBFrame);
 	CHECK(g.formField1->frame == formFieldFrame);
 	CHECK(g.sash->frame == sashFrame);
+	CHECK(g.openBody->frame == openBodyFrame);
 }
 
 } // unnamed namespace

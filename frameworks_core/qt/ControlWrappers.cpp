@@ -30,6 +30,7 @@
 #include <QStyle>
 #include <QTableWidget>
 #include <QTimeEdit>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 
@@ -740,6 +741,52 @@ void SplitterSashWrapper::realize(void* parentWindow)
 	sash->setFrameShadow(QFrame::Sunken);
 	sash->setCursor(horizontal ? Qt::SplitHCursor : Qt::SplitVCursor);
 	m_nativeWidget = sash;
+
+}
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+
+void ExpanderHeaderWrapper::realize(void* parentWindow)
+{
+	// Qt has no collapsible-header control, so the header is a checkable tool
+	// button with an arrow beside its text -- the shape QTreeView section
+	// headers and every Qt settings dialog use, and the closest thing to
+	// wxCollapsibleHeaderCtrl that needs no painting of our own.
+	auto* header = new QToolButton(static_cast<QWidget*>(parentWindow));
+	header->setText(qstr(m_label));
+	header->setCheckable(true);
+	header->setChecked(m_state->expanded.get());
+	header->setAutoRaise(true);
+	header->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	header->setArrowType(m_state->expanded.get() ? Qt::DownArrow : Qt::RightArrow);
+	m_nativeWidget = header;
+
+	// The ExpanderState lives in the node tree, which the engine session owns
+	// and which outlives every window here; the wrapper must never be captured.
+	ExpanderState* state = m_state;
+	QObject::connect(header, &QToolButton::toggled, header, [header, state](bool open) {
+		header->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+		state->expanded.set(open);
+	});
+
+	// A bound flag can be written from anywhere, and the button applies its own
+	// state only when clicked -- so it is mirrored like any other external ref.
+	// The relayout that follows is armed separately, by the session's
+	// bindInvalidation: this only keeps the header itself honest.
+	//
+	// The arrow is set HERE as well as in the toggled handler above, and has to
+	// be: every RefSync push runs under a QSignalBlocker, so a programmatic
+	// setChecked() deliberately does not re-enter that handler.
+	if (m_state->expanded.isBound())
+	{
+		bindExternalRefSync(header,
+			[header] { return header->isChecked(); },
+			[state] { return state->expanded.get(); },
+			[header](bool open) {
+				header->setChecked(open);
+				header->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+			});
+	}
 
 }
 

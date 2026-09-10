@@ -2,6 +2,7 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
 
 #include <algorithm>
@@ -559,6 +560,43 @@ private:
 	// ImGui scope and could not derive the same key -- see the ImGui half of
 	// ControlWrappers.cpp. Unused on the retained backends, where the wrapper
 	// lives as long as the native window does.
+	std::uint64_t m_snapshotKey = 0;
+};
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+// The clickable title row of an Expander, and -- exactly like the Splitter's
+// sash -- a leaf the caller never declares: Expander::buildNode() creates it and
+// hands it a pointer to the ExpanderState living in its own node, which outlives
+// every wrapper in the tree.
+//
+// Clicking it flips that state; the engine reads the state on its next measure
+// pass and the section grows or shrinks with the dialog around it. The three
+// backends draw the row natively where they can (wxCollapsibleHeaderCtrl, a
+// checkable QToolButton) and by hand where a native row would not stay inside
+// the engine's rectangle (ImGui's CollapsingHeader always spans the whole
+// window, so the header is drawn on the draw list instead).
+class ExpanderHeaderWrapper : public ControlWrapper
+{
+public:
+	ExpanderHeaderWrapper(const std::string& label, ExpanderState* state,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_label(label)
+		, m_state(state)
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	std::string m_label;
+	ExpanderState* m_state;
+
+	// Where this header's open state is parked between ImGui frames. Taken
+	// during measureIntrinsic() and reused by render(), which runs in a
+	// different ImGui scope and could not derive the same key -- see the ImGui
+	// half of ControlWrappers.cpp. Unused on the retained backends, where the
+	// wrapper lives as long as the native window does.
 	std::uint64_t m_snapshotKey = 0;
 };
 

@@ -96,6 +96,14 @@ int buttonMeasuredHeight(const wxWindow* button, const ControlWrapper& widget)
 }
 #endif
 
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it. Read from the node's own parent rather than from
+// the scope stack, so it holds wherever the subtree is entered from.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
+}
+
 } // unnamed namespace
 
 WxLayoutBackend::WxLayoutBackend(wxWindow* host)
@@ -213,6 +221,13 @@ wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)
 		scrolled->SetScrollRate(1, 1);
 		window = scrolled;
 	}
+	else if (isExpanderContent(node))
+	{
+		// A collapsed section has to take its whole subtree out of view, and a
+		// panel is the one handle that does it in a single call however deep
+		// that subtree runs -- the same trick a notebook page relies on.
+		window = new wxPanel(m_host, wxID_ANY);
+	}
 	if (window != nullptr)
 		applyDisabled(window, node);
 	m_containers[&node] = window;
@@ -264,6 +279,28 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 	Scope scope { &node, currentParent(), m_stack.back().originX, m_stack.back().originY };
 	const bool isTabPage = m_stack.back().node != nullptr
 		&& m_stack.back().node->kind == NodeKind::TabPanel;
+
+	if (isExpanderContent(node))
+	{
+		// The panel becomes the parent and coordinate origin of the section's
+		// subtree, exactly as a notebook page does -- so hiding it hides
+		// everything in it, whatever was realized while the section was open.
+		wxWindow* panel = ensureContainer(node);
+		if (panel->GetParent() != scope.parent)
+			panel->Reparent(scope.parent);
+		const bool expanded = node.parent->expander.applied;
+		panel->Show(expanded);
+		if (!expanded)
+			return false; // collapsed: engine skips the subtree, as for an inactive tab page
+
+		const Rect local = toLocal(frame);
+		panel->SetSize(local.x, local.y, local.width, local.height);
+		scope.parent = panel;
+		scope.originX = frame.x;
+		scope.originY = frame.y;
+		m_stack.push_back(scope);
+		return true;
+	}
 
 	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel
 		|| node.kind == NodeKind::ScrollPanel)

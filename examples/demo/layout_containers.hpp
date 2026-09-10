@@ -1,7 +1,7 @@
 #pragma once
 
-// Layout primitives: the gallery dialogs for Spacer, Separator, Grid and
-// ScrollPanel.
+// Layout primitives: the gallery dialogs for Spacer, Separator, Grid,
+// ScrollPanel and Expander.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // layout primitives land here instead, alongside a few already-implemented
@@ -341,6 +341,128 @@ inline auto drawScrollPanelUI(bool& optionsDisabled)
             .withScroll(ScrollAxis::Horizontal),
             HStack {
                 LayoutFlags().Border(Side::Top, 12),
+                Spacer{},
+                Button{"Close"}
+                    .withSize({110, 28})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .onClick([]() {})
+            }
+        }
+    };
+}
+
+
+// Expander: the "Settings" gallery dialog.
+//
+// Three collapsible sections over ordinary controls. Collapsed, a section costs
+// the dialog EXACTLY its header -- no content, no margins, and not even the gap
+// the content would have sat below -- so an auto-fit dialog shrinks as sections
+// close and grows as they open. Watch the window height as you click.
+//
+// The header is native where a native one exists (wxCollapsibleHeaderCtrl, a
+// checkable QToolButton) and drawn on the draw list on ImGui, whose own
+// CollapsingHeader always spans the whole window and would overrun the engine's
+// rectangle in a narrow column -- the same reason Separator draws its own line.
+//
+// Every value inside is bound to a caller-owned variable rather than declared
+// from a literal. That is deliberate: on ImGui a folded section stops consuming
+// widget ids, so the controls after it renumber, and an unbound snapshot is
+// keyed by exactly that numbering. Bound values are the caller's variables and
+// do not care.
+//
+// The dialog pins its width with MinSize so opening a section changes the
+// height and nothing else; without it the widest open section would decide how
+// wide the whole dialog is from one click to the next.
+inline auto drawExpanderUI(
+    bool& basicOpen,
+    bool& advancedOpen,
+    bool& networkOpen,
+    bool& logging,
+    int& level,
+    int& retries,
+    std::string& proxy,
+    bool& sectionsDisabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kDialogW = 420;
+    constexpr int kLabelW = 90;
+
+    return Dialog {
+        "Settings",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({kDialogW, -1}),
+            StaticText{"Click a header: the dialog grows and shrinks with it."}
+                .withSize({-1, kLabelH}),
+
+            Expander { "Basic",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                basicOpen,
+                VStack {
+                    LayoutFlags().Expand().Border(Side::Left, 16),
+                    CheckBox{logging, "Enable logging"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        StaticText{"Level:"}
+                            .withSize({kLabelW, kRowH})
+                            .withFlags(LayoutFlags().CenterVertical()),
+                        ComboBox{ {"Error", "Warning", "Info", "Debug"}, level }
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1).Expand())
+                    }
+                }
+            }
+            .isDisabled(sectionsDisabled),
+
+            Expander { "Advanced",
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                advancedOpen,
+                VStack {
+                    LayoutFlags().Expand().Border(Side::Left, 16),
+                    HStack {
+                        LayoutFlags().Expand(),
+                        StaticText{"Retries:"}
+                            .withSize({kLabelW, kRowH})
+                            .withFlags(LayoutFlags().CenterVertical()),
+                        SpinBox { Range<int>{ .min = 0, .max = 10 }, retries }
+                            .withSize({90, kRowH})
+                    },
+                    StaticText{"This section starts collapsed; nothing below it moved."}
+                        .withSize({-1, kLabelH})
+                        .withFlags(LayoutFlags().Border(Side::Top, 6))
+                }
+            }
+            .isDisabled(sectionsDisabled),
+
+            Expander { "Network",
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                networkOpen,
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Left, 16),
+                    StaticText{"Proxy:"}
+                        .withSize({kLabelW, kRowH})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    TextCtrl{proxy}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Proportion(1).Expand()),
+                    Button{"Test"}
+                        .withSize({80, kRowH})
+                        .withFlags(LayoutFlags().Border(Side::Left, 6))
+                        .onClick([]() {})
+                }
+            }
+            .isDisabled(sectionsDisabled),
+
+            CheckBox{sectionsDisabled, "Lock every section (headers included)"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12)),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
                 Spacer{},
                 Button{"Close"}
                     .withSize({110, 28})

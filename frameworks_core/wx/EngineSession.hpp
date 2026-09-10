@@ -97,8 +97,7 @@ struct EngineSession
 	// Arms a re-measure for every source of engine-visible change in the tree.
 	//
 	// Today that is AutoGrow text fields, whose live content the measure pass
-	// reads, and Splitter sash positions. The remaining source is an Expander's
-	// collapsed state (T1.6), which joins here on the same terms.
+	// reads, Splitter sash positions, and Expander open states.
 	void bindInvalidation(LayoutNode& node)
 	{
 		// A sash drag (or anything else writing the bound int) changes a value
@@ -115,6 +114,20 @@ struct EngineSession
 				[split] { return split->resolved; },
 				[split] { return split->position.get(); },
 				[this](int) { relayout(); });
+		}
+		// Clicking a header (or anything else writing the bound bool) changes
+		// what the measure pass will find, and wx has no notification for that
+		// either. Same RefSync shape as the sash above: `applied` is what the
+		// layout currently shows and `expanded` what it should show. It has to
+		// be a full re-measure rather than a re-arrange -- a section opening
+		// changes what there is to lay out, not merely where it lands.
+		if (node.kind == NodeKind::Expander)
+		{
+			ExpanderState* expander = &node.expander;
+			bindExternalRefSync(window,
+				[expander] { return expander->applied; },
+				[expander] { return expander->expanded.get(); },
+				[this](bool) { relayout(); });
 		}
 		if (node.isLeaf())
 		{

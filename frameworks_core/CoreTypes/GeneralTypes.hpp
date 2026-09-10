@@ -78,6 +78,7 @@ enum class NodeKind
     Grid,
     ScrollPanel,
     Splitter,
+    Expander,
     Leaf
 };
 

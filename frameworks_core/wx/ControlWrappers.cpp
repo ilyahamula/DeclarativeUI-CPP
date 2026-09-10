@@ -23,6 +23,7 @@
 #include <wx/treectrl.h>
 #include <wx/dataview.h>
 #include <wx/settings.h>
+#include <wx/collheaderctrl.h>
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -752,6 +753,45 @@ void SplitterSashWrapper::realize(void* parentWindow)
 	sash->Bind(wxEVT_MOUSE_CAPTURE_LOST, [drag](wxMouseCaptureLostEvent&) {
 		drag->active = false;
 	});
+
+}
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+
+void ExpanderHeaderWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ExpanderHeaderWrapper::realize()\t-> new wxCollapsibleHeaderCtrl()\n");
+#endif
+	// wxCollapsibleHeaderCtrl is the header half of wxCollapsiblePane without
+	// the pane -- which is precisely what is wanted here, since the content is
+	// an engine-arranged subtree rather than something wx may size for us.
+	auto* header = new wxCollapsibleHeaderCtrl(static_cast<wxWindow*>(parentWindow),
+		wxID_ANY, m_label, wxPoint(m_pos.x, m_pos.y),
+		wxSize(m_size.width, m_size.height), m_style);
+	header->SetCollapsed(!m_state->expanded.get());
+	m_nativeWidget = header;
+
+	// The ExpanderState lives in the node tree, which the engine session owns
+	// and which outlives every window here; the wrapper must never be captured
+	// (wx/RefSync.hpp -- wrapper and window teardown order is not fixed).
+	ExpanderState* state = m_state;
+	header->Bind(wxEVT_COLLAPSIBLEHEADER_CHANGED, [header, state](wxCommandEvent& event) {
+		state->expanded.set(!header->IsCollapsed());
+		event.Skip();
+	});
+
+	// A bound flag can be written from anywhere, and the header control applies
+	// its own state only when clicked -- so the arrow is mirrored like any other
+	// external ref. The relayout that follows is armed separately, by the
+	// session's bindInvalidation: this only keeps the header itself honest.
+	if (m_state->expanded.isBound())
+	{
+		bindExternalRefSync(header,
+			[header] { return !header->IsCollapsed(); },
+			[state] { return state->expanded.get(); },
+			[header](bool open) { header->SetCollapsed(!open); });
+	}
 
 }
 
