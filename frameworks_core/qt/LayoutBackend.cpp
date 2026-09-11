@@ -7,6 +7,8 @@
 #include <QGroupBox>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QScrollArea>
+#include <QStyle>
 #include <QTabWidget>
 
 #include <algorithm>
@@ -72,6 +74,14 @@ void applyTooltip(QWidget* window, const ControlWrapper& widget)
 		[window] { return window->toolTip().toStdString(); },
 		[bound] { return *bound; },
 		push);
+}
+
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it. Read from the node's own parent rather than from
+// the scope stack, so it holds wherever the subtree is entered from.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
 }
 
 } // unnamed namespace
@@ -181,6 +191,23 @@ QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)
 		window = new QGroupBox(labelText(node.label), m_host);
 	else if (node.kind == NodeKind::TabPanel)
 		window = new QTabWidget(m_host);
+	else if (isExpanderContent(node))
+	{
+		// A collapsed section has to take its whole subtree out of view, and a
+		// widget scope is the one handle that does it in a single call however
+		// deep that subtree runs -- the same trick a tab page relies on.
+		window = new QWidget(m_host);
+	}
+	else if (node.kind == NodeKind::ScrollPanel)
+	{
+		auto* area = new QScrollArea(m_host);
+		area->setFrameShape(QFrame::NoFrame);
+		// The inner widget is sized by the engine, not by Qt: it IS the virtual
+		// rect, and the children placed into it are what scrolls.
+		area->setWidgetResizable(false);
+		area->setWidget(new QWidget(area));
+		window = area;
+	}
 	if (window != nullptr)
 		applyDisabled(window, node);
 	m_containers[&node] = window;
@@ -204,6 +231,21 @@ EdgeInsets QtLayoutBackend::containerInsets(const LayoutNode& node)
 		// useful height only after pages exist)
 		return { 2, 2, tabs->fontMetrics().height() + 14, 2 };
 	}
+	if (node.kind == NodeKind::ScrollPanel)
+	{
+		// The scrollbar gutter, reserved on the cross side of each scrolling
+		// axis and reserved ALWAYS: containerInsets runs before the content is
+		// measured, so "only when it overflows" could read no more than the
+		// previous pass and would let a panel near the boundary oscillate.
+		QWidget* area = ensureContainer(node);
+		const int bar = area->style()->pixelMetric(QStyle::PM_ScrollBarExtent, nullptr, area);
+		return {
+			0,
+			scrollsVertically(node.scroll) ? bar : 0,
+			0,
+			scrollsHorizontally(node.scroll) ? bar : 0,
+		};
+	}
 	return {};
 }
 
@@ -213,7 +255,30 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 	const bool isTabPage = m_stack.back().node != nullptr
 		&& m_stack.back().node->kind == NodeKind::TabPanel;
 
-	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel)
+	if (isExpanderContent(node))
+	{
+		// The panel becomes the parent and coordinate origin of the section's
+		// subtree, exactly as a tab page does -- so hiding it hides everything
+		// in it, whatever was realized while the section was open.
+		QWidget* panel = ensureContainer(node);
+		if (panel->parentWidget() != scope.parent)
+			panel->setParent(scope.parent); // setParent hides the widget
+		const bool expanded = node.parent->expander.applied;
+		panel->setVisible(expanded);
+		if (!expanded)
+			return false; // collapsed: engine skips the subtree, as for an inactive tab page
+
+		const Rect local = toLocal(frame);
+		panel->setGeometry(local.x, local.y, local.width, local.height);
+		scope.parent = panel;
+		scope.originX = frame.x;
+		scope.originY = frame.y;
+		m_stack.push_back(scope);
+		return true;
+	}
+
+	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel
+		|| node.kind == NodeKind::ScrollPanel)
 	{
 		QWidget* window = ensureContainer(node);
 		if (window->parentWidget() != scope.parent)
@@ -225,6 +290,28 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		window->setGeometry(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
 			window->lower(); // chrome stays behind its sibling content
+
+		if (node.kind == NodeKind::ScrollPanel)
+		{
+			// The inner widget becomes the parent and coordinate origin of the
+			// subtree, exactly as a tab page does; QScrollArea scrolls by moving
+			// that widget, so the children never need the scroll offset applied
+			// to them. Its size is the content's arranged frame -- the engine
+			// already sized that to the full extent there is to scroll over.
+			auto* area = static_cast<QScrollArea*>(window);
+			area->setVerticalScrollBarPolicy(scrollsVertically(node.scroll)
+				? Qt::ScrollBarAlwaysOn : Qt::ScrollBarAlwaysOff);
+			area->setHorizontalScrollBarPolicy(scrollsHorizontally(node.scroll)
+				? Qt::ScrollBarAlwaysOn : Qt::ScrollBarAlwaysOff);
+
+			QWidget* inner = area->widget();
+			const Rect virt = node.children.empty() ? Rect{} : node.children.front()->frame;
+			inner->resize(virt.width, virt.height);
+			inner->show();
+			scope.parent = inner;
+			scope.originX = frame.x;
+			scope.originY = frame.y;
+		}
 	}
 	else if (isTabPage)
 	{

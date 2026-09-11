@@ -182,8 +182,7 @@ inline auto drawControlsUI(
             },
             HStack {
                 LayoutFlags().Border(Side::Top, 8),
-                StaticText{""}
-                    .withFlags(LayoutFlags().Proportion(1)),
+                Spacer{},
                 Button{"Check"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())

@@ -2,8 +2,11 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/ExpanderState.hpp"
+#include "frameworks_core/CoreTypes/SplitterState.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <numeric>
@@ -475,17 +478,126 @@ private:
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
 
+// SpacerWrapper -----------------------------------------------------------
+// The one windowless leaf: it creates nothing on any backend, so it declares no
+// realize() (the base's no-op is exactly right, and the retained backends fall
+// back to measureContent() while the native handle stays null) and it overrides
+// measureIntrinsic() for every backend rather than through
+// DECLARE_CONTROL_WRAPPER_OVERRIDES, whose ImGui half would leave wx and Qt
+// measuring the base's {0, 0}. Its extent is pure data, so one body serves all
+// three.
+class SpacerWrapper : public ControlWrapper
+{
+public:
+	SpacerWrapper(const Size& fixedSize,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_fixedSize(fixedSize)
+	{
+	}
+
+	// {0, 0} for a flexible spacer: its extent comes from the Proportion the
+	// widget defaults to, never from content.
+	Size measureIntrinsic(const Constraints&) override
+	{
+		return m_fixedSize;
+	}
+
+#ifdef USE_IMGUI
+	void render(const Rect& frame) override;
+#endif
+
+private:
+	Size m_fixedSize;
+};
+
 // SeparatorWrapper -----------------------------------------------------------
 class SeparatorWrapper : public ControlWrapper
 {
 public:
-	SeparatorWrapper(
+	SeparatorWrapper(Orientation orient,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
+		, m_orient(orient)
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	Orientation m_orient;
+};
+
+// SplitterSashWrapper -----------------------------------------------------------
+// The draggable divider between a Splitter's two panes, and the one wrapper a
+// caller never declares: Splitter::buildNode() creates it and hands it a pointer
+// to the SplitterState living in its own node, which outlives every wrapper in
+// the tree.
+//
+// There is no native splitter behind it on any backend -- wxSplitterWindow and
+// QSplitter own their children's geometry and would fight the engine, which is
+// the very thing the layout engine removed. What is left is a 6 px leaf that
+// knows how to be dragged: it writes the first pane's new extent into the state
+// (clamped against the bounds the arrange pass published there) and the engine
+// re-divides the area on the next pass.
+class SplitterSashWrapper : public ControlWrapper
+{
+public:
+	SplitterSashWrapper(SplitterState* state,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_state(state)
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	SplitterState* m_state;
+
+	// Where this sash's position is parked between ImGui frames. Taken during
+	// measureIntrinsic() and reused by render(), which runs in a different
+	// ImGui scope and could not derive the same key -- see the ImGui half of
+	// ControlWrappers.cpp. Unused on the retained backends, where the wrapper
+	// lives as long as the native window does.
+	std::uint64_t m_snapshotKey = 0;
+};
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+// The clickable title row of an Expander, and -- exactly like the Splitter's
+// sash -- a leaf the caller never declares: Expander::buildNode() creates it and
+// hands it a pointer to the ExpanderState living in its own node, which outlives
+// every wrapper in the tree.
+//
+// Clicking it flips that state; the engine reads the state on its next measure
+// pass and the section grows or shrinks with the dialog around it. The three
+// backends draw the row natively where they can (wxCollapsibleHeaderCtrl, a
+// checkable QToolButton) and by hand where a native row would not stay inside
+// the engine's rectangle (ImGui's CollapsingHeader always spans the whole
+// window, so the header is drawn on the draw list instead).
+class ExpanderHeaderWrapper : public ControlWrapper
+{
+public:
+	ExpanderHeaderWrapper(const std::string& label, ExpanderState* state,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_label(label)
+		, m_state(state)
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	std::string m_label;
+	ExpanderState* m_state;
+
+	// Where this header's open state is parked between ImGui frames. Taken
+	// during measureIntrinsic() and reused by render(), which runs in a
+	// different ImGui scope and could not derive the same key -- see the ImGui
+	// half of ControlWrappers.cpp. Unused on the retained backends, where the
+	// wrapper lives as long as the native window does.
+	std::uint64_t m_snapshotKey = 0;
 };
 
 // ProgressBarWrapper -----------------------------------------------------------
@@ -826,11 +938,11 @@ extern template class TreeViewWrapper<std::vector<std::string>>;
 //
 // The ROWS are a BoundValue as well as the selection, which is what makes cell
 // editing work: bound, an edit writes through to the caller's data and is what
-// every backend redraws from; unbound, it lands in a snapshot this wrapper owns
-// and only onCellChange observes it. That distinction is invisible on wx and Qt
-// -- their native control retains the edited text either way -- but decides the
-// behaviour on ImGui, where the whole tree is rebuilt every frame and an edit
-// with nowhere caller-owned to live is gone by the next one.
+// every backend redraws from; unbound, it lands in a snapshot and only
+// onCellChange observes it. The edit survives either way on every backend --
+// the native control retains it on wx and Qt, and on ImGui, where the whole
+// tree is rebuilt every frame, an unbound snapshot lives in the per-widget
+// store (frameworks_core/imgui/SnapshotStore.hpp) rather than in this wrapper.
 template <TableValue T>
 class TableWrapper : public ControlWrapper
 {
@@ -1034,8 +1146,8 @@ public:
 	const T& boundValue() const { return m_value.get(); }
 
 	// Non-null only while the rows are bound: the caller-owned table an edit may
-	// write through to. A snapshot reports nullptr -- see the note above on what
-	// that costs on ImGui.
+	// write through to. A snapshot reports nullptr -- an edit still sticks, but
+	// it is the framework's copy that keeps it.
 	TableRows* boundRows() { return m_rows.isBound() ? &m_rows.get() : nullptr; }
 
 private:

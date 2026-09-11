@@ -11,6 +11,8 @@
 #include "composite_dialogs.hpp"
 #include "container_disabling.hpp"
 #include "value_binding.hpp"
+#include "layout_containers.hpp"
+#include "app_shell.hpp"
 #include "layout_probes.hpp"
 
 #ifdef USE_LOGGER

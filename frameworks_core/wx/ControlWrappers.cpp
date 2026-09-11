@@ -22,6 +22,8 @@
 #include <wx/clrpicker.h>
 #include <wx/treectrl.h>
 #include <wx/dataview.h>
+#include <wx/settings.h>
+#include <wx/collheaderctrl.h>
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -678,8 +680,118 @@ void SeparatorWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("SeparatorWrapper::realize()\t-> new wxStaticLine()\n");
 #endif
+	const long orientStyle = m_orient == Orientation::Vertical ? wxLI_VERTICAL : wxLI_HORIZONTAL;
 	m_nativeWidget = new wxStaticLine(static_cast<wxWindow*>(parentWindow), wxID_ANY,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxLI_HORIZONTAL);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | orientStyle);
+
+}
+
+// SplitterSashWrapper -----------------------------------------------------------
+
+void SplitterSashWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("SplitterSashWrapper::realize()\t-> new wxPanel()\n");
+#endif
+	const bool horizontal = m_state->orientation == Orientation::Horizontal;
+
+	auto* sash = new wxPanel(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+	m_nativeWidget = sash;
+	sash->SetCursor(wxCursor(horizontal ? wxCURSOR_SIZEWE : wxCURSOR_SIZENS));
+	sash->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_3DSHADOW));
+	// An empty wxPanel's best size is arbitrary; the sash is exactly this thick
+	// on its own axis and asks for nothing on the other, where the engine
+	// stretches it across both panes.
+	sash->SetMinSize(wxSize(horizontal ? SplitterState::kSashThickness : 0,
+		horizontal ? 0 : SplitterState::kSashThickness));
+
+	// Per-drag state, shared by the handlers below through a shared_ptr rather
+	// than through the wrapper: every handler dies with the panel, and nothing
+	// here may capture the wrapper (wx/RefSync.hpp -- wrapper and window
+	// teardown order is not fixed). The SplitterState may be: it lives in the
+	// node tree, which the engine session owns.
+	struct SashDrag
+	{
+		int anchorScreen = 0;
+		int anchorPos = 0;
+		bool active = false;
+	};
+	auto drag = std::make_shared<SashDrag>();
+	SplitterState* state = m_state;
+
+	// The drag anchors on the position arrange RESOLVED when the gesture began,
+	// so a long drag cannot accumulate rounding the way a per-event delta would,
+	// and screen coordinates are used because the panel itself moves underneath
+	// the pointer as the layout follows it.
+	sash->Bind(wxEVT_LEFT_DOWN, [sash, state, drag, horizontal](wxMouseEvent& event) {
+		const wxPoint screen = sash->ClientToScreen(event.GetPosition());
+		drag->anchorScreen = horizontal ? screen.x : screen.y;
+		drag->anchorPos = state->resolved;
+		drag->active = true;
+		if (!sash->HasCapture())
+			sash->CaptureMouse();
+		event.Skip();
+	});
+	sash->Bind(wxEVT_MOTION, [sash, state, drag, horizontal](wxMouseEvent& event) {
+		if (drag->active && event.Dragging())
+		{
+			const wxPoint screen = sash->ClientToScreen(event.GetPosition());
+			const int moved = (horizontal ? screen.x : screen.y) - drag->anchorScreen;
+			state->position.set(std::clamp(drag->anchorPos + moved,
+				state->lowerBound, state->upperBound));
+		}
+		event.Skip();
+	});
+	sash->Bind(wxEVT_LEFT_UP, [sash, drag](wxMouseEvent& event) {
+		drag->active = false;
+		if (sash->HasCapture())
+			sash->ReleaseMouse();
+		event.Skip();
+	});
+	// The capture is already gone here; releasing it again would assert.
+	sash->Bind(wxEVT_MOUSE_CAPTURE_LOST, [drag](wxMouseCaptureLostEvent&) {
+		drag->active = false;
+	});
+
+}
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+
+void ExpanderHeaderWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ExpanderHeaderWrapper::realize()\t-> new wxCollapsibleHeaderCtrl()\n");
+#endif
+	// wxCollapsibleHeaderCtrl is the header half of wxCollapsiblePane without
+	// the pane -- which is precisely what is wanted here, since the content is
+	// an engine-arranged subtree rather than something wx may size for us.
+	auto* header = new wxCollapsibleHeaderCtrl(static_cast<wxWindow*>(parentWindow),
+		wxID_ANY, m_label, wxPoint(m_pos.x, m_pos.y),
+		wxSize(m_size.width, m_size.height), m_style);
+	header->SetCollapsed(!m_state->expanded.get());
+	m_nativeWidget = header;
+
+	// The ExpanderState lives in the node tree, which the engine session owns
+	// and which outlives every window here; the wrapper must never be captured
+	// (wx/RefSync.hpp -- wrapper and window teardown order is not fixed).
+	ExpanderState* state = m_state;
+	header->Bind(wxEVT_COLLAPSIBLEHEADER_CHANGED, [header, state](wxCommandEvent& event) {
+		state->expanded.set(!header->IsCollapsed());
+		event.Skip();
+	});
+
+	// A bound flag can be written from anywhere, and the header control applies
+	// its own state only when clicked -- so the arrow is mirrored like any other
+	// external ref. The relayout that follows is armed separately, by the
+	// session's bindInvalidation: this only keeps the header itself honest.
+	if (m_state->expanded.isBound())
+	{
+		bindExternalRefSync(header,
+			[header] { return !header->IsCollapsed(); },
+			[state] { return state->expanded.get(); },
+			[header](bool open) { header->SetCollapsed(!open); });
+	}
 
 }
 

@@ -1,9 +1,12 @@
 #pragma once
 
 #include "frameworks_core/ControlWrapper.hpp"
+#include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
+#include "frameworks_core/CoreTypes/SplitterState.hpp"
 #include "frameworks_core/LayoutFlags.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,6 +22,17 @@ struct LayoutNode
 	Orientation orientation = Orientation::Vertical; // for Box/GroupBox
 	LayoutFlags flags;                               // how THIS node sits in its parent
 	std::string label;                               // GroupBox title / Tab title
+	int columns = 0;                                 // Grid only: cells fill rows
+	                                                 // left-to-right, so a cell's
+	                                                 // column is index % columns and
+	                                                 // its row index / columns
+	ScrollAxis scroll = ScrollAxis::Vertical;        // ScrollPanel only
+	SplitterState split;                             // Splitter only: the sash
+	                                                 // position and its floors,
+	                                                 // shared with the sash leaf
+	ExpanderState expander;                          // Expander only: the open
+	                                                 // state, shared with the
+	                                                 // header leaf
 
 	std::vector<std::unique_ptr<LayoutNode>> children;
 	const LayoutNode* parent = nullptr;              // set by add(); disabling walks it
@@ -108,6 +122,60 @@ inline std::unique_ptr<LayoutNode> makeGroupBox(Orientation orient, std::string 
 	auto node = std::make_unique<LayoutNode>();
 	node->kind = NodeKind::GroupBox;
 	node->orientation = orient;
+	node->label = std::move(label);
+	node->flags = flags;
+	return node;
+}
+
+// A grid has no chrome and no backend scope -- it is a Box that happens to
+// arrange its children in `columns` columns, so every backend treats it as one.
+inline std::unique_ptr<LayoutNode> makeGrid(int columns, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Grid;
+	node->columns = std::max(1, columns);
+	node->flags = flags;
+	return node;
+}
+
+// A scroll panel has exactly one content child. The backend turns it into a
+// parent+origin scope with native scrollbars (T1.4b); the engine only decides
+// how big the viewport is and how big a virtual rect the content gets inside it.
+inline std::unique_ptr<LayoutNode> makeScrollPanel(ScrollAxis axis, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::ScrollPanel;
+	node->scroll = axis;
+	node->flags = flags;
+	return node;
+}
+
+// A splitter has exactly three children in this order: the first pane, a leaf
+// owning the sash, and the second pane. The sash is a leaf like any other --
+// the backends measure, place, disable and (not) tooltip it without knowing
+// what it is -- which is why no backend needs a Splitter case at all: like a
+// Grid, the node itself is a box with no chrome and no scope.
+inline std::unique_ptr<LayoutNode> makeSplitter(Orientation orient, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Splitter;
+	node->orientation = orient;
+	node->split.orientation = orient;
+	node->flags = flags;
+	return node;
+}
+
+// An expander has exactly two children in this order: a leaf owning the header
+// and the content container. It is a vertical Box whose second child comes and
+// goes -- so, like a Grid or a Splitter, no backend needs an Expander case at
+// all: the node itself has no chrome and opens no scope. What the backends do
+// learn is the CONTENT child, which is a parent scope they can hide in one call
+// (the tab-page pattern) and which reports itself invisible while collapsed.
+inline std::unique_ptr<LayoutNode> makeExpander(std::string label, LayoutFlags flags = {})
+{
+	auto node = std::make_unique<LayoutNode>();
+	node->kind = NodeKind::Expander;
+	node->orientation = Orientation::Vertical;
 	node->label = std::move(label);
 	node->flags = flags;
 	return node;

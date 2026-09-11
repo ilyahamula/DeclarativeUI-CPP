@@ -21,6 +21,11 @@ public:
 	// engine-owned constant, identical on every backend).
 	static constexpr int kDefaultGap = 8;
 
+	// Viewport a ScrollPanel falls back to on a scrolling axis when the caller
+	// set no MaxSize there: the whole point of the panel is that its content
+	// does NOT decide the window's size, so an uncapped axis needs a number.
+	static constexpr int kDefaultScrollViewport = 240;
+
 	// Width cap offered to an auto-fit root so wrapping content wraps
 	// instead of widening the window without bound. Backends may override
 	// via setMaxAutoFitWidth() with a fraction of the actual work area.
@@ -71,8 +76,16 @@ private:
 	static constexpr int kMaxReconcilePasses = 8;
 
 	Size measureBox(LayoutNode& node, const Constraints& c);
+	Size measureGrid(LayoutNode& node, const Constraints& c);
+	Size measureScrollPanel(LayoutNode& node, const Constraints& c);
+	Size measureSplitter(LayoutNode& node, const Constraints& c);
+	Size measureExpander(LayoutNode& node, const Constraints& c);
 	Size measureTabPanel(LayoutNode& node, const Constraints& c);
 	void arrangeBox(LayoutNode& node);
+	void arrangeGrid(LayoutNode& node);
+	void arrangeScrollPanel(LayoutNode& node);
+	void arrangeSplitter(LayoutNode& node);
+	void arrangeExpander(LayoutNode& node);
 	void arrangeTabPanel(LayoutNode& node);
 	void traverse(LayoutNode& node);
 

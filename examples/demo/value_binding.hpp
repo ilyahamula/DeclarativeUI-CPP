@@ -330,3 +330,315 @@ inline auto drawGroupDisabledByCheckBox(int& value, bool& disabled)
         }
     };
 }
+
+// Spacer and vertical Separator under a bound isDisabled(). Neither carries a
+// value of its own, so
+// there is nothing to share by reference the way the dialogs above do -- the
+// bindable half of it is the disable flag, and even that it only ever inherits:
+// a windowless leaf has nothing to grey out, and never asks for the flag.
+//
+// So the binding on show is one bool doing three jobs around the spacers: it is
+// the CheckBox's own value, it disables the group box the flexible Spacer{}
+// pushes apart, and it disables the Button in the fixed row. Tick the box and
+// every one of them follows at once, while the gaps stay exactly where the
+// engine put them -- which is the point: geometry is not state.
+inline auto drawSpacerDisableBinding(std::string& caption, bool& disabled)
+{
+    return Dialog {
+        "Spacer in a bound row",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HGroupBox { "Pushed apart by one Spacer{}",
+                LayoutFlags().Expand().MinSize({380, -1}),
+                // Both fields are bound to the same string, so the spacer sits
+                // between two controls that already mirror each other: editing
+                // either one leaves the gap untouched.
+                TextCtrl{caption}
+                    .withSize({150, 26})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Spacer{},
+                // A vertical Separator between them: like the Spacer it carries
+                // no value of its own, and like every leaf it inherits the group
+                // box's bound disable flag rather than naming it.
+                Separator{Orientation::Vertical}
+                    .withSize({1, -1})
+                    .withFlags(LayoutFlags().Expand()),
+                Spacer{},
+                TextCtrl{caption}
+                    .withSize({150, 26})
+                    .withFlags(LayoutFlags().CenterVertical())
+            }
+            .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 12),
+                CheckBox{disabled, "Lock the row"}
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Spacer{},
+                Button{"Reset"}
+                    .withSize({90, 28})
+                    .isDisabled(disabled)
+                    .onClick([&caption]() { caption = "shared"; })
+            }
+        }
+    };
+}
+
+// A Grid of TextCtrls over one string. Every field in column 1 is bound to the
+// same std::string, so typing in any one of them moves all the others -- the
+// same shared-ref sync as drawTextMirror, but arranged as a form so the labels
+// and fields line up in two bands rather than three independent rows.
+//
+// The Grid itself is bound to isDisabled(), which cascades to all six cells;
+// none of them names the flag. Note the CheckBox lives OUTSIDE the grid, or
+// locking the form would lock the control that unlocks it.
+inline auto drawGridMirror(std::string& shared, bool& disabled)
+{
+    constexpr int kLabelH = 22;
+    constexpr int kFieldH = 26;
+
+    return Dialog {
+        "Grid of fields (shared string)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"All three fields are bound to one std::string:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            Grid { 2, LayoutFlags().Expand().MinSize({420, -1}),
+                StaticText{"First:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand()),
+
+                StaticText{"Second:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand()),
+
+                StaticText{"Third:"}
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{shared}
+                    .withSize({-1, kFieldH})
+                    .withFlags(LayoutFlags().Proportion(1).Expand())
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock the grid"}
+                .withSize({-1, kFieldH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// Ten CheckBoxes inside a ScrollPanel, all bound to ONE bool that lives outside
+// it -- and a CheckBox outside the panel bound to the same one. Tick any of
+// them and every other follows, including the ones currently scrolled out of
+// sight: a bound value is polled, not captured at build time, so being off
+// screen changes nothing.
+//
+// That is also the point of the second flag. It disables the panel, and the
+// cascade reaches the whole scrolled subtree -- none of the rows names it.
+inline auto drawScrollPanelBinding(bool& shared, bool& disabled)
+{
+    constexpr int kRowH = 28;
+
+    return Dialog {
+        "Scrolled checkboxes (shared bool)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({360, -1}),
+            CheckBox{shared, "Outside the panel -- bound to the same bool"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Bottom, 8)),
+            ScrollPanel { LayoutFlags().Expand(),
+                VStack {
+                    LayoutFlags().Expand(),
+                    CheckBox{shared, "Bound copy 1"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 2"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 3"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 4"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 5"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 6"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 7"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 8"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 9"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand()),
+                    CheckBox{shared, "Bound copy 10"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock the scrolled list"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}
+
+// Two splitters and a spin box on ONE int: drag either sash and the other one
+// follows, and typing a number into the spin box moves them both.
+//
+// This is the same shared-ref idiom the dialogs above use, applied to a value
+// the user drives by dragging rather than by typing -- and it is the honest test
+// of a Splitter's binding, because it exercises both directions at once. The
+// sash writes the first pane's new width through to `divider`; anything else
+// writing `divider` moves the sash. Neither splitter knows the other exists.
+//
+// Note that a bound position is CLAMPED by each splitter against its own floors
+// but written back unclamped by neither: the engine only ever reads the int, so
+// the spin box shows exactly what the user last committed. What each splitter
+// then draws is that value pinned into its own legal range -- which is why the
+// two sashes can briefly disagree if you type a number one of them cannot honour.
+inline auto drawSplitterBinding(int& divider, bool& disabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kPaneH = 110;
+
+    return Dialog {
+        "Two splitters (shared int)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({520, -1}),
+            StaticText{"Both sashes and the spin box are bound to the same int:"}
+                .withSize({-1, kLabelH}),
+            HSplitter { LayoutFlags().Expand().Border(Side::Top, 8).MinSize({-1, kPaneH}),
+                divider,
+                VGroupBox { "Left",
+                    LayoutFlags().Expand(),
+                    // T is the binding type and cannot be deduced from items
+                    // alone, so an unbound list spells it out.
+                    ListBox<std::string> { { "Alpha", "Beta", "Gamma" } }
+                        .withVisibleRows(4)
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(disabled)
+                },
+                VGroupBox { "Right",
+                    LayoutFlags().Expand(),
+                    MultiLineTextCtrl{"Drag the sash above or below."}
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(disabled)
+                }
+            }
+            .isDisabled(disabled),
+            HSplitter { LayoutFlags().Expand().Border(Side::Top, 10).MinSize({-1, kPaneH}),
+                divider,
+                // Read-only fields rather than StaticText: a pane's width is
+                // whatever the user last dragged it to, and wrapping text pinned
+                // to one line's height would overflow its own frame the moment
+                // the pane narrowed. A single-line field clips instead.
+                VGroupBox { "Same int, second splitter",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"This sash mirrors the one above."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                },
+                VGroupBox { "Remainder",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"...and this pane takes what is left."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
+                StaticText{"Sash position:"}
+                    .withSize({100, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                // Writes the same int the two sashes do: type into it and both
+                // move, drag either sash and it follows.
+                SpinBox { Range<int>{ .min = 40, .max = 460 }, divider }
+                    .withSize({90, kRowH})
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .isDisabled(disabled),
+                Spacer{},
+                CheckBox{disabled, "Lock both splitters"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+            }
+        }
+    };
+}
+
+
+// A CheckBox, a ToggleButton and an Expander on ONE bool: tick the box and the
+// section opens, click the header and the box ticks itself.
+//
+// This is the same shared-ref idiom the dialogs above use, applied to a value
+// the user drives by clicking a container's chrome rather than a control. The
+// header writes the new state through to `open`; anything else writing `open`
+// folds or unfolds the section, and the dialog re-fits around it -- a section
+// closing is a re-measure, not just a move, which is why the window follows.
+//
+// The second expander is bound to the SAME bool, so the two open and close
+// together and neither knows the other exists.
+inline auto drawExpanderBinding(bool& open, bool& disabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+
+    return Dialog {
+        "Two expanders (shared bool)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({420, -1}),
+            StaticText{"Both headers, the check box and the toggle share one bool:"}
+                .withSize({-1, kLabelH}),
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                CheckBox{open, "Show details"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    .isDisabled(disabled),
+                ToggleButton{open, "Details"}
+                    .withSize({110, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(disabled)
+            },
+            Expander { "Details",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                open,
+                VGroupBox { "Bound to the same bool",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"Fold me from the check box, the toggle or my own header."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            Expander { "Details, again",
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                open,
+                VGroupBox { "Same bool, second expander",
+                    LayoutFlags().Expand(),
+                    ReadonlyTextCtrl{"...and this one follows the first."}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand())
+                }
+            }
+            .isDisabled(disabled),
+            CheckBox{disabled, "Lock both sections"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}

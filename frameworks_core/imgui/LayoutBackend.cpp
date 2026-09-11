@@ -13,19 +13,21 @@
 namespace
 {
 
-// Engine frames are relative to the window content origin; ImGui cursor
-// coordinates are window-relative including title bar and padding.
-ImVec2 toWindowPos(const Rect& frame)
+// Engine frames are absolute; ImGui cursor coordinates are relative to the
+// current window's content origin (which is the child's own, inside a
+// BeginChild). `scopeX/scopeY` is the absolute origin of that window -- 0 for
+// the dialog, the panel's origin inside a ScrollPanel.
+ImVec2 toWindowPos(const Rect& frame, int scopeX, int scopeY)
 {
 	const ImVec2 origin = ImGui::GetCursorStartPos();
-	return ImVec2(origin.x + (float)frame.x, origin.y + (float)frame.y);
+	return ImVec2(origin.x + (float)(frame.x - scopeX), origin.y + (float)(frame.y - scopeY));
 }
 
 // Screen-space point for draw-list chrome.
-ImVec2 toScreenPos(const Rect& frame)
+ImVec2 toScreenPos(const Rect& frame, int scopeX, int scopeY)
 {
 	const ImVec2 window = ImGui::GetWindowPos();
-	const ImVec2 local = toWindowPos(frame);
+	const ImVec2 local = toWindowPos(frame, scopeX, scopeY);
 	return ImVec2(window.x + local.x - ImGui::GetScrollX(),
 		window.y + local.y - ImGui::GetScrollY());
 }
@@ -33,6 +35,13 @@ ImVec2 toScreenPos(const Rect& frame)
 int ceilInt(float v)
 {
 	return (int)std::ceil(v);
+}
+
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
 }
 
 } // unnamed namespace
@@ -51,7 +60,7 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	// same way, so a leaf inside a disabled group box stays disabled either way
 	const bool disabled = leaf.isDisabledEffective();
 
-	ImGui::SetCursorPos(toWindowPos(frame));
+	ImGui::SetCursorPos(toWindowPos(frame, currentScope().originX, currentScope().originY));
 	// group the render so composite widgets (DatePicker = 3 items) read
 	// back as one item rect
 	ImGui::BeginGroup();
@@ -103,6 +112,22 @@ EdgeInsets ImGuiLayoutBackend::containerInsets(const LayoutNode& node)
 	case NodeKind::TabPanel:
 		// tab bar row above the pages
 		return EdgeInsets { 0, 0, ceilInt(ImGui::GetFrameHeight() + style.ItemSpacing.y), 0 };
+	case NodeKind::ScrollPanel:
+	{
+		// The scrollbar gutter, reserved on the cross side of each scrolling
+		// axis and reserved ALWAYS -- containerInsets runs before the content
+		// is measured, so "only when it overflows" could only ever read the
+		// previous pass and would let a panel near the boundary oscillate.
+		// ImGui reserves the same gutter wx and Qt do, rather than letting its
+		// scrollbar overlay the content: one tree, one set of content frames.
+		const int bar = ceilInt(style.ScrollbarSize);
+		return EdgeInsets {
+			0,
+			scrollsVertically(node.scroll) ? bar : 0,
+			0,
+			scrollsHorizontally(node.scroll) ? bar : 0,
+		};
+	}
 	default:
 		return EdgeInsets{};
 	}
@@ -114,6 +139,13 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 	// it: BeginDisabled nests by OR, so no child can opt back in. The scope is
 	// popped in endContainer, and on every early-out below.
 	const bool disabled = node.isDisabledEffective();
+
+	// A collapsed section draws nothing at all -- no chrome, no disabled scope,
+	// no child window -- so it reports invisible before any of that is opened,
+	// exactly as an inactive tab page does. Nothing else is needed on ImGui:
+	// there are no retained windows here to take back out of view.
+	if (isExpanderContent(node) && !node.parent->expander.applied)
+		return false;
 
 	// a container whose open parent is a TabPanel is a tab page
 	const bool isTabPage = !m_containerStack.empty()
@@ -144,7 +176,7 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 	{
 		// chrome only — border + title via the draw list, no child window,
 		// so every frame stays in one coordinate space
-		const ImVec2 min = toScreenPos(frame);
+		const ImVec2 min = toScreenPos(frame, currentScope().originX, currentScope().originY);
 		const ImVec2 max = ImVec2(min.x + (float)frame.width, min.y + (float)frame.height);
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
 		drawList->AddRect(min, max, ImGui::GetColorU32(ImGuiCol_Border));
@@ -158,7 +190,7 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 	}
 	case NodeKind::TabPanel:
 	{
-		ImGui::SetCursorPos(toWindowPos(frame));
+		ImGui::SetCursorPos(toWindowPos(frame, currentScope().originX, currentScope().originY));
 		ImGui::PushID(WidgetIdManager::nextWidgetId());
 		if (!ImGui::BeginTabBar("##tabs"))
 		{
@@ -167,6 +199,39 @@ bool ImGuiLayoutBackend::beginContainer(const LayoutNode& node, const Rect& fram
 				ImGui::EndDisabled();
 			return false;
 		}
+		break;
+	}
+	case NodeKind::ScrollPanel:
+	{
+		ImGui::SetCursorPos(toWindowPos(frame, currentScope().originX, currentScope().originY));
+		ImGui::PushID(WidgetIdManager::nextWidgetId());
+
+		// Bars are AlwaysX to match the gutter containerInsets always reserves;
+		// a bar that came and went would move the content under the user.
+		ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoSavedSettings;
+		if (scrollsVertically(node.scroll))
+			windowFlags |= ImGuiWindowFlags_AlwaysVerticalScrollbar;
+		if (scrollsHorizontally(node.scroll))
+			windowFlags |= ImGuiWindowFlags_HorizontalScrollbar
+				| ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+
+		// Whatever BeginChild returns, EndChild must run -- and the engine only
+		// calls endContainer when beginContainer returned true, so this branch
+		// never reports invisible the way an inactive tab page does.
+		ImGui::BeginChild("##scroll", ImVec2((float)frame.width, (float)frame.height),
+			ImGuiChildFlags_None, windowFlags);
+
+		// Declare the virtual extent up front so the child has something to
+		// scroll over; the content itself is drawn at absolute cursor positions
+		// on top of it, so this Dummy only ever sets the content size.
+		if (!node.children.empty())
+		{
+			const Rect& content = node.children.front()->frame;
+			ImGui::Dummy(ImVec2((float)content.width, (float)content.height));
+		}
+
+		// From here on the subtree is drawn in the panel's own space.
+		m_originStack.push_back(Scope { &node, frame.x, frame.y });
 		break;
 	}
 	default:
@@ -190,6 +255,17 @@ void ImGuiLayoutBackend::endContainer(const LayoutNode& node)
 
 	const bool isTabPage = !m_containerStack.empty()
 		&& m_containerStack.back()->kind == NodeKind::TabPanel;
+
+	// A child window closes BEFORE the BeginDisabled that wrapped it: ImGui
+	// records the disabled-stack depth per window and asserts in EndChild if it
+	// has moved since BeginChild.
+	if (node.kind == NodeKind::ScrollPanel)
+	{
+		ImGui::EndChild();
+		ImGui::PopID();
+		if (m_originStack.size() > 1 && m_originStack.back().node == &node)
+			m_originStack.pop_back();
+	}
 
 	// closed before EndTabItem (it opened after BeginTabItem) but after the
 	// other chrome, which it greyed

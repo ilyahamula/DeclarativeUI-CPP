@@ -14,14 +14,27 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Text gallery state. Bound by reference, so it has to outlive the frame
+    // Expander demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string editableText = "Type here -- this one is editable.";
-    bool fieldsDisabled = false;
+    bool basicOpen = true;
+    bool advancedOpen = false;
+    bool networkOpen = true;
+    bool logging = true;
+    int level = 2;
+    int retries = 3;
+    std::string proxy = "proxy.local:8080";
+    bool sectionsDisabled = false;
+    bool detailsOpen = false;
+    bool bindingDisabled = false;
 
     runImGuiApp([&]
     {
-        drawTextUI(editableText, fieldsDisabled).show();
+        // setPosition places where the window opens; the user can still move
+        // it afterwards. On ImGui these are host-window-relative, on wx and Qt
+        // desktop-absolute -- the two dialogs land side by side either way.
+        drawExpanderUI(basicOpen, advancedOpen, networkOpen, logging,
+            level, retries, proxy, sectionsDisabled).setPosition({ 40, 40 }).show();
+        drawExpanderBinding(detailsOpen, bindingDisabled).setPosition({ 500, 40 }).show();
     });
 
     return 0;

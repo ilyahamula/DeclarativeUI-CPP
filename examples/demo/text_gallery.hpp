@@ -111,8 +111,7 @@ inline auto drawTextUI(
                 CheckBox{fieldsDisabled, "Disable the fields"}
                     .withSize({-1, kRowH})
                     .withFlags(LayoutFlags().CenterVertical()),
-                StaticText{""}
-                    .withFlags(LayoutFlags().Proportion(1)),
+                Spacer{},
                 Button{"Close"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())

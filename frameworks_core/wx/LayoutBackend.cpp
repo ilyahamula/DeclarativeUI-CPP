@@ -7,6 +7,8 @@
 #endif
 
 #include <wx/notebook.h>
+#include <wx/scrolwin.h>
+#include <wx/settings.h>
 #include <wx/tooltip.h>
 #include <wx/wx.h>
 
@@ -94,6 +96,14 @@ int buttonMeasuredHeight(const wxWindow* button, const ControlWrapper& widget)
 }
 #endif
 
+// The content half of an Expander: the child that folds away, as opposed to
+// the header leaf beside it. Read from the node's own parent rather than from
+// the scope stack, so it holds wherever the subtree is entered from.
+bool isExpanderContent(const LayoutNode& node)
+{
+	return node.parent != nullptr && node.parent->kind == NodeKind::Expander;
+}
+
 } // unnamed namespace
 
 WxLayoutBackend::WxLayoutBackend(wxWindow* host)
@@ -105,7 +115,15 @@ WxLayoutBackend::WxLayoutBackend(wxWindow* host)
 Rect WxLayoutBackend::toLocal(const Rect& frame) const
 {
 	const Scope& scope = m_stack.back();
-	return { frame.x - scope.originX, frame.y - scope.originY, frame.width, frame.height };
+	Rect local { frame.x - scope.originX, frame.y - scope.originY, frame.width, frame.height };
+	// Inside a scroll panel the engine's coordinates are the panel's LOGICAL
+	// (unscrolled) space, while SetSize positions a child physically. wx moves
+	// the children itself as the user scrolls, so taking the offset off here is
+	// what keeps a relayout mid-scroll landing where the user left the content
+	// instead of snapping back to the top.
+	if (auto* scrolled = wxDynamicCast(scope.parent, wxScrolledWindow))
+		scrolled->CalcScrolledPosition(local.x, local.y, &local.x, &local.y);
+	return local;
 }
 
 Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
@@ -194,6 +212,22 @@ wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)
 		window = new wxStaticBox(m_host, wxID_ANY, labelText(node.label));
 	else if (node.kind == NodeKind::TabPanel)
 		window = new wxNotebook(m_host, wxID_ANY);
+	else if (node.kind == NodeKind::ScrollPanel)
+	{
+		auto* scrolled = new wxScrolledWindow(m_host, wxID_ANY,
+			wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+		// Scroll in single pixels: the engine already decided every rectangle,
+		// so wx must not round the view to a "line" of its own choosing.
+		scrolled->SetScrollRate(1, 1);
+		window = scrolled;
+	}
+	else if (isExpanderContent(node))
+	{
+		// A collapsed section has to take its whole subtree out of view, and a
+		// panel is the one handle that does it in a single call however deep
+		// that subtree runs -- the same trick a notebook page relies on.
+		window = new wxPanel(m_host, wxID_ANY);
+	}
 	if (window != nullptr)
 		applyDisabled(window, node);
 	m_containers[&node] = window;
@@ -221,6 +255,22 @@ EdgeInsets WxLayoutBackend::containerInsets(const LayoutNode& node)
 		const int side = extraW / 2;
 		return { side, extraW - side, std::max(0, extraH - side), side };
 	}
+	if (node.kind == NodeKind::ScrollPanel)
+	{
+		// The scrollbar gutter, reserved on the cross side of each scrolling
+		// axis and reserved ALWAYS: containerInsets runs before the content is
+		// measured, so "only when it overflows" could read no more than the
+		// previous pass and would let a panel near the boundary oscillate.
+		wxWindow* window = ensureContainer(node);
+		return {
+			0,
+			scrollsVertically(node.scroll)
+				? wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, window) : 0,
+			0,
+			scrollsHorizontally(node.scroll)
+				? wxSystemSettings::GetMetric(wxSYS_HSCROLL_Y, window) : 0,
+		};
+	}
 	return {};
 }
 
@@ -230,7 +280,30 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 	const bool isTabPage = m_stack.back().node != nullptr
 		&& m_stack.back().node->kind == NodeKind::TabPanel;
 
-	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel)
+	if (isExpanderContent(node))
+	{
+		// The panel becomes the parent and coordinate origin of the section's
+		// subtree, exactly as a notebook page does -- so hiding it hides
+		// everything in it, whatever was realized while the section was open.
+		wxWindow* panel = ensureContainer(node);
+		if (panel->GetParent() != scope.parent)
+			panel->Reparent(scope.parent);
+		const bool expanded = node.parent->expander.applied;
+		panel->Show(expanded);
+		if (!expanded)
+			return false; // collapsed: engine skips the subtree, as for an inactive tab page
+
+		const Rect local = toLocal(frame);
+		panel->SetSize(local.x, local.y, local.width, local.height);
+		scope.parent = panel;
+		scope.originX = frame.x;
+		scope.originY = frame.y;
+		m_stack.push_back(scope);
+		return true;
+	}
+
+	if (node.kind == NodeKind::GroupBox || node.kind == NodeKind::TabPanel
+		|| node.kind == NodeKind::ScrollPanel)
 	{
 		wxWindow* window = ensureContainer(node);
 		if (window->GetParent() != scope.parent)
@@ -239,6 +312,23 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		window->SetSize(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
 			window->Lower(); // chrome stays behind its sibling content
+
+		if (node.kind == NodeKind::ScrollPanel)
+		{
+			// The panel becomes the parent and coordinate origin of its
+			// subtree, exactly as a notebook page does. The virtual size is the
+			// content's arranged frame -- the engine already sized it to the
+			// full extent there is to scroll over.
+			auto* scrolled = static_cast<wxScrolledWindow*>(window);
+			const Rect virt = node.children.empty() ? Rect{} : node.children.front()->frame;
+			scrolled->SetVirtualSize(virt.width, virt.height);
+			scrolled->ShowScrollbars(
+				scrollsHorizontally(node.scroll) ? wxSHOW_SB_ALWAYS : wxSHOW_SB_NEVER,
+				scrollsVertically(node.scroll) ? wxSHOW_SB_ALWAYS : wxSHOW_SB_NEVER);
+			scope.parent = scrolled;
+			scope.originX = frame.x;
+			scope.originY = frame.y;
+		}
 	}
 	else if (isTabPage)
 	{

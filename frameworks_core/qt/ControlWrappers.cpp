@@ -30,6 +30,7 @@
 #include <QStyle>
 #include <QTableWidget>
 #include <QTimeEdit>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 
@@ -68,6 +69,68 @@ protected:
 	}
 };
 
+// The Splitter's sash: a sunken line the user drags, with the mouse handling
+// done by virtual overrides (no Q_OBJECT). Deliberately not a QSplitter, which
+// would own its children's geometry and fight the layout engine.
+class SashFrame : public QFrame
+{
+public:
+	using QFrame::QFrame;
+
+	SplitterState* state = nullptr;
+	bool horizontal = true;
+
+	// QFrame's own hint for a bare line is not the 6 px the engine budgeted, and
+	// the cross axis must ask for nothing -- the engine stretches the sash
+	// across both panes there.
+	QSize sizeHint() const override
+	{
+		return horizontal ? QSize(SplitterState::kSashThickness, 0)
+						  : QSize(0, SplitterState::kSashThickness);
+	}
+
+protected:
+	// The drag anchors on the position arrange RESOLVED when the gesture began,
+	// so a long drag cannot accumulate rounding the way a per-event delta would,
+	// and global coordinates are used because the frame itself moves underneath
+	// the pointer as the layout follows it.
+	void mousePressEvent(QMouseEvent* event) override
+	{
+		if (event->button() == Qt::LeftButton && state != nullptr)
+		{
+			m_anchorScreen = globalMain(event);
+			m_anchorPos = state->resolved;
+			m_dragging = true;
+		}
+		QFrame::mousePressEvent(event);
+	}
+
+	void mouseMoveEvent(QMouseEvent* event) override
+	{
+		if (m_dragging && state != nullptr)
+			state->position.set(std::clamp(m_anchorPos + globalMain(event) - m_anchorScreen,
+				state->lowerBound, state->upperBound));
+		QFrame::mouseMoveEvent(event);
+	}
+
+	void mouseReleaseEvent(QMouseEvent* event) override
+	{
+		m_dragging = false;
+		QFrame::mouseReleaseEvent(event);
+	}
+
+private:
+	int globalMain(const QMouseEvent* event) const
+	{
+		const QPointF global = event->globalPosition();
+		return static_cast<int>(horizontal ? global.x() : global.y());
+	}
+
+	int m_anchorScreen = 0;
+	int m_anchorPos = 0;
+	bool m_dragging = false;
+};
+
 } // unnamed namespace
 
 // ButtonWrapper -----------------------------------------------------------
@@ -75,6 +138,10 @@ protected:
 void ButtonWrapper::realize(void* parentWindow)
 {
 	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	// QPushButton is autoDefault inside a QDialog, so the first one built would come
+	// up drawn as the dialog's default button (blue on macOS) and keep that highlight
+	// for the life of the dialog. wx and ImGui highlight nothing, so neither do we.
+	button->setAutoDefault(false);
 	m_nativeWidget = button;
 
 	if (m_onClick)
@@ -544,6 +611,7 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
 	button->setCheckable(true);
 	button->setChecked(toggled);
+	button->setAutoDefault(false);
 	m_nativeWidget = button;
 
 	if (m_value.isBound())
@@ -604,6 +672,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 {
 	const Color initial = m_value.get();
 	auto* button = new QPushButton(static_cast<QWidget*>(parentWindow));
+	button->setAutoDefault(false);
 	auto sheetFor = [](const Color& c) {
 		return QStringLiteral("background-color: rgba(%1,%2,%3,%4);")
 			.arg((int)(c.r * 255)).arg((int)(c.g * 255)).arg((int)(c.b * 255)).arg((int)(c.a * 255));
@@ -653,9 +722,71 @@ void ColorPickerWrapper::realize(void* parentWindow)
 void SeparatorWrapper::realize(void* parentWindow)
 {
 	auto* line = new QFrame(static_cast<QWidget*>(parentWindow));
-	line->setFrameShape(QFrame::HLine);
+	line->setFrameShape(m_orient == Orientation::Vertical ? QFrame::VLine : QFrame::HLine);
 	line->setFrameShadow(QFrame::Sunken);
 	m_nativeWidget = line;
+
+}
+
+// SplitterSashWrapper -----------------------------------------------------------
+
+void SplitterSashWrapper::realize(void* parentWindow)
+{
+	const bool horizontal = m_state->orientation == Orientation::Horizontal;
+
+	auto* sash = new SashFrame(static_cast<QWidget*>(parentWindow));
+	sash->state = m_state;
+	sash->horizontal = horizontal;
+	sash->setFrameShape(horizontal ? QFrame::VLine : QFrame::HLine);
+	sash->setFrameShadow(QFrame::Sunken);
+	sash->setCursor(horizontal ? Qt::SplitHCursor : Qt::SplitVCursor);
+	m_nativeWidget = sash;
+
+}
+
+// ExpanderHeaderWrapper -----------------------------------------------------------
+
+void ExpanderHeaderWrapper::realize(void* parentWindow)
+{
+	// Qt has no collapsible-header control, so the header is a checkable tool
+	// button with an arrow beside its text -- the shape QTreeView section
+	// headers and every Qt settings dialog use, and the closest thing to
+	// wxCollapsibleHeaderCtrl that needs no painting of our own.
+	auto* header = new QToolButton(static_cast<QWidget*>(parentWindow));
+	header->setText(qstr(m_label));
+	header->setCheckable(true);
+	header->setChecked(m_state->expanded.get());
+	header->setAutoRaise(true);
+	header->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	header->setArrowType(m_state->expanded.get() ? Qt::DownArrow : Qt::RightArrow);
+	m_nativeWidget = header;
+
+	// The ExpanderState lives in the node tree, which the engine session owns
+	// and which outlives every window here; the wrapper must never be captured.
+	ExpanderState* state = m_state;
+	QObject::connect(header, &QToolButton::toggled, header, [header, state](bool open) {
+		header->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+		state->expanded.set(open);
+	});
+
+	// A bound flag can be written from anywhere, and the button applies its own
+	// state only when clicked -- so it is mirrored like any other external ref.
+	// The relayout that follows is armed separately, by the session's
+	// bindInvalidation: this only keeps the header itself honest.
+	//
+	// The arrow is set HERE as well as in the toggled handler above, and has to
+	// be: every RefSync push runs under a QSignalBlocker, so a programmatic
+	// setChecked() deliberately does not re-enter that handler.
+	if (m_state->expanded.isBound())
+	{
+		bindExternalRefSync(header,
+			[header] { return header->isChecked(); },
+			[state] { return state->expanded.get(); },
+			[header](bool open) {
+				header->setChecked(open);
+				header->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+			});
+	}
 
 }
 
