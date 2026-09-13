@@ -1,11 +1,20 @@
 #pragma once
 
-// The application shell: the gallery dialog for Splitter.
+// The application shell: the gallery for Window and Splitter.
 //
-// It is a Dialog for now and becomes a real Window when T2.1 lands, at which
-// point the menu bar, tool bar and status bar join it here. The layout is the
-// shape they will all hang off: a browser pane on the left, the work area on
-// the right, and a draggable sash between them.
+// It is a real Window now -- wxFrame, QMainWindow, an ImGui window in the host
+// viewport -- which is the thing a Dialog cannot be: wxMenuBar attaches to a
+// wxFrame and nothing else, so the menu bar, tool bar and status bar join it
+// here in T2.2-T2.5. The layout is the shape they will all hang off: a browser
+// pane on the left, the work area on the right, and a draggable sash between.
+//
+// Two things about a Window are worth watching, both the inverse of a Dialog:
+//
+//   * it is RESIZABLE by default, with the auto-fit size as its floor -- drag
+//     it larger and the splitter panes take the room; Fixed() opts out;
+//   * whoever closes it, the caller's bool and onClose() agree. The close
+//     button clears the flag, and clearing the flag closes the window -- the
+//     second dialog below does exactly that from a CheckBox.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // splitter lands here instead, alongside a few already-implemented controls for
@@ -32,12 +41,18 @@
 #include <string>
 #include <vector>
 
+// `shellOpen` is the bool the shell is shown against and `shellStatus` the line
+// onClose() writes when it goes away -- both belong to the caller and have to
+// outlive the window, which is modeless on every backend. The control panel in
+// value_binding.hpp shares the same two.
 inline auto drawAppShellUI(
     std::string& selectedFile,
     TableRows& rows,
     int& selectedRow,
     std::string& notes,
-    bool& shellDisabled)
+    bool& shellDisabled,
+    bool& shellOpen,
+    std::string& shellStatus)
 {
     // Same pinning discipline as the other galleries: explicit sizes on the
     // leaves and MinSize on the containers, so the three backends compute the
@@ -62,7 +77,7 @@ inline auto drawAppShellUI(
         { "Notes", -1, /*sortable*/ false, /*editable*/ true },
     };
 
-    return Dialog {
+    return Window {
         "Application Shell",
         VStack {
             LayoutFlags().Expand().Border(Side::All, 10),
@@ -117,11 +132,18 @@ inline auto drawAppShellUI(
             HStack {
                 LayoutFlags().Border(Side::Top, 10),
                 Spacer{},
+                // Closing from inside is the same act as closing from the
+                // title bar: clear the bool and the window follows.
                 Button{"Close"}
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
+                    .onClick([&shellOpen]() { shellOpen = false; })
             }
         }
-    };
+    }
+    // Fires once however the window went away -- this button, the title bar's
+    // close button, or the control panel's check box clearing the bool.
+    .onClose([&shellStatus]() {
+        shellStatus = "Shell closed -- onClose() fired once.";
+    });
 }

@@ -35,13 +35,42 @@ struct EngineSession
 	Size fixedContent { -1, -1 };
 	bool busy = false;
 
-	// Lifecycle seams the caller fills in; both are inert until the elements
-	// that set them land. `openFlag` is a caller-owned bool the window is shown
-	// against (Dialog/Window::show(bool&), T3.6/T2.1): clearing it closes the
-	// window, closing the window clears it. `onClose` fires exactly once when
-	// the window goes away.
+	// Lifecycle the caller fills in. `openFlag` is a caller-owned bool the
+	// window is shown against (Window::show(bool&), and Dialog's in T3.6):
+	// clearing it closes the window, closing the window clears it. `onClose`
+	// fires exactly once when the window goes away.
 	bool* openFlag = nullptr;
 	std::function<void()> onClose;
+	bool closed = false; // one-shot guard for notifyClosed()
+
+	// The one close path, whatever triggered it -- the user's close button or
+	// the caller clearing `openFlag`. Both clear the flag and fire onClose
+	// once, so a caller cannot tell the two apart by what it observes.
+	void notifyClosed()
+	{
+		if (closed)
+			return;
+		closed = true;
+		if (openFlag != nullptr)
+			*openFlag = false;
+		if (onClose)
+			onClose();
+	}
+
+	// Polls the caller-owned flag: clearing it closes the window. Qt has no
+	// notification for a bool written from somewhere else, so this is the
+	// ordinary RefSync shape -- `pull` is whether the window is up now, `want`
+	// whether the flag says it should be.
+	void bindOpenFlag()
+	{
+		if (openFlag == nullptr)
+			return;
+		const bool* flag = openFlag;
+		bindExternalRefSync(window,
+			[this] { return window->isVisible(); },
+			[flag] { return *flag; },
+			[this](bool) { window->close(); }); // -> closeEvent -> notifyClosed()
+	}
 
 	Size minClient() const
 	{

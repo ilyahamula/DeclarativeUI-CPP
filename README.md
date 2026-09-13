@@ -39,7 +39,7 @@ return Dialog {
 
 ## Features
 
-- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, `TabPanel`, and `Dialog`
+- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, `TabPanel`, and `Dialog` or `Window`
 - **Framework-owned layout engine** — one shared measure/arrange engine computes every rectangle; backends only measure native widgets and place them, so the same tree follows identical layout rules on every backend (see `docs/specs/custom_layout_system/`)
 - **Sensible defaults, no flags required** — widgets size to their content (text fields never collapse below their text), sibling group boxes in a column equalize to the widest one (tallest in a row), and dialogs auto-fit their content
 - **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
@@ -65,7 +65,7 @@ return Dialog {
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
-| Top-level         | `Dialog`, `MessageBox` |
+| Top-level         | `Dialog`, `Window`, `MessageBox` |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
 intrinsic height identically on every backend — the native hints disagree far too much
@@ -78,6 +78,16 @@ splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, w
 is exactly what the layout engine takes back — so the same tree divides the same
 way on all three backends. Bind the sash position to an `int&` and dragging writes
 through to it; writing it from anywhere else moves the sash.
+
+`Dialog` and `Window` are the two top-level spellings and share the engine behind
+them; the defaults are opposites, because the roles are. A `Dialog` is a transient
+box the engine sizes exactly and the user cannot resize. A `Window` is the
+application frame — `wxFrame`, `QMainWindow`, an ImGui window in the host
+viewport — so it is **resizable by default** with the auto-fit size as its floor,
+and `Fixed()` is what opts out. A `Window` is also the only thing a menu bar can
+attach to on wx. `show(bool& open)` makes a caller-owned bool the single truth
+about whether the window is up: clearing it closes the window, closing the window
+clears it, and `onClose()` fires exactly once either way.
 
 `Expander` folds a section away behind a clickable header. Collapsed, the content
 costs the layout *nothing at all* — not its size, not its margins, not even the gap

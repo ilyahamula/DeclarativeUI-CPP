@@ -4,6 +4,7 @@
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 #include <functional>
+#include <string>
 
 namespace
 {
@@ -14,27 +15,34 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Expander demo state. Bound by reference, so it has to outlive the frame
+    // Window demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
-    bool basicOpen = true;
-    bool advancedOpen = false;
-    bool networkOpen = true;
-    bool logging = true;
-    int level = 2;
-    int retries = 3;
-    std::string proxy = "proxy.local:8080";
-    bool sectionsDisabled = false;
-    bool detailsOpen = false;
-    bool bindingDisabled = false;
+    std::string selectedFile = "main.cpp";
+    TableRows files {
+        { "main.cpp",   "2 KB",  "entry point" },
+        { "layout.cpp", "31 KB", "measure/arrange" },
+        { "widgets.hpp", "18 KB", "public API" },
+        { "engine.hpp", "9 KB",  "" },
+    };
+    int selectedRow = 0;
+    std::string notes = "Drag a sash, then resize the window: the panes take the room.";
+    bool shellDisabled = false;
+    bool shellOpen = true;
+    std::string shellStatus = "(the shell is still open)";
+    bool panelDisabled = false;
 
     runImGuiApp([&]
     {
-        // setPosition places where the window opens; the user can still move
-        // it afterwards. On ImGui these are host-window-relative, on wx and Qt
-        // desktop-absolute -- the two dialogs land side by side either way.
-        drawExpanderUI(basicOpen, advancedOpen, networkOpen, logging,
-            level, retries, proxy, sectionsDisabled).setPosition({ 40, 40 }).show();
-        drawExpanderBinding(detailsOpen, bindingDisabled).setPosition({ 500, 40 }).show();
+        // The shell is a Window: resizable by default, shown against a bool
+        // that its own Close button and the control panel both write.
+        drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
+            shellOpen, shellStatus).show(shellOpen);
+        // Fixed(), and shown with the plain show() -- the panel stays up so the
+        // shell's onClose() report is readable after the shell has gone.
+        //
+        // Only on ImGui does re-ticking the box bring the shell back: the frame
+        // loop calls show() again. wx and Qt destroyed the frame.
+        drawWindowBinding(shellOpen, shellStatus, panelDisabled).show();
     });
 
     return 0;
@@ -52,8 +60,8 @@ namespace
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-        // Large enough to host the auto-fit Controls Demo dialog (~832x520)
-        GLFWwindow* window = glfwCreateWindow(1000, 700, "DeclarativeUI - ImGui", nullptr, nullptr);
+        // Large enough to host the auto-fit application shell Window
+        GLFWwindow* window = glfwCreateWindow(1100, 800, "DeclarativeUI - ImGui", nullptr, nullptr);
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
 

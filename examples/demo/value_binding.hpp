@@ -642,3 +642,77 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
         }
     };
 }
+
+// The Window control panel: one bool shared between a Window's show(bool&), a
+// CheckBox and a ToggleButton, plus onClose()'s report read back live.
+//
+// `shellOpen` is the same bool the application shell in app_shell.hpp is shown
+// against, which makes it a three-way binding rather than the usual two:
+//
+//   * untick the check box (or the toggle) and the shell WINDOW closes;
+//   * close the shell from its title bar or its Close button and both controls
+//     clear themselves.
+//
+// `shellStatus` is written by the shell's onClose() and mirrored here through an
+// ordinary bound TextCtrl -- the same shape drawTextMirror() uses, and the only
+// one that updates live on the retained backends (ReadonlyTextCtrl takes a
+// snapshot, so an external write would never reach it). So the callback firing
+// exactly once is visible from a window that is still up. Both refs belong to
+// the caller and outlive every window here.
+//
+// Backend divergence worth knowing: TICKING THE BOX BACK ON DOES NOT REOPEN the
+// shell on wx or Qt. Closing destroys the frame and frees its engine session
+// (R6.4), and nothing re-runs show() for a retained backend. On ImGui the main
+// calls show() every frame, so there the shell comes straight back. Re-showing a
+// closed window is a lifecycle question T3.6 settles, not part of T2.1.
+//
+// This panel is Fixed() at an explicit Size -- the one place the Window default
+// is turned off, next to the shell which keeps it and auto-fits. Drag the
+// shell's edge and it grows; drag this one's and nothing happens. The Size is
+// the TOTAL window size on every backend (client area plus frame on wx, the
+// widget itself on Qt, padding plus title bar on ImGui), which is the same
+// contract Dialog's Size overload has.
+inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& disabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+
+    return Window {
+        "Window controls (shared bool)",
+        Size{ 460, 330 },
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({420, -1}),
+            StaticText{"The shell's open flag, a check box and a toggle: one bool."}
+                .withSize({-1, kLabelH}),
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                CheckBox{shellOpen, "Application Shell is open"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    .isDisabled(disabled),
+                ToggleButton{shellOpen, "Shell"}
+                    .withSize({110, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(disabled)
+                    .withTooltip("Untick to close the shell window")
+            },
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"What the shell's onClose() last reported:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // Bound, not readonly: an external write only reaches a control
+            // through a bound ref, and this one is written from a callback in
+            // another window.
+            TextCtrl{shellStatus}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+            CheckBox{disabled, "Lock both controls"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    }
+    // The inverse of a Dialog: a Window resizes unless it is told not to.
+    .Fixed();
+}

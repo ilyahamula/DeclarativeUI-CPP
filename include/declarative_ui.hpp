@@ -8,6 +8,7 @@
 #include "expander.hpp"
 #include "groupboxes.hpp"
 #include "dialog.hpp"
+#include "window.hpp"
 #include "tabpanel.hpp"
 #include "messagebox.hpp"
 
@@ -36,6 +37,10 @@ static_assert(NodeBuildable<Expander<VStack<Button>>>);
 static_assert(NodeBuildable<Expander<CheckBox>>);
 static_assert(NodeBuildable<HStack<Button, TextCtrl>>);
 static_assert(NodeBuildable<VStack<StaticText, Button>>);
+
+static_assert(TopLevel<Dialog<VStack<Button>>>);
+static_assert(TopLevel<Window<VStack<Button>>>);
+static_assert(FlagShowable<Window<VStack<Button>>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);
