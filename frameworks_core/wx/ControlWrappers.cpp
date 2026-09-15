@@ -23,6 +23,7 @@
 #include <wx/clrpicker.h>
 #include <wx/treectrl.h>
 #include <wx/toolbar.h>
+#include <wx/statusbr.h>
 #include <wx/dataview.h>
 #include <wx/settings.h>
 #include <wx/collheaderctrl.h>
@@ -743,6 +744,55 @@ void ToolBarWrapper::realize(void* parentWindow)
 	// Lays the tools out and fixes the bar's best size -- nothing appears
 	// without it.
 	bar->Realize();
+}
+
+// StatusBarWrapper -----------------------------------------------------------
+
+void StatusBarWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("StatusBarWrapper::realize()\t-> new wxStatusBar()\n");
+#endif
+	// A CHILD wxStatusBar, deliberately not wxFrame::CreateStatusBar(): that one
+	// docks itself to a frame, out of the engine's sight, and would make a
+	// status bar impossible in a Dialog or anywhere else down a stack.
+	auto* bar = new wxStatusBar(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxSTB_DEFAULT_STYLE | m_style);
+	m_nativeWidget = bar;
+
+	const int count = m_fields.empty() ? 1 : (int)m_fields.size();
+	bar->SetFieldsCount(count);
+
+	// wx reads a NEGATIVE width as a stretch weight and a positive one as fixed
+	// pixels, which is exactly the split StatusField already describes.
+	std::vector<int> widths;
+	widths.reserve((std::size_t)count);
+	for (const StatusField& field : m_fields)
+		widths.push_back(field.width > 0 ? field.width : -1);
+	if (m_fields.empty())
+		widths.push_back(-1);
+	bar->SetStatusWidths(count, widths.data());
+
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		StatusField& field = m_fields[index];
+		bar->SetStatusText(wxString::FromUTF8(field.text.get()), (int)index);
+
+		// A bound field is the whole point: the text is written from elsewhere
+		// and wx has no notification for that, so it is polled like any other
+		// external ref.
+		if (field.text.isBound())
+		{
+			const std::string* bound = field.text.boundValue();
+			const int pane = (int)index;
+			bindExternalRefSync(bar,
+				[bar, pane] { return std::string(bar->GetStatusText(pane).ToUTF8()); },
+				[bound] { return *bound; },
+				[bar, pane](const std::string& text) {
+					bar->SetStatusText(wxString::FromUTF8(text), pane);
+				});
+		}
+	}
 }
 
 // ColorPickerWrapper -----------------------------------------------------------

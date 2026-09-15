@@ -1323,6 +1323,81 @@ void ToolBarWrapper::render(const Rect& frame)
 	(void)frame;
 }
 
+// StatusBarWrapper -----------------------------------------------------------
+
+Size StatusBarWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+
+	// Deliberately NOT measured from the live text: a status bar displays a
+	// string written from elsewhere, so measuring it would let an arriving
+	// message widen an auto-fit window. Fixed fields contribute their width,
+	// stretch fields a constant, and Expand() gets the bar the rest of the row.
+	float width = 0.0f;
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		if (index > 0)
+			width += style.ItemSpacing.x;
+		const StatusField& field = m_fields[index];
+		width += (float)(field.width > 0 ? field.width : kDefaultStatusFieldWidth);
+	}
+	return Size { (int)std::ceil(width), (int)std::ceil(ImGui::GetFrameHeight()) };
+}
+
+void StatusBarWrapper::render(const Rect& frame)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float height = (float)frame.height;
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	// Fixed fields keep their width; the rest share what is left, equally.
+	float fixedTotal = 0.0f;
+	int stretchCount = 0;
+	for (const StatusField& field : m_fields)
+	{
+		if (field.width > 0)
+			fixedTotal += (float)field.width;
+		else
+			++stretchCount;
+	}
+	const float gaps = m_fields.empty() ? 0.0f : style.ItemSpacing.x * (float)(m_fields.size() - 1);
+	const float leftover = std::max(0.0f, (float)frame.width - fixedTotal - gaps);
+	const float stretchWidth = stretchCount > 0 ? leftover / (float)stretchCount : 0.0f;
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	float x = origin.x;
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		const StatusField& field = m_fields[index];
+		const float fieldWidth = field.width > 0 ? (float)field.width : stretchWidth;
+
+		if (index > 0)
+		{
+			// A thin divider between panes, drawn by hand -- ImGui::Separator()
+			// would span the window instead of this row.
+			const float lineX = x - style.ItemSpacing.x * 0.5f;
+			draw->AddLine(ImVec2(lineX, origin.y + style.FramePadding.y),
+				ImVec2(lineX, origin.y + height - style.FramePadding.y),
+				ImGui::GetColorU32(ImGuiCol_Separator));
+		}
+
+		// Clipped to its own pane, so a long string cannot run into the next
+		// field or out of the engine's frame.
+		const std::string& text = field.text.get();
+		const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+		const ImVec4 clip(x, origin.y, x + fieldWidth, origin.y + height);
+		draw->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.z, clip.w), true);
+		draw->AddText(ImVec2(x, origin.y + (height - textSize.y) * 0.5f),
+			ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+		draw->PopClipRect();
+
+		x += fieldWidth + style.ItemSpacing.x;
+	}
+
+	// One item for the whole row, so the engine's frame is what it occupies.
+	ImGui::Dummy(ImVec2((float)frame.width, height));
+}
+
 // ColorPickerWrapper -----------------------------------------------------------
 
 Size ColorPickerWrapper::measureIntrinsic(const Constraints&)

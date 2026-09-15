@@ -22,6 +22,13 @@
 //     box in the control panel (value_binding.hpp) -- across two windows.
 //   * isDisabled(bool&) greys live: lock the shell and Undo/Redo go with it.
 //
+// The StatusBar along the bottom is the third piece of chrome and the same
+// story as the tool bar: a native container (wxStatusBar, QStatusBar) that is a
+// LEAF to the engine, and the only widget in the framework that defaults to
+// Expand() -- a status bar that did not span its parent would not be one. Its
+// first field is bound to the tree view's selection, so it follows a click
+// without anything in the demo wiring the two together.
+//
 // The ToolBar under it is the same story again: one ToolItem model, drawn as a
 // wxToolBar, a QToolBar and a hand-drawn ImGui button row. Its "Wrap" tool is a
 // CHECK tool bound to the same bool as the View menu's check item, so pressing
@@ -253,6 +260,16 @@ inline auto drawAppShellUI(
                 .withFlags(LayoutFlags().Border(Side::Top, 10)),
             Separator{}
                 .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            // The status bar. Its first field is BOUND to the same string the
+            // tree view writes its selection into, so clicking a file in the
+            // project pane updates the bar live -- nothing polls it in the
+            // demo, the backends do. The other two are fixed-width snapshots.
+            StatusBar {{
+                StatusField{ selectedFile },
+                StatusField{ "Ln 1, Col 1", 120 },
+                StatusField{ "UTF-8", 70 },
+            }}
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
             HStack {
                 LayoutFlags().Border(Side::Top, 10),

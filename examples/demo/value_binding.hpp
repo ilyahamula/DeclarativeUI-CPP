@@ -654,6 +654,10 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
 //   * close the shell from its title bar or its Close button and both controls
 //     clear themselves.
 //
+// `shellStatus` is bound THREE ways here: the shell's onClose() writes it, the
+// TextCtrl below edits it, and the StatusBar field under that shows it. Type in
+// the box and the bar follows.
+//
 // `shellStatus` is written by the shell's onClose() and mirrored here through an
 // ordinary bound TextCtrl -- the same shape drawTextMirror() uses, and the only
 // one that updates live on the retained backends (ReadonlyTextCtrl takes a
@@ -726,6 +730,12 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
             // another window.
             TextCtrl{shellStatus}
                 .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+            // The same string again, in a status bar field: type in the box
+            // above and the bar follows, because both are bound to `shellStatus`
+            // and neither knows about the other. A StatusBar needs no flags to
+            // span -- Expand() is its default.
+            StatusBar{ shellStatus }
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
             CheckBox{disabled, "Lock both controls"}
                 .withSize({-1, kRowH})

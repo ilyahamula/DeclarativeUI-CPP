@@ -1272,6 +1272,62 @@ private:
 // so a tool's icon, label, tooltip, bound toggle and bound disabling are written
 // once. A tool with no icon -- or one whose icon fails to load -- shows its
 // label instead, so a toolbar is never blank.
+// StatusBar ------------------------------------------------------------
+// The row of read-only text along an application's bottom edge: "Ready" on the
+// left, "Ln 12, Col 4" and "UTF-8" in narrow fields on the right.
+//
+// Like ToolBar it is a native container but an engine LEAF -- the native control
+// owns its panes, so the engine sizes one rectangle and the backend divides it.
+// Unlike every other widget it defaults to Expand(): a status bar that did not
+// span its parent would not be one.
+//
+// A field with a fixed width keeps it; the rest share what is left over. Bind a
+// field to a std::string& and anything that writes that string shows up live.
+struct StatusBar : Widget<StatusBar>
+{
+	using super = Widget<StatusBar>;
+
+	explicit StatusBar(StatusFields fields)
+		: super()
+		, m_fields(std::move(fields))
+	{
+	}
+
+	// One stretched field, the common case. The pair is the usual one: a
+	// literal snapshots, a non-const lvalue binds.
+	explicit StatusBar(const std::string& text)
+		: super()
+		, m_fields{ StatusField(text) }
+	{
+	}
+
+	explicit StatusBar(std::string& text)
+		: super()
+		, m_fields{ StatusField(text) }
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<StatusBarWrapper>(m_fields, pos, size, style);
+	}
+
+	// A status bar always spans its parent, so it says so here rather than
+	// making every caller repeat it. withFlags() replaces this outright, as it
+	// does for Spacer.
+	LayoutFlags defaultFlags() const override
+	{
+		return LayoutFlags().Expand();
+	}
+
+private:
+	StatusFields m_fields;
+};
+
 struct ToolBar : Widget<ToolBar>
 {
 	using super = Widget<ToolBar>;

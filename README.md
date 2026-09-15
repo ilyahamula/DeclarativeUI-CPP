@@ -64,7 +64,7 @@ return Dialog {
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
-| Chrome            | `ToolBar` + `ToolItem` |
+| Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox` |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
@@ -113,6 +113,21 @@ ToolBar {{
     ToolItem{"Wrap"}.toggled(wordWrap),          // a check tool, on the caller's bool
     ToolItem{"Delete"}.isDisabled(locked),       // greys live
 }}
+```
+
+`StatusBar` is the row of text along the bottom. It is the one widget that defaults to
+`Expand()` — a status bar that did not span its parent would not be one — and it
+deliberately **does not measure its own text**: a field is there to show a string
+written from somewhere else, so measuring it would let an arriving message resize an
+auto-fit window. Fields with a fixed width keep it; the rest share what is left.
+
+```cpp
+StatusBar {{
+    StatusField{ status },              // bound: anything that writes it shows live
+    StatusField{ "Ln 1, Col 1", 120 },  // fixed width
+    StatusField{ "UTF-8", 70 },
+}}
+StatusBar{ status }                     // or one stretched field, the common case
 ```
 
 The same `MenuItem` model is a right-click menu on any leaf:
