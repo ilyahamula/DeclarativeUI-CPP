@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstdint>
+#include <optional>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -11,18 +13,7 @@
 #include "frameworks_core/imgui/ImGuiWidgetIdManager.hpp"
 #include "frameworks_core/imgui/SnapshotStore.hpp"
 
-#ifdef _WIN32
-#include <windows.h>
-#include <GL/gl.h>
-#elif defined(__APPLE__)
-#define GL_SILENCE_DEPRECATION
-#include <OpenGL/gl3.h>
-#else
-#include <GL/gl.h>
-#endif
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "frameworks_core/imgui/TextureCache.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // pos, size, style: not directly applicable in ImGui immediate mode.
@@ -607,8 +598,8 @@ Size ImageWrapper::measureIntrinsic(const Constraints&)
 {
 	// natural image size; header-only probe, no decode (explicit withSize
 	// dimensions override per axis in measureContent)
-	if (m_imgWidth == 0 && !m_filePath.empty())
-		stbi_info(m_filePath.c_str(), &m_imgWidth, &m_imgHeight, nullptr);
+	if (m_imgWidth == 0)
+		imageSizeFor(m_filePath, m_imgWidth, m_imgHeight);
 	const int w = m_displayWidth  > 0 ? m_displayWidth  : m_imgWidth;
 	const int h = m_displayHeight > 0 ? m_displayHeight : m_imgHeight;
 	return Size { w, h };
@@ -616,20 +607,17 @@ Size ImageWrapper::measureIntrinsic(const Constraints&)
 
 void ImageWrapper::render(const Rect& frame)
 {
-	if (m_textureId == nullptr && !m_filePath.empty())
+	// Decoded and uploaded once per process, however many wrappers name the
+	// same file -- the tree is rebuilt every frame, so this wrapper is not the
+	// same object it was last frame.
+	if (m_textureId == nullptr)
 	{
-		stbi_set_flip_vertically_on_load(0);
-		unsigned char* data = stbi_load(m_filePath.c_str(), &m_imgWidth, &m_imgHeight, nullptr, 4);
-		if (data)
+		const CachedTexture& texture = textureFor(m_filePath);
+		if (texture.valid())
 		{
-			GLuint texId = 0;
-			glGenTextures(1, &texId);
-			glBindTexture(GL_TEXTURE_2D, texId);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_imgWidth, m_imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-			stbi_image_free(data);
-			m_textureId = reinterpret_cast<void*>(static_cast<uintptr_t>(texId));
+			m_textureId = texture.id;
+			m_imgWidth = texture.width;
+			m_imgHeight = texture.height;
 		}
 	}
 
@@ -1169,6 +1157,246 @@ template class TableWrapper<int>;
 template class TableWrapper<std::string>;
 template class TableWrapper<std::vector<int>>;
 template class TableWrapper<std::vector<std::string>>;
+
+// ToolBarWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// ImGui has no toolbar, so one is drawn: a row of buttons with a drawn divider
+// for separators. These two agree on the geometry so measure and render never
+// disagree about how wide the row is.
+constexpr float kToolBarSeparatorWidth = 9.0f;
+
+float toolWidth(const ToolItem& tool, const Size& iconSize, bool labelsForced)
+{
+	if (tool.isSeparator)
+		return kToolBarSeparatorWidth;
+
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const bool hasIcon = !tool.iconPath.empty() && textureFor(tool.iconPath).valid();
+	const bool showLabel = !hasIcon || labelsForced;
+
+	float width = style.FramePadding.x * 2.0f;
+	if (hasIcon)
+		width += (float)iconSize.width;
+	if (showLabel && !tool.label.empty())
+	{
+		if (hasIcon)
+			width += style.ItemInnerSpacing.x;
+		width += ImGui::CalcTextSize(tool.label.c_str()).x;
+	}
+	return width;
+}
+
+} // unnamed namespace
+
+Size ToolBarWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	float width = 0.0f;
+	for (std::size_t index = 0; index < m_tools.size(); ++index)
+	{
+		if (index > 0)
+			width += style.ItemSpacing.x;
+		width += toolWidth(m_tools[index], m_iconSize, m_labelsForced);
+	}
+
+	// A tool is one frame high, or as high as its icon needs.
+	const float height = std::max(ImGui::GetFrameHeight(),
+		(float)m_iconSize.height + style.FramePadding.y * 2.0f);
+	return Size { (int)std::ceil(width), (int)std::ceil(height) };
+}
+
+void ToolBarWrapper::render(const Rect& frame)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float rowHeight = std::max(ImGui::GetFrameHeight(),
+		(float)m_iconSize.height + style.FramePadding.y * 2.0f);
+
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	for (std::size_t index = 0; index < m_tools.size(); ++index)
+	{
+		if (index > 0)
+			ImGui::SameLine(0.0f, style.ItemSpacing.x);
+
+		ToolItem& tool = m_tools[index];
+		if (tool.isSeparator)
+		{
+			// Drawn by hand for the same reason SeparatorWrapper draws its own
+			// line: ImGui::SeparatorEx spans the window rather than the space
+			// it was given.
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			const float x = origin.x + kToolBarSeparatorWidth * 0.5f;
+			ImGui::GetWindowDrawList()->AddLine(
+				ImVec2(x, origin.y + style.FramePadding.y),
+				ImVec2(x, origin.y + rowHeight - style.FramePadding.y),
+				ImGui::GetColorU32(ImGuiCol_Separator));
+			ImGui::Dummy(ImVec2(kToolBarSeparatorWidth, rowHeight));
+			continue;
+		}
+
+		ImGui::PushID((int)index);
+
+		// An unbound toggle has no home in the wrapper -- the tree is rebuilt
+		// every frame -- so it lives in the store keyed like the tool's own
+		// ImGui state, exactly as every other snapshot value does.
+		std::optional<SnapshotScope<bool>> snapshot;
+		if (tool.toggledFlag)
+			snapshot.emplace(WidgetIdManager::stateKey(WidgetIdManager::nextWidgetId()),
+				*tool.toggledFlag);
+
+		const bool down = tool.toggledFlag && tool.toggledFlag->get();
+		if (down)
+		{
+			// The same colour push ToggleButtonWrapper uses, so a check tool
+			// and a ToggleButton read as the same thing.
+			ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+		}
+
+		ImGui::BeginDisabled(tool.disabledFlag.get());
+
+		const CachedTexture& icon = tool.iconPath.empty()
+			? CachedTexture{}
+			: textureFor(tool.iconPath);
+		const bool showLabel = !icon.valid() || m_labelsForced;
+		const float width = toolWidth(tool, m_iconSize, m_labelsForced);
+
+		bool clicked = false;
+		if (icon.valid())
+		{
+			// An icon tool draws the image and, when labels are forced, the
+			// text beside it -- as one button, so the whole thing is clickable.
+			const ImVec2 iconExtent((float)m_iconSize.width, (float)m_iconSize.height);
+			if (showLabel && !tool.label.empty())
+			{
+				const ImVec2 cursor = ImGui::GetCursorScreenPos();
+				clicked = ImGui::Button("##tool", ImVec2(width, rowHeight));
+				ImDrawList* draw = ImGui::GetWindowDrawList();
+				const float iconY = cursor.y + (rowHeight - iconExtent.y) * 0.5f;
+				draw->AddImage((ImTextureID)(std::uintptr_t)icon.id,
+					ImVec2(cursor.x + style.FramePadding.x, iconY),
+					ImVec2(cursor.x + style.FramePadding.x + iconExtent.x, iconY + iconExtent.y));
+				const ImVec2 textSize = ImGui::CalcTextSize(tool.label.c_str());
+				draw->AddText(
+					ImVec2(cursor.x + style.FramePadding.x + iconExtent.x + style.ItemInnerSpacing.x,
+						cursor.y + (rowHeight - textSize.y) * 0.5f),
+					ImGui::GetColorU32(ImGuiCol_Text), tool.label.c_str());
+			}
+			else
+			{
+				clicked = ImGui::ImageButton("##tool",
+					(ImTextureID)(std::uintptr_t)icon.id, iconExtent);
+			}
+		}
+		else
+		{
+			// No icon, or one that failed to load: the label IS the tool, so
+			// the row is never blank (R9.3).
+			const char* label = tool.label.empty() ? "##tool" : tool.label.c_str();
+			clicked = ImGui::Button(label, ImVec2(width, rowHeight));
+		}
+
+		if (clicked)
+		{
+			// Value first, then the callback.
+			if (tool.toggledFlag)
+				tool.toggledFlag->set(!tool.toggledFlag->get());
+			if (tool.clickHandler)
+				tool.clickHandler();
+		}
+
+		ImGui::EndDisabled();
+		if (down)
+			ImGui::PopStyleColor(2);
+
+		// EndDisabled leaves the item outside the disabled scope, so a disabled
+		// tool would still answer IsItemHovered -- suppressed by hand here just
+		// as the backend does for a leaf's tooltip.
+		if (!tool.tooltip.empty() && !tool.disabledFlag.get())
+			ImGui::SetItemTooltip("%s", tool.tooltip.c_str());
+
+		ImGui::PopID();
+	}
+	ImGui::PopID();
+	(void)frame;
+}
+
+// StatusBarWrapper -----------------------------------------------------------
+
+Size StatusBarWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+
+	// Deliberately NOT measured from the live text: a status bar displays a
+	// string written from elsewhere, so measuring it would let an arriving
+	// message widen an auto-fit window. Fixed fields contribute their width,
+	// stretch fields a constant, and Expand() gets the bar the rest of the row.
+	float width = 0.0f;
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		if (index > 0)
+			width += style.ItemSpacing.x;
+		const StatusField& field = m_fields[index];
+		width += (float)(field.width > 0 ? field.width : kDefaultStatusFieldWidth);
+	}
+	return Size { (int)std::ceil(width), (int)std::ceil(ImGui::GetFrameHeight()) };
+}
+
+void StatusBarWrapper::render(const Rect& frame)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float height = (float)frame.height;
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	// Fixed fields keep their width; the rest share what is left, equally.
+	float fixedTotal = 0.0f;
+	int stretchCount = 0;
+	for (const StatusField& field : m_fields)
+	{
+		if (field.width > 0)
+			fixedTotal += (float)field.width;
+		else
+			++stretchCount;
+	}
+	const float gaps = m_fields.empty() ? 0.0f : style.ItemSpacing.x * (float)(m_fields.size() - 1);
+	const float leftover = std::max(0.0f, (float)frame.width - fixedTotal - gaps);
+	const float stretchWidth = stretchCount > 0 ? leftover / (float)stretchCount : 0.0f;
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	float x = origin.x;
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		const StatusField& field = m_fields[index];
+		const float fieldWidth = field.width > 0 ? (float)field.width : stretchWidth;
+
+		if (index > 0)
+		{
+			// A thin divider between panes, drawn by hand -- ImGui::Separator()
+			// would span the window instead of this row.
+			const float lineX = x - style.ItemSpacing.x * 0.5f;
+			draw->AddLine(ImVec2(lineX, origin.y + style.FramePadding.y),
+				ImVec2(lineX, origin.y + height - style.FramePadding.y),
+				ImGui::GetColorU32(ImGuiCol_Separator));
+		}
+
+		// Clipped to its own pane, so a long string cannot run into the next
+		// field or out of the engine's frame.
+		const std::string& text = field.text.get();
+		const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+		const ImVec4 clip(x, origin.y, x + fieldWidth, origin.y + height);
+		draw->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.z, clip.w), true);
+		draw->AddText(ImVec2(x, origin.y + (height - textSize.y) * 0.5f),
+			ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+		draw->PopClipRect();
+
+		x += fieldWidth + style.ItemSpacing.x;
+	}
+
+	// One item for the whole row, so the engine's frame is what it occupies.
+	ImGui::Dummy(ImVec2((float)frame.width, height));
+}
 
 // ColorPickerWrapper -----------------------------------------------------------
 

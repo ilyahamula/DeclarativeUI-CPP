@@ -30,6 +30,15 @@ public:
     // one: a tree whose shape shifts renumbers both alike.
     static int nextMeasureId() { return next(s_measureIds); }
 
+    // Sequential integer for a leaf's CONTEXT MENU popup, taken in place().
+    // It needs its own counter for the same reason the measure one does: place()
+    // runs after render() has already consumed the widget ids, so borrowing that
+    // counter would shift every snapshot key. A popup has to keep one id across
+    // frames or it would close the moment it opened, and place() visits each
+    // leaf exactly once per frame in tree order -- so this sequence is as stable
+    // as the other two, and only leaves that actually carry a menu draw from it.
+    static int nextContextMenuId() { return next(s_contextMenuIds); }
+
     // Slot stateKey() reserves for measure-phase state. Measure ids and widget
     // ids are separate sequences, so without it the two could hash to the same
     // key in a SnapshotStore<T> they happen to share (SnapshotStore<int> holds
@@ -65,4 +74,5 @@ private:
     static inline std::unordered_map<ImGuiID, ScopeState> s_widgetIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_groupBoxIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_measureIds;
+    static inline std::unordered_map<ImGuiID, ScopeState> s_contextMenuIds;
 };

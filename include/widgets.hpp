@@ -32,6 +32,7 @@ struct Widget
 		// a temporary that dies with the enclosing declarative expression.
 		wrapper->setDisabled(m_disabled);
 		wrapper->setTooltip(m_tooltip);
+		wrapper->setContextMenu(m_contextMenu);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(defaultFlags()));
 
 		if (m_postCreateCallback)
@@ -108,6 +109,23 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
+	// A right-click menu for this control: the same MenuItem model the menu bar
+	// is built from (include/menus.hpp), so items carry shortcuts, separators,
+	// submenus, bound check marks and bound disabling exactly as they do there.
+	//
+	// Leaf-only by construction, like withTooltip -- it lives on Widget<W> and
+	// no container has it. A stack is pure geometry with no native window to
+	// deliver a right-click, so a container overload could not be honoured.
+	//
+	// A DISABLED control opens no menu, matching its tooltip: wx and Qt deliver
+	// no context-menu event to a disabled window, and the ImGui backend
+	// suppresses the popup by hand to agree with them.
+	W& withContextMenu(ContextMenu menu)
+	{
+		m_contextMenu = std::move(menu);
+		return static_cast<W&>(*this);
+	}
+
 	W& withStyle(long style)
 	{
 		m_style = style;
@@ -136,6 +154,7 @@ private: // callbacks
 private:
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
+	ContextMenu m_contextMenu;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };
@@ -1243,6 +1262,112 @@ private:
 };
 
 // ToggleButton -----------------------------------------------------------
+// ToolBar --------------------------------------------------------------
+// A horizontal row of command buttons, as an application usually puts under its
+// menu bar. Natively a container on wx and Qt, but a LEAF to the layout engine:
+// the native control lays its own tools out, so the engine sizes one rectangle
+// and the backend fills it.
+//
+// Every backend renders the same ToolItem model (frameworks_core/CoreTypes/),
+// so a tool's icon, label, tooltip, bound toggle and bound disabling are written
+// once. A tool with no icon -- or one whose icon fails to load -- shows its
+// label instead, so a toolbar is never blank.
+// StatusBar ------------------------------------------------------------
+// The row of read-only text along an application's bottom edge: "Ready" on the
+// left, "Ln 12, Col 4" and "UTF-8" in narrow fields on the right.
+//
+// Like ToolBar it is a native container but an engine LEAF -- the native control
+// owns its panes, so the engine sizes one rectangle and the backend divides it.
+// Unlike every other widget it defaults to Expand(): a status bar that did not
+// span its parent would not be one.
+//
+// A field with a fixed width keeps it; the rest share what is left over. Bind a
+// field to a std::string& and anything that writes that string shows up live.
+struct StatusBar : Widget<StatusBar>
+{
+	using super = Widget<StatusBar>;
+
+	explicit StatusBar(StatusFields fields)
+		: super()
+		, m_fields(std::move(fields))
+	{
+	}
+
+	// One stretched field, the common case. The pair is the usual one: a
+	// literal snapshots, a non-const lvalue binds.
+	explicit StatusBar(const std::string& text)
+		: super()
+		, m_fields{ StatusField(text) }
+	{
+	}
+
+	explicit StatusBar(std::string& text)
+		: super()
+		, m_fields{ StatusField(text) }
+	{
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<StatusBarWrapper>(m_fields, pos, size, style);
+	}
+
+	// A status bar always spans its parent, so it says so here rather than
+	// making every caller repeat it. withFlags() replaces this outright, as it
+	// does for Spacer.
+	LayoutFlags defaultFlags() const override
+	{
+		return LayoutFlags().Expand();
+	}
+
+private:
+	StatusFields m_fields;
+};
+
+struct ToolBar : Widget<ToolBar>
+{
+	using super = Widget<ToolBar>;
+
+	explicit ToolBar(std::vector<ToolItem> tools)
+		: super()
+		, m_tools(std::move(tools))
+	{
+	}
+
+	// The size icons are drawn at; 16x16 unless the caller says otherwise.
+	ToolBar& withIconSize(Size size)
+	{
+		m_iconSize = size;
+		return *this;
+	}
+
+	// Force labels beside the icons. Labels already show for any tool that has
+	// no icon, so this is about the icon'd ones.
+	ToolBar& showLabels(bool show = true)
+	{
+		m_labelsForced = show;
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<ToolBarWrapper>(m_tools, m_iconSize, m_labelsForced, pos, size, style);
+	}
+
+private:
+	std::vector<ToolItem> m_tools;
+	Size m_iconSize { 16, 16 };
+	bool m_labelsForced = false;
+};
+
 struct ToggleButton : Widget<ToggleButton>
 {
 	using super = Widget<ToggleButton>;

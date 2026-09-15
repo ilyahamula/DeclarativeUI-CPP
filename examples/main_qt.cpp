@@ -2,29 +2,39 @@
 
 #include <QApplication>
 
+#include <string>
+
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Expander demo state: locals of main, so the bound refs outlive the
-    // modeless dialogs that read them for the whole of exec().
-    bool basicOpen = true;
-    bool advancedOpen = false;
-    bool networkOpen = true;
-    bool logging = true;
-    int level = 2;
-    int retries = 3;
-    std::string proxy = "proxy.local:8080";
-    bool sectionsDisabled = false;
-    bool detailsOpen = false;
-    bool bindingDisabled = false;
+    // Window demo state: locals of main, so the bound refs outlive the modeless
+    // windows that read them for the whole of exec().
+    std::string selectedFile = "main.cpp";
+    TableRows files {
+        { "main.cpp",    "2 KB",  "entry point" },
+        { "layout.cpp",  "31 KB", "measure/arrange" },
+        { "widgets.hpp", "18 KB", "public API" },
+        { "engine.hpp",  "9 KB",  "" },
+    };
+    int selectedRow = 0;
+    std::string notes = "Drag a sash, then resize the window: the panes take the room.";
+    bool shellDisabled = false;
+    bool shellOpen = true;
+    std::string shellStatus = "(the shell is still open)";
+    bool panelDisabled = false;
+    bool wordWrap = true;
+    bool showGrid = false;
 
-    // setPosition places where the window opens; the user can still move it
-    // afterwards. On ImGui these are host-window-relative, on wx and Qt
-    // desktop-absolute -- the two dialogs land side by side either way.
-    drawExpanderUI(basicOpen, advancedOpen, networkOpen, logging,
-        level, retries, proxy, sectionsDisabled).setPosition({ 40, 40 }).show();
-    drawExpanderBinding(detailsOpen, bindingDisabled).setPosition({ 500, 40 }).show();
+    // The shell is a Window -- a QMainWindow, which is where its QMenuBar
+    // attaches. Resizable by default, shown against a bool that its own Close
+    // button, its File > Close item and the control panel all write.
+    drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
+        shellOpen, shellStatus, wordWrap).show(shellOpen);
+    // Fixed(), and shown with the plain show() -- the panel stays up so the
+    // shell's onClose() report is readable after the shell has gone, and so the
+    // app does not exit with its last window.
+    drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap, showGrid).show();
 
     return app.exec();
 }

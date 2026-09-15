@@ -2,6 +2,8 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/StatusField.hpp"
+#include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
 
@@ -453,6 +455,55 @@ private:
 	std::function<void()> m_onHover;
 	std::function<void(void*)> m_onClickWithWidget;
 	std::function<void(void*)> m_onHoverWithWidget;
+};
+
+// ToolBarWrapper -----------------------------------------------------------
+// A row of command buttons. Unlike every other leaf here this one is a
+// CONTAINER natively (a wxToolBar / QToolBar holding its own tools), but it is
+// a LEAF to the engine: the tools are chrome the native control lays out
+// itself, not nodes, so the engine sizes one rectangle and the backend fills
+// it. That is why there is no NodeKind for it.
+class ToolBarWrapper : public ControlWrapper
+{
+public:
+	ToolBarWrapper(std::vector<ToolItem> tools, Size iconSize, bool labelsForced,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_tools(std::move(tools))
+		, m_iconSize(iconSize)
+		, m_labelsForced(labelsForced)
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	std::vector<ToolItem> m_tools;
+	Size m_iconSize { 16, 16 };
+	// Labels are shown for a tool that has no icon whatever this says; it
+	// forces them on for the icon'd ones too.
+	bool m_labelsForced = false;
+};
+
+// StatusBarWrapper -----------------------------------------------------------
+// The row of read-only text an application keeps at its bottom edge. Like
+// ToolBarWrapper this is a native CONTAINER but an engine LEAF: the native
+// control owns its own panes, so the engine sizes one rectangle and the backend
+// divides it.
+class StatusBarWrapper : public ControlWrapper
+{
+public:
+	StatusBarWrapper(StatusFields fields,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_fields(std::move(fields))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	StatusFields m_fields;
 };
 
 // ColorPickerWrapper -----------------------------------------------------------

@@ -1,4 +1,5 @@
 #include "frameworks_core/qt/LayoutBackend.hpp"
+#include "frameworks_core/qt/MenuBuilder.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
@@ -76,6 +77,28 @@ void applyTooltip(QWidget* window, const ControlWrapper& widget)
 		push);
 }
 
+// Gives a leaf its right-click menu -- the Qt twin of the wx applyContextMenu,
+// same contract. The model is COPIED into the handler: the wrapper that supplied
+// it must never be captured, and the copy is what an unbound check item's state
+// then lives in. A bound one writes through to the caller's bool.
+//
+// Nothing is polled. The menu is rebuilt from the model every time it opens, so
+// bound check and disabled flags are read at that moment.
+//
+// No disabled check is needed here: Qt sends no context-menu request to a
+// disabled widget, exactly as it sends no tooltip event.
+void applyContextMenu(QWidget* window, const ControlWrapper& widget)
+{
+	if (widget.contextMenu().empty())
+		return;
+
+	window->setContextMenuPolicy(Qt::CustomContextMenu);
+	QObject::connect(window, &QWidget::customContextMenuRequested, window,
+		[window, items = widget.contextMenu()](const QPoint& pos) mutable {
+			popupContextMenu(window, items, pos);
+		});
+}
+
 // The content half of an Expander: the child that folds away, as opposed to
 // the header leaf beside it. Read from the node's own parent rather than from
 // the scope stack, so it holds wherever the subtree is entered from.
@@ -112,6 +135,7 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 		{
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
+			applyContextMenu(created, *widget);
 		}
 	}
 

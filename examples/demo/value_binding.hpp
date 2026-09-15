@@ -642,3 +642,149 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
         }
     };
 }
+
+// The Window control panel: one bool shared between a Window's show(bool&), a
+// CheckBox and a ToggleButton, plus onClose()'s report read back live -- and a
+// second bool shared with a CHECKABLE MENU ITEM in the shell's View menu.
+//
+// `shellOpen` is the same bool the application shell in app_shell.hpp is shown
+// against, which makes it a three-way binding rather than the usual two:
+//
+//   * untick the check box (or the toggle) and the shell WINDOW closes;
+//   * close the shell from its title bar or its Close button and both controls
+//     clear themselves.
+//
+// `shellStatus` is bound THREE ways here: the shell's onClose() writes it, the
+// TextCtrl below edits it, and the StatusBar field under that shows it. Type in
+// the box and the bar follows.
+//
+// `shellStatus` is written by the shell's onClose() and mirrored here through an
+// ordinary bound TextCtrl -- the same shape drawTextMirror() uses, and the only
+// one that updates live on the retained backends (ReadonlyTextCtrl takes a
+// snapshot, so an external write would never reach it). So the callback firing
+// exactly once is visible from a window that is still up. Both refs belong to
+// the caller and outlive every window here.
+//
+// Backend divergence worth knowing: TICKING THE BOX BACK ON DOES NOT REOPEN the
+// shell on wx or Qt. Closing destroys the frame and frees its engine session
+// (R6.4), and nothing re-runs show() for a retained backend. On ImGui the main
+// calls show() every frame, so there the shell comes straight back. Re-showing a
+// closed window is a lifecycle question T3.6 settles, not part of T2.1.
+//
+// `showGrid` is the context-menu binding: a check item inside the toggle's own
+// right-click menu and the `ToggleButton` itself, on one bool. Unlike the menu
+// bar, a popup is rebuilt from the model every time it opens, so its check mark
+// is read at that moment and nothing polls it.
+//
+// `wordWrap` is the menu-item AND tool-bar binding: the shell's View > Word wrap
+// check item, the shell's "Wrap" tool, the check box below and the tool bar
+// below are four holders of one bool, across two windows. A check tool is an
+// ordinary bound value, polled on wx and Qt exactly as a CheckBox's is.
+//
+// `wordWrap` is the menu-item binding: it is the shell's View > Word wrap check
+// item and the check box at the bottom of this panel, on one bool, across two
+// windows. Tick either and the other follows -- a menu item is an ordinary
+// bound value, polled on wx and Qt exactly as every other control's is, and
+// read live on ImGui. Ctrl+Shift+W does the same thing from the keyboard while
+// the shell is the active window.
+//
+// This panel is Fixed() at an explicit Size -- the one place the Window default
+// is turned off, next to the shell which keeps it and auto-fits. Drag the
+// shell's edge and it grows; drag this one's and nothing happens. The Size is
+// the TOTAL window size on every backend (client area plus frame on wx, the
+// widget itself on Qt, padding plus title bar on ImGui), which is the same
+// contract Dialog's Size overload has.
+inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& disabled,
+    bool& wordWrap, bool& showGrid)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+
+    return Window {
+        "Window controls (shared bool)",
+        Size{ 460, 500 },
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({420, -1}),
+            StaticText{"The shell's open flag, a check box and a toggle: one bool."}
+                .withSize({-1, kLabelH}),
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                CheckBox{shellOpen, "Application Shell is open"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    .isDisabled(disabled),
+                ToggleButton{shellOpen, "Shell"}
+                    .withSize({110, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(disabled)
+                    .withTooltip("Untick to close the shell window")
+            },
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"What the shell's onClose() last reported:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // Bound, not readonly: an external write only reaches a control
+            // through a bound ref, and this one is written from a callback in
+            // another window.
+            TextCtrl{shellStatus}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+            // The same string again, in a status bar field: type in the box
+            // above and the bar follows, because both are bound to `shellStatus`
+            // and neither knows about the other. A StatusBar needs no flags to
+            // span -- Expand() is its default.
+            StatusBar{ shellStatus }
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+            CheckBox{disabled, "Lock both controls"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12)),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"The shell's View > Word wrap check item, and this box: one bool."}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // The menu-item binding. The check mark and this box are the same
+            // bool: tick either one (or press Ctrl+Shift+W in the shell) and
+            // both follow, across two separate windows.
+            CheckBox{wordWrap, "Word wrap"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                .withTooltip("Also on the shell's View menu, as Ctrl+Shift+W"),
+            // The third and fourth holders of that same bool: a toolbar CHECK
+            // tool here, and the shell's own toolbar and View menu over there.
+            // Press any one of the four and the other three follow.
+            ToolBar {{
+                ToolItem{"Wrap"}.withTooltip("The same bool as the box above").toggled(wordWrap),
+                ToolItem::Separator(),
+                ToolItem{"On"}.onClick([&wordWrap]() { wordWrap = true; }),
+                ToolItem{"Off"}.onClick([&wordWrap]() { wordWrap = false; }),
+            }}
+                .withFlags(LayoutFlags().Border(Side::Top, 4)),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"A context-menu check item and this toggle: one bool."}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // The context-menu binding. Right-click the toggle: the check item
+            // in its own menu and the toggle's pressed state are the same bool,
+            // so either one moves the other. The menu is rebuilt from the model
+            // every time it opens, which is why the check mark is always current
+            // without anything polling it.
+            ToggleButton{showGrid, "Show grid"}
+                .withSize({140, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                .withTooltip("Right-click me")
+                .withContextMenu({
+                    MenuItem{"Show grid"}.checkable(showGrid),
+                    MenuItem::Separator(),
+                    MenuItem{"Reset"}.onSelect([&showGrid]() { showGrid = false; }),
+                })
+        }
+    }
+    // The inverse of a Dialog: a Window resizes unless it is told not to.
+    .Fixed();
+}

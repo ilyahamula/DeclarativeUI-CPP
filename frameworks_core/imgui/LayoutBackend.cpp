@@ -3,6 +3,7 @@
 #include "frameworks_core/ControlWrapper.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/imgui/ImGuiWidgetIdManager.hpp"
+#include "frameworks_core/imgui/MenuDraw.hpp"
 
 #include "imgui.h"
 
@@ -93,6 +94,33 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	const std::string& tooltip = leaf.widget->tooltip();
 	if (!disabled && !tooltip.empty())
 		ImGui::SetItemTooltip("%s", tooltip.c_str());
+
+	// The right-click menu, on the same terms and for the same reasons: the
+	// group is the item the popup hangs off, so a composite widget opens one
+	// menu over the whole of itself, and a disabled leaf opens none -- wx and Qt
+	// deliver no context-menu event to a disabled window either.
+	//
+	// The popup needs an id of its OWN, and an explicit one: EndGroup adds the
+	// group with id 0, so letting BeginPopupContextItem fall back to the last
+	// item's id (its nullptr default) would trip its own assert. The id must
+	// also survive from frame to frame -- a popup is reopened by id every frame
+	// it stays up -- which rules out anything derived from the node, since the
+	// tree is rebuilt. Hence the dedicated counter, pushed so that every leaf's
+	// "##ctx" hashes differently.
+	const ContextMenu& menu = leaf.widget->contextMenu();
+	if (!disabled && !menu.empty())
+	{
+		const int contextId = WidgetIdManager::nextContextMenuId();
+		ImGui::PushID(contextId);
+		if (ImGui::BeginPopupContextItem("##ctx"))
+		{
+			// The path keys an unbound check item's state, which on ImGui lives
+			// outside the frame; the counter is what makes it unique per leaf.
+			drawMenuItems(menu, "##ctx" + std::to_string(contextId));
+			ImGui::EndPopup();
+		}
+		ImGui::PopID();
+	}
 }
 
 EdgeInsets ImGuiLayoutBackend::containerInsets(const LayoutNode& node)

@@ -35,13 +35,63 @@ struct EngineSession
 	Size fixedContent { -1, -1 };
 	bool busy = false;
 
-	// Lifecycle seams the caller fills in; both are inert until the elements
-	// that set them land. `openFlag` is a caller-owned bool the window is shown
-	// against (Dialog/Window::show(bool&), T3.6/T2.1): clearing it closes the
-	// window, closing the window clears it. `onClose` fires exactly once when
-	// the window goes away.
+	// How much bigger the WINDOW is than the space the engine lays out into.
+	// Zero for a Dialog and for a Window with no chrome, one menu-bar height
+	// once a bar is attached -- QMainWindow stacks the bar above the central
+	// widget the engine renders into, so the two rectangles stop agreeing.
+	// (Not on macOS, where the bar goes to the system menu and takes no room;
+	// the caller measures it and reports what it actually cost.)
+	Size chrome { 0, 0 };
+
+	// Lifecycle the caller fills in. `openFlag` is a caller-owned bool the
+	// window is shown against (Window::show(bool&), and Dialog's in T3.6):
+	// clearing it closes the window, closing the window clears it. `onClose`
+	// fires exactly once when the window goes away.
 	bool* openFlag = nullptr;
 	std::function<void()> onClose;
+	bool closed = false; // one-shot guard for notifyClosed()
+
+	// The one close path, whatever triggered it -- the user's close button or
+	// the caller clearing `openFlag`. Both clear the flag and fire onClose
+	// once, so a caller cannot tell the two apart by what it observes.
+	void notifyClosed()
+	{
+		if (closed)
+			return;
+		closed = true;
+		if (openFlag != nullptr)
+			*openFlag = false;
+		if (onClose)
+			onClose();
+	}
+
+	// Polls the caller-owned flag: clearing it closes the window. Qt has no
+	// notification for a bool written from somewhere else, so this is the
+	// ordinary RefSync shape -- `pull` is whether the window is up now, `want`
+	// whether the flag says it should be.
+	void bindOpenFlag()
+	{
+		if (openFlag == nullptr)
+			return;
+		const bool* flag = openFlag;
+		bindExternalRefSync(window,
+			[this] { return window->isVisible(); },
+			[flag] { return *flag; },
+			[this](bool) { window->close(); }); // -> closeEvent -> notifyClosed()
+	}
+
+	// The space the engine actually has: the window minus its chrome.
+	Size contentSize() const
+	{
+		return { std::max(0, window->width() - chrome.width),
+				 std::max(0, window->height() - chrome.height) };
+	}
+
+	// The window size that gives the engine `content`.
+	Size windowSizeFor(const Size& content) const
+	{
+		return { content.width + chrome.width, content.height + chrome.height };
+	}
 
 	Size minClient() const
 	{
@@ -56,7 +106,7 @@ struct EngineSession
 		if (busy)
 			return;
 		busy = true;
-		engine->render(*root, { window->width(), window->height() });
+		engine->render(*root, contentSize());
 		busy = false;
 	}
 
@@ -72,22 +122,23 @@ struct EngineSession
 		const Size content = engine->resolve(*root, autoFit ? Size { -1, -1 } : fixedContent);
 		if (autoFit && resizable)
 		{
-			const Size floor = minClient();
+			const Size floor = windowSizeFor(minClient());
 			window->setMinimumSize(floor.width, floor.height);
 			const int width = std::max(window->width(), floor.width);
 			const int height = std::max(window->height(), floor.height);
 			if (width != window->width() || height != window->height())
 				window->resize(width, height);
-			engine->render(*root, { width, height });
+			engine->render(*root, contentSize());
 		}
 		else if (autoFit)
 		{
-			window->setFixedSize(content.width, content.height);
+			const Size target = windowSizeFor(content);
+			window->setFixedSize(target.width, target.height);
 			engine->render(*root, content);
 		}
 		else
 		{
-			engine->render(*root, { window->width(), window->height() });
+			engine->render(*root, contentSize());
 		}
 
 		busy = false;

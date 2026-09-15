@@ -39,7 +39,7 @@ return Dialog {
 
 ## Features
 
-- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, `TabPanel`, and `Dialog`
+- **Declarative widget tree** — compose layouts using `VStack`, `HStack`, `VGroupBox`, `HGroupBox`, `TabPanel`, and `Dialog` or `Window`
 - **Framework-owned layout engine** — one shared measure/arrange engine computes every rectangle; backends only measure native widgets and place them, so the same tree follows identical layout rules on every backend (see `docs/specs/custom_layout_system/`)
 - **Sensible defaults, no flags required** — widgets size to their content (text fields never collapse below their text), sibling group boxes in a column equalize to the widest one (tallest in a row), and dialogs auto-fit their content
 - **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
@@ -64,8 +64,10 @@ return Dialog {
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
+| Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
-| Top-level         | `Dialog`, `MessageBox` |
+| Top-level         | `Dialog`, `Window`, `MessageBox` |
+| Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
 intrinsic height identically on every backend — the native hints disagree far too much
@@ -78,6 +80,89 @@ splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, w
 is exactly what the layout engine takes back — so the same tree divides the same
 way on all three backends. Bind the sash position to an `int&` and dragging writes
 through to it; writing it from anywhere else moves the sash.
+
+`Dialog` and `Window` are the two top-level spellings and share the engine behind
+them; the defaults are opposites, because the roles are. A `Dialog` is a transient
+box the engine sizes exactly and the user cannot resize. A `Window` is the
+application frame — `wxFrame`, `QMainWindow`, an ImGui window in the host
+viewport — so it is **resizable by default** with the auto-fit size as its floor,
+and `Fixed()` is what opts out. A `Window` is also the only thing a menu bar can
+attach to on wx. `show(bool& open)` makes a caller-owned bool the single truth
+about whether the window is up: clearing it closes the window, closing the window
+clears it, and `onClose()` fires exactly once either way.
+
+`Window::withMenuBar()` attaches nested menus with separators, submenus, checkable
+items and per-item disabling — native chrome outside the content area on wx and Qt,
+a menu row inside the window on ImGui. A shortcut is written once as text
+(`.withShortcut("Ctrl+Shift+S")`), parsed once into a `Shortcut`, and mapped by each
+backend to its own accelerator; **`Ctrl` means Cmd on macOS on all three**, so one
+string reads native everywhere. A check item is an ordinary bound value:
+`.checkable(wordWrap)` and a `CheckBox` on the same `bool&` stay in step, and
+`.isDisabled(flag)` greys an item live.
+
+`ToolBar` is the row of commands under the menu bar. It is a container natively — a
+`wxToolBar`, a `QToolBar`, a drawn button row on ImGui — but a **leaf** to the layout
+engine: the native control lays its own tools out, so the engine sizes one rectangle.
+A tool with no icon, or one whose icon fails to load, shows its label instead, so a
+toolbar is never blank.
+
+```cpp
+ToolBar {{
+    ToolItem{"New"}.withIcon("icons/new.png").onClick([&] { newFile(); }),
+    ToolItem::Separator(),
+    ToolItem{"Wrap"}.toggled(wordWrap),          // a check tool, on the caller's bool
+    ToolItem{"Delete"}.isDisabled(locked),       // greys live
+}}
+```
+
+`StatusBar` is the row of text along the bottom. It is the one widget that defaults to
+`Expand()` — a status bar that did not span its parent would not be one — and it
+deliberately **does not measure its own text**: a field is there to show a string
+written from somewhere else, so measuring it would let an arriving message resize an
+auto-fit window. Fields with a fixed width keep it; the rest share what is left.
+
+```cpp
+StatusBar {{
+    StatusField{ status },              // bound: anything that writes it shows live
+    StatusField{ "Ln 1, Col 1", 120 },  // fixed width
+    StatusField{ "UTF-8", 70 },
+}}
+StatusBar{ status }                     // or one stretched field, the common case
+```
+
+The same `MenuItem` model is a right-click menu on any leaf:
+
+```cpp
+Table { columns, rows, selected }
+    .withContextMenu({
+        MenuItem{"Open"}.onSelect([&] { open(); }),
+        MenuItem::Separator(),
+        MenuItem{"Copy"}.withSubmenu({ MenuItem{"Name"}, MenuItem{"Path"} }),
+        MenuItem{"Delete"}.isDisabled(locked),
+    })
+```
+
+`.withContextMenu()` is **leaf-only**, like `.withTooltip()` — a container has no
+native window to deliver a right-click, so there is no container overload and asking
+for one will not compile. A **disabled** control opens no menu, exactly as it shows no
+tooltip. A popup is rebuilt from the model each time it opens, so bound check marks and
+bound disabling are always current without anything polling them; a shortcut on a
+context-menu item is *displayed* but not registered, on every backend.
+
+```cpp
+Window { "Editor", content }
+    .withMenuBar(MenuBar { {
+        Menu { "File", {
+            MenuItem{"New"}.withShortcut("Ctrl+N").onSelect([&] { newFile(); }),
+            MenuItem::Separator(),
+            MenuItem{"Recent"}.withSubmenu({ MenuItem{"main.cpp"}, MenuItem{"layout.cpp"} }),
+        } },
+        Menu { "View", {
+            MenuItem{"Word wrap"}.withShortcut("Ctrl+Shift+W").checkable(wordWrap),
+        } },
+    } })
+    .show(open);
+```
 
 `Expander` folds a section away behind a clickable header. Collapsed, the content
 costs the layout *nothing at all* — not its size, not its margins, not even the gap

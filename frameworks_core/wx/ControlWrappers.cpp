@@ -2,6 +2,7 @@
 #include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <tuple>
 #include <utility>
@@ -21,6 +22,8 @@
 #include <wx/statline.h>
 #include <wx/clrpicker.h>
 #include <wx/treectrl.h>
+#include <wx/toolbar.h>
+#include <wx/statusbr.h>
 #include <wx/dataview.h>
 #include <wx/settings.h>
 #include <wx/collheaderctrl.h>
@@ -621,6 +624,175 @@ void ImageWrapper::realize(void* parentWindow)
 	else if (m_onHoverWithWidget)
 		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
+}
+
+// ToolBarWrapper -----------------------------------------------------------
+
+void ToolBarWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("ToolBarWrapper::realize()\t-> new wxToolBar()\n");
+#endif
+	static bool s_handlersInit = false;
+	if (!s_handlersInit)
+	{
+		wxInitAllImageHandlers();
+		s_handlersInit = true;
+	}
+
+	// A CHILD wxToolBar, deliberately not wxFrame::CreateToolBar(): that one
+	// docks itself to a frame and would be invisible to the engine, and it
+	// would make a toolbar impossible inside a Dialog or anywhere down a stack.
+	long style = wxTB_HORIZONTAL | wxTB_FLAT | wxTB_NODIVIDER;
+	const bool anyLabels = m_labelsForced
+		|| std::any_of(m_tools.begin(), m_tools.end(), [](const ToolItem& tool) {
+			return !tool.isSeparator && tool.iconPath.empty();
+		});
+	if (anyLabels)
+		style |= wxTB_TEXT;
+
+	auto* bar = new wxToolBar(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), style | m_style);
+	bar->SetToolBitmapSize(wxSize(m_iconSize.width, m_iconSize.height));
+	m_nativeWidget = bar;
+
+	for (ToolItem& tool : m_tools)
+	{
+		if (tool.isSeparator)
+		{
+			bar->AddSeparator();
+			continue;
+		}
+
+		// A tool with no usable icon shows its label instead, so the row is
+		// never blank -- and a bitmap is still required by AddTool, so an empty
+		// one of the right size stands in.
+		wxBitmap bitmap;
+		if (!tool.iconPath.empty())
+		{
+			wxImage image(tool.iconPath, wxBITMAP_TYPE_ANY);
+			if (image.IsOk())
+			{
+				if (m_iconSize.width > 0 && m_iconSize.height > 0)
+					image = image.Scale(m_iconSize.width, m_iconSize.height, wxIMAGE_QUALITY_HIGH);
+				bitmap = wxBitmap(image);
+			}
+#ifdef USE_LOGGER
+			else
+			{
+				Logger::instance().log("ToolBarWrapper::realize()\t-> icon \""
+					+ tool.iconPath + "\" failed to load; falling back to the label\n");
+			}
+#endif
+		}
+		if (!bitmap.IsOk())
+		{
+			bitmap = wxBitmap(std::max(1, m_iconSize.width), std::max(1, m_iconSize.height));
+			// Fully transparent, so only the label reads.
+			wxImage blank = bitmap.ConvertToImage();
+			blank.InitAlpha();
+			std::memset(blank.GetAlpha(), 0,
+				(std::size_t)blank.GetWidth() * (std::size_t)blank.GetHeight());
+			bitmap = wxBitmap(blank);
+		}
+
+		const int id = wxWindow::NewControlId();
+		const wxString label = wxString::FromUTF8(tool.label);
+		const wxString help = wxString::FromUTF8(tool.tooltip);
+		ToolItem* model = &tool;
+		if (model->toggledFlag)
+		{
+			bar->AddCheckTool(id, label, bitmap, wxNullBitmap, help);
+			bar->ToggleTool(id, model->toggledFlag->get());
+		}
+		else
+		{
+			bar->AddTool(id, label, bitmap, help);
+		}
+		bar->EnableTool(id, !model->disabledFlag.get());
+
+		bar->Bind(wxEVT_TOOL, [model, bar, id](wxCommandEvent& event) {
+			// Value first, then the callback, so a handler reading the bound
+			// bool sees the state the user just produced.
+			if (model->toggledFlag)
+				model->toggledFlag->set(bar->GetToolState(id));
+			if (model->clickHandler)
+				model->clickHandler();
+			event.Skip(false);
+		}, id);
+
+		// Bound flags are polled, never pushed on disagreement -- the shape
+		// every externally-written value in the framework uses.
+		if (model->toggledFlag && model->toggledFlag->isBound())
+		{
+			const bool* flag = model->toggledFlag->boundValue();
+			bindExternalRefSync(bar,
+				[bar, id] { return bar->GetToolState(id); },
+				[flag] { return *flag; },
+				[bar, id](bool value) { bar->ToggleTool(id, value); });
+		}
+		if (model->disabledFlag.isBound())
+		{
+			const bool* flag = model->disabledFlag.boundValue();
+			bindExternalRefSync(bar,
+				[bar, id] { return bar->GetToolEnabled(id); },
+				[flag] { return !*flag; },
+				[bar, id](bool enabled) { bar->EnableTool(id, enabled); });
+		}
+	}
+
+	// Lays the tools out and fixes the bar's best size -- nothing appears
+	// without it.
+	bar->Realize();
+}
+
+// StatusBarWrapper -----------------------------------------------------------
+
+void StatusBarWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("StatusBarWrapper::realize()\t-> new wxStatusBar()\n");
+#endif
+	// A CHILD wxStatusBar, deliberately not wxFrame::CreateStatusBar(): that one
+	// docks itself to a frame, out of the engine's sight, and would make a
+	// status bar impossible in a Dialog or anywhere else down a stack.
+	auto* bar = new wxStatusBar(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxSTB_DEFAULT_STYLE | m_style);
+	m_nativeWidget = bar;
+
+	const int count = m_fields.empty() ? 1 : (int)m_fields.size();
+	bar->SetFieldsCount(count);
+
+	// wx reads a NEGATIVE width as a stretch weight and a positive one as fixed
+	// pixels, which is exactly the split StatusField already describes.
+	std::vector<int> widths;
+	widths.reserve((std::size_t)count);
+	for (const StatusField& field : m_fields)
+		widths.push_back(field.width > 0 ? field.width : -1);
+	if (m_fields.empty())
+		widths.push_back(-1);
+	bar->SetStatusWidths(count, widths.data());
+
+	for (std::size_t index = 0; index < m_fields.size(); ++index)
+	{
+		StatusField& field = m_fields[index];
+		bar->SetStatusText(wxString::FromUTF8(field.text.get()), (int)index);
+
+		// A bound field is the whole point: the text is written from elsewhere
+		// and wx has no notification for that, so it is polled like any other
+		// external ref.
+		if (field.text.isBound())
+		{
+			const std::string* bound = field.text.boundValue();
+			const int pane = (int)index;
+			bindExternalRefSync(bar,
+				[bar, pane] { return std::string(bar->GetStatusText(pane).ToUTF8()); },
+				[bound] { return *bound; },
+				[bar, pane](const std::string& text) {
+					bar->SetStatusText(wxString::FromUTF8(text), pane);
+				});
+		}
+	}
 }
 
 // ColorPickerWrapper -----------------------------------------------------------
