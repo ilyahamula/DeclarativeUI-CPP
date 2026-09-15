@@ -31,6 +31,7 @@ int main(int argc, char** argv)
     std::string shellStatus = "(the shell is still open)";
     bool panelDisabled = false;
     bool wordWrap = true;
+    bool showGrid = false;
 
     runImGuiApp([&]
     {
@@ -44,7 +45,7 @@ int main(int argc, char** argv)
         //
         // Only on ImGui does re-ticking the box bring the shell back: the frame
         // loop calls show() again. wx and Qt destroyed the frame.
-        drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap).show();
+        drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap, showGrid).show();
     });
 
     return 0;

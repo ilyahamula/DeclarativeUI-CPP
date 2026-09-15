@@ -24,6 +24,7 @@ int main(int argc, char** argv)
     std::string shellStatus = "(the shell is still open)";
     bool panelDisabled = false;
     bool wordWrap = true;
+    bool showGrid = false;
 
     // The shell is a Window -- a QMainWindow, which is where its QMenuBar
     // attaches. Resizable by default, shown against a bool that its own Close
@@ -33,7 +34,7 @@ int main(int argc, char** argv)
     // Fixed(), and shown with the plain show() -- the panel stays up so the
     // shell's onClose() report is readable after the shell has gone, and so the
     // app does not exit with its last window.
-    drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap).show();
+    drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap, showGrid).show();
 
     return app.exec();
 }

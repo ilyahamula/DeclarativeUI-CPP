@@ -22,6 +22,14 @@
 //     box in the control panel (value_binding.hpp) -- across two windows.
 //   * isDisabled(bool&) greys live: lock the shell and Undo/Redo go with it.
 //
+// The same model serves right-click menus: `.withContextMenu({...})` on the
+// Table and on the Close button below. Two things to watch there:
+//
+//   * a DISABLED control opens no menu at all -- lock the shell and the table
+//     stops offering one, exactly as it stops offering its tooltip;
+//   * the modifier is leaf-only, like withTooltip. There is no container
+//     overload to call: a stack has no native window to deliver a right-click.
+//
 // Two things about a Window are worth watching, both the inverse of a Dialog:
 //
 //   * it is RESIZABLE by default, with the auto-fit size as its floor -- drag
@@ -178,6 +186,22 @@ inline auto drawAppShellUI(
                             .withVisibleRows(6)
                             .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
                             .isDisabled(shellDisabled)
+                            // Right-click the table. Same MenuItem model as the
+                            // menu bar, so separators and submenus work here
+                            // too -- and locking the shell disables the table,
+                            // after which it opens no menu at all (a disabled
+                            // control has no context menu on any backend).
+                            .withContextMenu({
+                                MenuItem{"Open"}.onSelect([&notes]() { notes = "Context > Open"; }),
+                                MenuItem{"Rename..."}.onSelect([&notes]() { notes = "Context > Rename..."; }),
+                                MenuItem::Separator(),
+                                MenuItem{"Copy"}.withSubmenu({
+                                    MenuItem{"Copy name"}.onSelect([&notes]() { notes = "Context > Copy name"; }),
+                                    MenuItem{"Copy path"}.onSelect([&notes]() { notes = "Context > Copy path"; }),
+                                }),
+                                MenuItem::Separator(),
+                                MenuItem{"Reveal in project"}.onSelect([&notes]() { notes = "Context > Reveal"; }),
+                            })
                     },
                     VStack {
                         LayoutFlags().Expand(),
@@ -209,6 +233,18 @@ inline auto drawAppShellUI(
                     .withSize(kButtonSize)
                     .withFlags(LayoutFlags().CenterVertical())
                     .onClick([&shellOpen]() { shellOpen = false; })
+                    // A context menu on a plain leaf, carrying the two bound
+                    // kinds of item: a check mark that is the same bool as the
+                    // box above and the Edit menu's item, and a command that
+                    // greys itself live when that bool goes true.
+                    .withContextMenu({
+                        MenuItem{"Lock the shell"}.checkable(shellDisabled),
+                        MenuItem::Separator(),
+                        MenuItem{"Close the shell"}.withShortcut("Ctrl+W")
+                            .onSelect([&shellOpen]() { shellOpen = false; }),
+                        MenuItem{"Delete"}.isDisabled(shellDisabled)
+                            .onSelect([&notes]() { notes = "Context > Delete"; }),
+                    })
             }
         }
     }

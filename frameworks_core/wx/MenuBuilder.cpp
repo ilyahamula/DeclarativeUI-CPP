@@ -11,6 +11,7 @@
 #include <wx/string.h>
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace
@@ -174,4 +175,75 @@ void attachMenuBar(wxFrame* frame, const MenuBarModel& model)
 			delete host; // wx owns the wxMenuBar itself; this owns the model
 		event.Skip();
 	});
+}
+
+namespace
+{
+
+// Builds a transient popup menu from the model, recording which MenuItem each
+// id belongs to. Everything here is read NOW -- check marks, disabled state --
+// because the menu is thrown away as soon as the user picks or dismisses it.
+void buildPopup(wxMenu& menu, ContextMenu& items,
+	std::unordered_map<int, MenuItem*>& byId)
+{
+	for (MenuItem& item : items)
+	{
+		if (item.isSeparator)
+		{
+			menu.AppendSeparator();
+			continue;
+		}
+
+		if (!item.submenu.empty())
+		{
+			auto* sub = new wxMenu; // owned by `menu` once appended
+			buildPopup(*sub, item.submenu, byId);
+			menu.AppendSubMenu(sub, escaped(item.label));
+			continue;
+		}
+
+		const int id = wxWindow::NewControlId();
+		wxString text = escaped(item.label);
+		if (item.shortcut)
+			text += wxT("\t") + acceleratorText(*item.shortcut);
+
+		if (item.checkedFlag)
+		{
+			menu.AppendCheckItem(id, text);
+			menu.Check(id, item.checkedFlag->get());
+		}
+		else
+		{
+			menu.Append(id, text);
+		}
+		menu.Enable(id, !item.disabledFlag.get());
+		byId[id] = &item;
+	}
+}
+
+} // unnamed namespace
+
+void popupContextMenu(wxWindow* owner, ContextMenu& items, const wxPoint& pos)
+{
+	if (items.empty())
+		return;
+
+	wxMenu menu;
+	std::unordered_map<int, MenuItem*> byId;
+	buildPopup(menu, items, byId);
+
+	// Synchronous: this returns only once the user has chosen or dismissed.
+	const int chosen = owner->GetPopupMenuSelectionFromUser(menu, pos);
+	const auto found = byId.find(chosen);
+	if (chosen == wxID_NONE || found == byId.end())
+		return;
+
+	MenuItem& item = *found->second;
+	// Value first, then the callback, as everywhere else. The menu is already
+	// gone, so the new check state is computed from the model rather than read
+	// back off a wxMenuItem that no longer exists.
+	if (item.checkedFlag)
+		item.checkedFlag->set(!item.checkedFlag->get());
+	if (item.selectHandler)
+		item.selectHandler();
 }

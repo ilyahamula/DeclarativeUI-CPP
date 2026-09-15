@@ -32,6 +32,7 @@ struct Widget
 		// a temporary that dies with the enclosing declarative expression.
 		wrapper->setDisabled(m_disabled);
 		wrapper->setTooltip(m_tooltip);
+		wrapper->setContextMenu(m_contextMenu);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(defaultFlags()));
 
 		if (m_postCreateCallback)
@@ -108,6 +109,23 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
+	// A right-click menu for this control: the same MenuItem model the menu bar
+	// is built from (include/menus.hpp), so items carry shortcuts, separators,
+	// submenus, bound check marks and bound disabling exactly as they do there.
+	//
+	// Leaf-only by construction, like withTooltip -- it lives on Widget<W> and
+	// no container has it. A stack is pure geometry with no native window to
+	// deliver a right-click, so a container overload could not be honoured.
+	//
+	// A DISABLED control opens no menu, matching its tooltip: wx and Qt deliver
+	// no context-menu event to a disabled window, and the ImGui backend
+	// suppresses the popup by hand to agree with them.
+	W& withContextMenu(ContextMenu menu)
+	{
+		m_contextMenu = std::move(menu);
+		return static_cast<W&>(*this);
+	}
+
 	W& withStyle(long style)
 	{
 		m_style = style;
@@ -136,6 +154,7 @@ private: // callbacks
 private:
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
+	ContextMenu m_contextMenu;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };

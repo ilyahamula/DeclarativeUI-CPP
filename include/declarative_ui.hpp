@@ -46,6 +46,13 @@ static_assert(FlagShowable<Window<VStack<Button>>>);
 // which is the reason Window exists next to Dialog.
 static_assert(MenuBarHost<Window<VStack<Button>>>);
 static_assert(!MenuBarHost<Dialog<VStack<Button>>>);
+// withContextMenu() is leaf-only, like withTooltip: a container has no native
+// window to deliver a right-click, so asking for one must not compile.
+static_assert(ContextMenuHost<Button>);
+static_assert(ContextMenuHost<Table<int>>);
+static_assert(!ContextMenuHost<VStack<Button>>);
+static_assert(!ContextMenuHost<HStack<Button>>);
+static_assert(!ContextMenuHost<TabPanel<Tab<VStack<Button>>>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

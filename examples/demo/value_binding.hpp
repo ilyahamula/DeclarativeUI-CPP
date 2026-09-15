@@ -667,6 +667,11 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
 // calls show() every frame, so there the shell comes straight back. Re-showing a
 // closed window is a lifecycle question T3.6 settles, not part of T2.1.
 //
+// `showGrid` is the context-menu binding: a check item inside the toggle's own
+// right-click menu and the `ToggleButton` itself, on one bool. Unlike the menu
+// bar, a popup is rebuilt from the model every time it opens, so its check mark
+// is read at that moment and nothing polls it.
+//
 // `wordWrap` is the menu-item binding: it is the shell's View > Word wrap check
 // item and the check box at the bottom of this panel, on one bool, across two
 // windows. Tick either and the other follows -- a menu item is an ordinary
@@ -681,14 +686,14 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
 // widget itself on Qt, padding plus title bar on ImGui), which is the same
 // contract Dialog's Size overload has.
 inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& disabled,
-    bool& wordWrap)
+    bool& wordWrap, bool& showGrid)
 {
     constexpr int kRowH = 28;
     constexpr int kLabelH = 20;
 
     return Window {
         "Window controls (shared bool)",
-        Size{ 460, 420 },
+        Size{ 460, 500 },
         VStack {
             LayoutFlags().Expand().Border(Side::All, 12).MinSize({420, -1}),
             StaticText{"The shell's open flag, a check box and a toggle: one bool."}
@@ -732,7 +737,27 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
             CheckBox{wordWrap, "Word wrap"}
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 4))
-                .withTooltip("Also on the shell's View menu, as Ctrl+Shift+W")
+                .withTooltip("Also on the shell's View menu, as Ctrl+Shift+W"),
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+            StaticText{"A context-menu check item and this toggle: one bool."}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // The context-menu binding. Right-click the toggle: the check item
+            // in its own menu and the toggle's pressed state are the same bool,
+            // so either one moves the other. The menu is rebuilt from the model
+            // every time it opens, which is why the check mark is always current
+            // without anything polling it.
+            ToggleButton{showGrid, "Show grid"}
+                .withSize({140, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                .withTooltip("Right-click me")
+                .withContextMenu({
+                    MenuItem{"Show grid"}.checkable(showGrid),
+                    MenuItem::Separator(),
+                    MenuItem{"Reset"}.onSelect([&showGrid]() { showGrid = false; }),
+                })
         }
     }
     // The inverse of a Dialog: a Window resizes unless it is told not to.

@@ -66,7 +66,7 @@ return Dialog {
 | Layout            | `Spacer` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox` |
-| Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`) |
+| Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
 intrinsic height identically on every backend — the native hints disagree far too much
@@ -98,6 +98,25 @@ backend to its own accelerator; **`Ctrl` means Cmd on macOS on all three**, so o
 string reads native everywhere. A check item is an ordinary bound value:
 `.checkable(wordWrap)` and a `CheckBox` on the same `bool&` stay in step, and
 `.isDisabled(flag)` greys an item live.
+
+The same `MenuItem` model is a right-click menu on any leaf:
+
+```cpp
+Table { columns, rows, selected }
+    .withContextMenu({
+        MenuItem{"Open"}.onSelect([&] { open(); }),
+        MenuItem::Separator(),
+        MenuItem{"Copy"}.withSubmenu({ MenuItem{"Name"}, MenuItem{"Path"} }),
+        MenuItem{"Delete"}.isDisabled(locked),
+    })
+```
+
+`.withContextMenu()` is **leaf-only**, like `.withTooltip()` — a container has no
+native window to deliver a right-click, so there is no container overload and asking
+for one will not compile. A **disabled** control opens no menu, exactly as it shows no
+tooltip. A popup is rebuilt from the model each time it opens, so bound check marks and
+bound disabling are always current without anything polling them; a shortcut on a
+context-menu item is *displayed* but not registered, on every backend.
 
 ```cpp
 Window { "Editor", content }

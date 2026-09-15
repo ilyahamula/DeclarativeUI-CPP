@@ -13,9 +13,12 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QObject>
+#include <QPoint>
 #include <QString>
+#include <QWidget>
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace
@@ -212,4 +215,67 @@ int attachMenuBar(QMainWindow* window, const MenuBarModel& model)
 	// A native (macOS) bar lives in the system menu and costs the window no
 	// height at all; an in-window one costs exactly its own.
 	return bar->isNativeMenuBar() ? 0 : bar->sizeHint().height();
+}
+
+namespace
+{
+
+// Builds a transient popup menu from the model, recording which MenuItem each
+// action belongs to. Everything here is read NOW -- check marks, disabled state,
+// shortcut text -- because the menu is thrown away as soon as the user picks or
+// dismisses it.
+void buildPopup(QMenu& menu, ContextMenu& items,
+	std::unordered_map<QAction*, MenuItem*>& byAction)
+{
+	for (MenuItem& item : items)
+	{
+		if (item.isSeparator)
+		{
+			menu.addSeparator();
+			continue;
+		}
+
+		if (!item.submenu.empty())
+		{
+			QMenu* sub = menu.addMenu(escaped(item.label));
+			buildPopup(*sub, item.submenu, byAction);
+			continue;
+		}
+
+		QAction* action = menu.addAction(escaped(item.label));
+		applyShortcut(action, item);
+		if (item.checkedFlag)
+		{
+			action->setCheckable(true);
+			action->setChecked(item.checkedFlag->get());
+		}
+		action->setEnabled(!item.disabledFlag.get());
+		byAction[action] = &item;
+	}
+}
+
+} // unnamed namespace
+
+void popupContextMenu(QWidget* owner, ContextMenu& items, const QPoint& pos)
+{
+	if (items.empty())
+		return;
+
+	QMenu menu(owner);
+	std::unordered_map<QAction*, MenuItem*> byAction;
+	buildPopup(menu, items, byAction);
+
+	// Synchronous: this returns only once the user has chosen or dismissed.
+	QAction* chosen = menu.exec(owner->mapToGlobal(pos));
+	const auto found = byAction.find(chosen);
+	if (chosen == nullptr || found == byAction.end())
+		return;
+
+	MenuItem& item = *found->second;
+	// Value first, then the callback. Qt has already toggled a checkable action
+	// by the time exec() returns, so that is the new state.
+	if (item.checkedFlag)
+		item.checkedFlag->set(chosen->isChecked());
+	if (item.selectHandler)
+		item.selectHandler();
 }

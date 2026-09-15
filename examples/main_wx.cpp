@@ -21,6 +21,7 @@ class DeclarativeApp : public wxApp
     std::string m_shellStatus = "(the shell is still open)";
     bool m_panelDisabled = false;
     bool m_wordWrap = true;
+    bool m_showGrid = false;
 
 public:
     bool OnInit() override
@@ -34,7 +35,8 @@ public:
         // Fixed(), and shown with the plain show() -- the panel stays up so the
         // shell's onClose() report is readable after the shell has gone, and so
         // the app does not exit with its last top-level window.
-        drawWindowBinding(m_shellOpen, m_shellStatus, m_panelDisabled, m_wordWrap).show();
+        drawWindowBinding(m_shellOpen, m_shellStatus, m_panelDisabled, m_wordWrap,
+            m_showGrid).show();
         return true;
     }
 };

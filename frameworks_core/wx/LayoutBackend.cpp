@@ -1,4 +1,5 @@
 #include "frameworks_core/wx/LayoutBackend.hpp"
+#include "frameworks_core/wx/MenuBuilder.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
@@ -85,6 +86,35 @@ void applyTooltip(wxWindow* window, const ControlWrapper& widget)
 		push);
 }
 
+// Gives a leaf its right-click menu. The model is COPIED into the handler: the
+// wrapper that supplied it must never be captured (its teardown order against
+// the native window is not fixed), and the copy is what an unbound check item's
+// state then lives in. A bound one writes through to the caller's bool.
+//
+// Nothing is polled. The menu is rebuilt from the model every time it opens, so
+// bound check and disabled flags are read at that moment -- the opposite of the
+// menu bar, which is built once and has to poll.
+//
+// No disabled check is needed here: wx sends no context-menu event to a disabled
+// window, exactly as it sends no tooltip event. Qt behaves the same and the
+// ImGui backend reproduces it by hand.
+void applyContextMenu(wxWindow* window, const ControlWrapper& widget)
+{
+	if (widget.contextMenu().empty())
+		return;
+
+	window->Bind(wxEVT_CONTEXT_MENU,
+		[window, items = widget.contextMenu()](wxContextMenuEvent& event) mutable {
+			// wxEVT_CONTEXT_MENU carries SCREEN coordinates, except for the
+			// keyboard-driven menu key, which carries wxDefaultPosition.
+			const wxPoint screen = event.GetPosition();
+			const wxPoint local = screen == wxDefaultPosition
+				? wxPoint(window->GetSize().x / 2, window->GetSize().y / 2)
+				: window->ScreenToClient(screen);
+			popupContextMenu(window, items, local);
+		});
+}
+
 #ifdef __WXOSX__
 // The height measure() reported for a button: withSize() when set, else the
 // native best size (buttons carry no content floor). A frame taller than
@@ -140,6 +170,7 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 		{
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
+			applyContextMenu(created, *widget);
 		}
 	}
 

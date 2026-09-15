@@ -2,6 +2,7 @@
 
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/CoreTypes/GeneralTypes.hpp"
+#include "frameworks_core/CoreTypes/MenuModel.hpp"
 
 #include <string>
 #include <utility>
@@ -121,6 +122,23 @@ public:
 		return m_tooltip.boundValue();
 	}
 
+	// The leaf's right-click menu, on the same terms as the tooltip: copied by
+	// value because the widget that supplied it is a temporary. Empty means
+	// "no context menu", which is what every leaf that never asked for one has.
+	void setContextMenu(ContextMenu menu)
+	{
+		m_contextMenu = std::move(menu);
+	}
+
+	// Read whenever a popup is about to open, never cached: a menu is rebuilt
+	// from the model each time it is shown, so bound check and disabled flags
+	// are picked up at that moment and nothing has to be polled -- the opposite
+	// of the menu BAR, which is built once and outlives every read.
+	const ContextMenu& contextMenu() const
+	{
+		return m_contextMenu;
+	}
+
 protected:
 	void* m_nativeWidget = nullptr;
 	Position m_pos { -1, -1 };
@@ -128,4 +146,5 @@ protected:
 	long m_style { 0 };
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
+	ContextMenu m_contextMenu;
 };
