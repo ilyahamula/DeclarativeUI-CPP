@@ -7,6 +7,7 @@
 
 #include "frameworks_core/WindowWrapper.hpp"
 #include "buildable.hpp"
+#include "menus.hpp"
 
 // A top-level application frame: wxFrame on wx, QMainWindow on Qt, an ImGui
 // window inside the host viewport on ImGui (the same viewport Dialog lives in --
@@ -20,8 +21,9 @@
 //     auto-fit size as its floor. Fixed() opts back out.
 //
 // The reason Window exists at all is chrome a dialog cannot carry: wxMenuBar
-// needs a wxFrame, and QMenuBar wants a QMainWindow. The menu bar itself lands
-// in T2.2 -- what is here is the frame, the engine session and the lifecycle.
+// needs a wxFrame, and QMenuBar wants a QMainWindow. withMenuBar() is that
+// chrome -- outside the engine's content space on wx and Qt, a row inside the
+// ImGui window, and the same model walked by all three either way.
 template<NodeBuildable Content>
 struct Window
 {
@@ -36,6 +38,17 @@ struct Window
 		, m_size(size)
 		, m_content(std::move(content))
 	{
+	}
+
+	// Attach the application menu bar. It is native chrome on wx and Qt --
+	// outside the client area, so the engine never sees it -- and a menu row
+	// inside the ImGui window, whose height is taken off the content space.
+	// Taken by value and copied into the backend: the bar outlives this
+	// Window, which is a temporary that dies with the show() expression.
+	Window& withMenuBar(MenuBar menuBar)
+	{
+		m_menuBar = std::move(menuBar);
+		return *this;
 	}
 
 	// Opt out of user resizing: the engine's auto-fit result becomes the
@@ -59,7 +72,7 @@ struct Window
 	void show()
 	{
 		WindowWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			std::move(m_onClose), nullptr);
+			menuBarModel(), std::move(m_onClose), nullptr);
 	}
 
 	// Show against a caller-owned flag. The flag is the single truth about
@@ -72,13 +85,21 @@ struct Window
 	void show(bool& open)
 	{
 		WindowWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			std::move(m_onClose), &open);
+			menuBarModel(), std::move(m_onClose), &open);
 	}
 
 private:
+	// Null when no bar was attached, which is what tells a backend to leave the
+	// chrome (and, on ImGui, the row's height) out altogether.
+	const MenuBarModel* menuBarModel() const
+	{
+		return m_menuBar.empty() ? nullptr : &m_menuBar;
+	}
+
 	std::string m_title;
 	Size m_size { -1, -1 };
 	bool m_resizable = true; // an application frame resizes by default
 	std::function<void()> m_onClose;
+	MenuBarModel m_menuBar;
 	Content m_content;
 };

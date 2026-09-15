@@ -4,6 +4,7 @@
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/qt/EngineSession.hpp"
 #include "frameworks_core/qt/LayoutBackend.hpp"
+#include "frameworks_core/qt/MenuBuilder.hpp"
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -48,22 +49,27 @@ protected:
 } // unnamed namespace
 
 void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable, std::function<void()> onClose, bool* open)
+	std::unique_ptr<LayoutNode> root, bool resizable, const MenuBarModel* menuBar,
+	std::function<void()> onClose, bool* open)
 {
 	auto* window = new EngineWindow(nullptr);
 	window->setWindowTitle(QString::fromStdString(title));
 	window->setAttribute(Qt::WA_DeleteOnClose);
 
 	// The engine lays out into the CENTRAL WIDGET, not the window: that is what
-	// keeps the menu bar (T2.2) outside the content space, since QMainWindow
-	// stacks its chrome above and below the central widget. With no chrome yet
-	// the central widget is exactly the window's contents rect, which is why
-	// the session can still size against the window itself below.
+	// keeps the menu bar outside the content space, since QMainWindow stacks
+	// its chrome above and below the central widget.
 	auto* host = new QWidget(window);
 	window->setCentralWidget(host);
 
+	// Attached before the engine resolves anything, because the bar is what
+	// decides how much of the window is left for the central widget. What it
+	// costs in height is chrome the session adds back on every sizing.
+	const int menuHeight = menuBar != nullptr ? attachMenuBar(window, *menuBar) : 0;
+
 	auto* session = new EngineSession;
 	session->window = window;
+	session->chrome = { 0, menuHeight };
 	session->backend = std::make_unique<QtLayoutBackend>(host);
 	session->engine = std::make_unique<LayoutEngine>(*session->backend);
 	session->root = std::move(root);
@@ -82,18 +88,21 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		? Size { -1, -1 }
 		: session->fixedContent);
 
+	// The engine sizes the CENTRAL WIDGET; the window is that plus its chrome.
 	if (resizable)
 	{
 		// the measured content is the floor: the user can grow the window
 		// but never shrink content into clipping
-		const Size floor = session->minClient();
+		const Size floor = session->windowSizeFor(session->minClient());
 		window->setMinimumSize(floor.width, floor.height);
-		window->resize(content.width, content.height);
+		const Size target = session->windowSizeFor(content);
+		window->resize(target.width, target.height);
 	}
 	else
 	{
 		// Fixed(): the engine owns the window size
-		window->setFixedSize(content.width, content.height);
+		const Size target = session->windowSizeFor(content);
+		window->setFixedSize(target.width, target.height);
 	}
 
 	session->engine->render(*session->root, content);

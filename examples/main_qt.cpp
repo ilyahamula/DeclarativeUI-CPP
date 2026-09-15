@@ -23,16 +23,17 @@ int main(int argc, char** argv)
     bool shellOpen = true;
     std::string shellStatus = "(the shell is still open)";
     bool panelDisabled = false;
+    bool wordWrap = true;
 
-    // The shell is a Window -- a QMainWindow, so T2.2's menu bar has somewhere
-    // to attach. Resizable by default, shown against a bool that its own Close
-    // button and the control panel both write.
+    // The shell is a Window -- a QMainWindow, which is where its QMenuBar
+    // attaches. Resizable by default, shown against a bool that its own Close
+    // button, its File > Close item and the control panel all write.
     drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
-        shellOpen, shellStatus).show(shellOpen);
+        shellOpen, shellStatus, wordWrap).show(shellOpen);
     // Fixed(), and shown with the plain show() -- the panel stays up so the
     // shell's onClose() report is readable after the shell has gone, and so the
     // app does not exit with its last window.
-    drawWindowBinding(shellOpen, shellStatus, panelDisabled).show();
+    drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap).show();
 
     return app.exec();
 }

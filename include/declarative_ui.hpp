@@ -9,6 +9,7 @@
 #include "groupboxes.hpp"
 #include "dialog.hpp"
 #include "window.hpp"
+#include "menus.hpp"
 #include "tabpanel.hpp"
 #include "messagebox.hpp"
 
@@ -41,6 +42,10 @@ static_assert(NodeBuildable<VStack<StaticText, Button>>);
 static_assert(TopLevel<Dialog<VStack<Button>>>);
 static_assert(TopLevel<Window<VStack<Button>>>);
 static_assert(FlagShowable<Window<VStack<Button>>>);
+// A menu bar attaches to a Window and only a Window: wxMenuBar needs a wxFrame,
+// which is the reason Window exists next to Dialog.
+static_assert(MenuBarHost<Window<VStack<Button>>>);
+static_assert(!MenuBarHost<Dialog<VStack<Button>>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

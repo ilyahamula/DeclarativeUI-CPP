@@ -66,6 +66,7 @@ return Dialog {
 | Layout            | `Spacer` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox` |
+| Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`) |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
 intrinsic height identically on every backend — the native hints disagree far too much
@@ -88,6 +89,30 @@ and `Fixed()` is what opts out. A `Window` is also the only thing a menu bar can
 attach to on wx. `show(bool& open)` makes a caller-owned bool the single truth
 about whether the window is up: clearing it closes the window, closing the window
 clears it, and `onClose()` fires exactly once either way.
+
+`Window::withMenuBar()` attaches nested menus with separators, submenus, checkable
+items and per-item disabling — native chrome outside the content area on wx and Qt,
+a menu row inside the window on ImGui. A shortcut is written once as text
+(`.withShortcut("Ctrl+Shift+S")`), parsed once into a `Shortcut`, and mapped by each
+backend to its own accelerator; **`Ctrl` means Cmd on macOS on all three**, so one
+string reads native everywhere. A check item is an ordinary bound value:
+`.checkable(wordWrap)` and a `CheckBox` on the same `bool&` stay in step, and
+`.isDisabled(flag)` greys an item live.
+
+```cpp
+Window { "Editor", content }
+    .withMenuBar(MenuBar { {
+        Menu { "File", {
+            MenuItem{"New"}.withShortcut("Ctrl+N").onSelect([&] { newFile(); }),
+            MenuItem::Separator(),
+            MenuItem{"Recent"}.withSubmenu({ MenuItem{"main.cpp"}, MenuItem{"layout.cpp"} }),
+        } },
+        Menu { "View", {
+            MenuItem{"Word wrap"}.withShortcut("Ctrl+Shift+W").checkable(wordWrap),
+        } },
+    } })
+    .show(open);
+```
 
 `Expander` folds a section away behind a clickable header. Collapsed, the content
 costs the layout *nothing at all* — not its size, not its margins, not even the gap

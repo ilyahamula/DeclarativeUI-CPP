@@ -1,12 +1,26 @@
 #pragma once
 
-// The application shell: the gallery for Window and Splitter.
+// The application shell: the gallery for Window, MenuBar and Splitter.
 //
-// It is a real Window now -- wxFrame, QMainWindow, an ImGui window in the host
+// It is a real Window -- wxFrame, QMainWindow, an ImGui window in the host
 // viewport -- which is the thing a Dialog cannot be: wxMenuBar attaches to a
-// wxFrame and nothing else, so the menu bar, tool bar and status bar join it
-// here in T2.2-T2.5. The layout is the shape they will all hang off: a browser
-// pane on the left, the work area on the right, and a draggable sash between.
+// wxFrame and nothing else. That is what the menu bar below is here to use; the
+// tool bar and status bar join it in T2.4-T2.5. The layout is the shape they
+// will all hang off: a browser pane on the left, the work area on the right,
+// and a draggable sash between.
+//
+// Four things about a MenuBar are worth watching:
+//
+//   * It is the SAME model on all three backends -- MenuItem is plain data in
+//     frameworks_core/CoreTypes/, walked by wx into a wxMenuBar, by Qt into a
+//     QMenuBar, and drawn by ImGui. Nothing below is written per backend.
+//   * A shortcut is parsed ONCE, into fields, and each backend maps those to
+//     its own accelerator. "Ctrl" means Cmd on macOS on all three, so one
+//     string reads native everywhere.
+//   * A check item is an ordinary bound value: "Lock the shell" and the check
+//     box further down are the same bool, and so are "Word wrap" and the check
+//     box in the control panel (value_binding.hpp) -- across two windows.
+//   * isDisabled(bool&) greys live: lock the shell and Undo/Redo go with it.
 //
 // Two things about a Window are worth watching, both the inverse of a Dialog:
 //
@@ -39,6 +53,7 @@
 #include "declarative_ui.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 // `shellOpen` is the bool the shell is shown against and `shellStatus` the line
@@ -52,8 +67,64 @@ inline auto drawAppShellUI(
     std::string& notes,
     bool& shellDisabled,
     bool& shellOpen,
-    std::string& shellStatus)
+    std::string& shellStatus,
+    bool& wordWrap)
 {
+    // Every handler and bound flag below belongs to the caller and outlives the
+    // window: the backends COPY the menu model, but a menu is not walked until
+    // the user opens one, long after this function has returned.
+    MenuBar menuBar { {
+        Menu { "File", {
+            MenuItem{"New"}.withShortcut("Ctrl+N")
+                .onSelect([&notes]() { notes = "File > New"; }),
+            MenuItem{"Open..."}.withShortcut("Ctrl+O")
+                .onSelect([&notes]() { notes = "File > Open..."; }),
+            MenuItem{"Save"}.withShortcut("Ctrl+S")
+                .onSelect([&notes]() { notes = "File > Save"; }),
+            MenuItem::Separator(),
+            // Submenus nest to any depth; the parent item opens, it never selects.
+            MenuItem{"Recent"}.withSubmenu({
+                MenuItem{"main.cpp"}.onSelect([&notes]() { notes = "Recent > main.cpp"; }),
+                MenuItem{"layout.cpp"}.onSelect([&notes]() { notes = "Recent > layout.cpp"; }),
+                MenuItem::Separator(),
+                MenuItem{"Clear list"}.onSelect([&notes]() { notes = "Recent > Clear list"; }),
+            }),
+            MenuItem::Separator(),
+            // Closing from the menu is the same act as closing from the title
+            // bar: clear the bool and the window follows.
+            MenuItem{"Close"}.withShortcut("Ctrl+W")
+                .onSelect([&shellOpen]() { shellOpen = false; }),
+        } },
+        Menu { "Edit", {
+            // Greyed live: tick "Lock the shell" and these go with it.
+            MenuItem{"Undo"}.withShortcut("Ctrl+Z").isDisabled(shellDisabled)
+                .onSelect([&notes]() { notes = "Edit > Undo"; }),
+            MenuItem{"Redo"}.withShortcut("Ctrl+Shift+Z").isDisabled(shellDisabled)
+                .onSelect([&notes]() { notes = "Edit > Redo"; }),
+            MenuItem::Separator(),
+            // The same bool as the check box below the splitter.
+            MenuItem{"Lock the shell"}.checkable(shellDisabled),
+        } },
+        Menu { "View", {
+            // The same bool as the check box in the control panel window.
+            // Value first, then the callback -- so this handler already reads
+            // the state the user just selected.
+            MenuItem{"Word wrap"}.withShortcut("Ctrl+Shift+W").checkable(wordWrap)
+                .onSelect([&notes, &wordWrap]() {
+                    notes = wordWrap ? "Word wrap is ON" : "Word wrap is OFF";
+                }),
+            // A snapshot check item: the framework owns this one, so ticking it
+            // is visible but nothing outside the menu can see or change it.
+            MenuItem{"Show line numbers"}.checkable(true),
+        } },
+        Menu { "Help", {
+            MenuItem{"About"}.withShortcut("F1")
+                .onSelect([&notes]() { notes = "DeclarativeUI-CPP -- one tree, three backends."; }),
+            // A snapshot disabled flag: greyed for good, not bound to anything.
+            MenuItem{"Check for updates..."}.isDisabled(true),
+        } },
+    } };
+
     // Same pinning discipline as the other galleries: explicit sizes on the
     // leaves and MinSize on the containers, so the three backends compute the
     // same frames despite their different native metrics.
@@ -141,6 +212,7 @@ inline auto drawAppShellUI(
             }
         }
     }
+    .withMenuBar(std::move(menuBar))
     // Fires once however the window went away -- this button, the title bar's
     // close button, or the control panel's check box clearing the bool.
     .onClose([&shellStatus]() {

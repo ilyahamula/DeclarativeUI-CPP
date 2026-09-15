@@ -3,6 +3,7 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
+#include "frameworks_core/imgui/MenuDraw.hpp"
 
 #include <algorithm>
 #include <string>
@@ -41,7 +42,8 @@ std::unordered_map<std::string, WindowState>& windowStates()
 } // unnamed namespace
 
 void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> rootPtr, bool resizable, std::function<void()> onClose, bool* open)
+	std::unique_ptr<LayoutNode> rootPtr, bool resizable, const MenuBarModel* menuBar,
+	std::function<void()> onClose, bool* open)
 {
 	WindowState& state = windowStates()[title];
 
@@ -72,11 +74,16 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	ImGuiLayoutBackend backend;
 	LayoutEngine engine(backend);
 
-	// window chrome around the engine's content space: padding + title bar
-	// (T2.2 adds one GetFrameHeight() here when a menu bar is present)
+	// Window chrome around the engine's content space: padding, title bar, and
+	// the menu row when there is one. ImGui has no chrome outside the window
+	// the way wx and Qt do -- the bar is drawn INSIDE it -- so its height comes
+	// straight off what the engine is given to lay out in.
+	const bool hasMenuBar = menuBar != nullptr && !menuBar->empty();
 	const ImGuiStyle& style = ImGui::GetStyle();
 	const int chromeW = (int)(style.WindowPadding.x * 2.0f);
-	const int chromeH = (int)(style.WindowPadding.y * 2.0f + ImGui::GetFrameHeight());
+	int chromeH = (int)(style.WindowPadding.y * 2.0f + ImGui::GetFrameHeight());
+	if (hasMenuBar)
+		chromeH += (int)ImGui::GetFrameHeight();
 
 	const ImVec2 display = ImGui::GetIO().DisplaySize;
 	if (display.x > 0.0f)
@@ -90,7 +97,7 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	const Size content = engine.resolve(root, contentRequest);
 
 	const ImVec2 winSize((float)(content.width + chromeW), (float)(content.height + chromeH));
-	ImGuiWindowFlags winFlags = ImGuiWindowFlags_None;
+	ImGuiWindowFlags winFlags = hasMenuBar ? ImGuiWindowFlags_MenuBar : ImGuiWindowFlags_None;
 	if (resizable)
 	{
 		// the measured content is the floor: the user can grow the window
@@ -113,6 +120,12 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// caller's own bool -- the same single truth the wx and Qt polls maintain.
 	if (ImGui::Begin(title.c_str(), flag, winFlags))
 	{
+		// Drawn first, and inside Begin/End: the bar occupies the row the
+		// chrome height above reserved for it, and routeMenuShortcuts() needs
+		// this window to be the current one to route against its focus.
+		if (hasMenuBar)
+			drawMenuBar(*menuBar);
+
 		Size renderContent = content;
 		if (resizable)
 		{

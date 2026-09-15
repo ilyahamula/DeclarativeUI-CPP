@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreTypes/GeneralTypes.hpp"
+#include "CoreTypes/MenuModel.hpp"
 
 #include <functional>
 #include <memory>
@@ -23,6 +24,12 @@ public:
 	// be shrunk into clipping. Takes ownership of the tree: retained backends
 	// keep it alive with the window, immediate ones drop it at end of call.
 	//
+	// `menuBar`, when non-null, is the application menu bar. It is native chrome
+	// on wx and Qt -- outside the client area the engine lays out into -- and a
+	// row inside the window on ImGui, whose height comes off the content space.
+	// The retained backends COPY it: the Window that built it is a temporary,
+	// so the model behind this pointer is gone by the time a menu is opened.
+	//
 	// `open`, when non-null, is a caller-owned flag that is the single truth
 	// about whether the window is up -- clearing it closes the window, closing
 	// the window clears it. `onClose` fires exactly once either way. The retained
@@ -30,5 +37,6 @@ public:
 	// (RefSync); ImGui hands it straight to ImGui::Begin.
 	static void runLayoutEngine(const std::string& title, const Size& size,
 		std::unique_ptr<LayoutNode> root, bool resizable = true,
+		const MenuBarModel* menuBar = nullptr,
 		std::function<void()> onClose = {}, bool* open = nullptr);
 };

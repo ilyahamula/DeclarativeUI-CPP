@@ -4,6 +4,7 @@
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/EngineSession.hpp"
 #include "frameworks_core/wx/LayoutBackend.hpp"
+#include "frameworks_core/wx/MenuBuilder.hpp"
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -12,24 +13,30 @@
 #include <wx/wx.h>
 
 void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable, std::function<void()> onClose, bool* open)
+	std::unique_ptr<LayoutNode> root, bool resizable, const MenuBarModel* menuBar,
+	std::function<void()> onClose, bool* open)
 {
 #ifdef USE_LOGGER
 	Logger::instance().log("WindowWrapper::runLayoutEngine()\t-> new wxFrame()\n");
 #endif
 	// The frame is what a Dialog cannot be: wxMenuBar attaches to a wxFrame and
-	// nothing else (T2.2). Resizable is the default here, so Fixed() is what
-	// takes wxRESIZE_BORDER away rather than Resizable() adding it.
+	// nothing else. Resizable is the default here, so Fixed() is what takes
+	// wxRESIZE_BORDER away rather than Resizable() adding it.
 	long style = wxDEFAULT_FRAME_STYLE;
 	if (!resizable)
 		style &= ~(wxRESIZE_BORDER | wxMAXIMIZE_BOX);
 	auto* frame = new wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxDefaultSize, style);
 
+	// Before the engine resolves anything: the bar changes the frame's CLIENT
+	// size, which is the space the layout is about to be measured against.
+	if (menuBar != nullptr)
+		attachMenuBar(frame, *menuBar);
+
 	auto* session = new EngineSession;
 	session->window = frame;
-	// The frame's CLIENT area is the engine's content space -- menu, tool and
-	// status bars all live outside it on every platform, so the engine needs to
-	// know nothing about them.
+	// The frame's CLIENT area is the engine's content space -- the menu bar
+	// attached above lives outside it on every platform, as tool and status
+	// bars will, so the engine needs to know nothing about any of them.
 	session->backend = std::make_unique<WxLayoutBackend>(frame);
 	session->engine = std::make_unique<LayoutEngine>(*session->backend);
 	session->root = std::move(root);

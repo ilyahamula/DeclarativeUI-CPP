@@ -30,19 +30,21 @@ int main(int argc, char** argv)
     bool shellOpen = true;
     std::string shellStatus = "(the shell is still open)";
     bool panelDisabled = false;
+    bool wordWrap = true;
 
     runImGuiApp([&]
     {
-        // The shell is a Window: resizable by default, shown against a bool
-        // that its own Close button and the control panel both write.
+        // The shell is a Window: resizable by default, carrying a menu bar
+        // drawn inside it, and shown against a bool that its own Close button,
+        // its File > Close item and the control panel all write.
         drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
-            shellOpen, shellStatus).show(shellOpen);
+            shellOpen, shellStatus, wordWrap).show(shellOpen);
         // Fixed(), and shown with the plain show() -- the panel stays up so the
         // shell's onClose() report is readable after the shell has gone.
         //
         // Only on ImGui does re-ticking the box bring the shell back: the frame
         // loop calls show() again. wx and Qt destroyed the frame.
-        drawWindowBinding(shellOpen, shellStatus, panelDisabled).show();
+        drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap).show();
     });
 
     return 0;

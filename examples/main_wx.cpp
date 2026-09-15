@@ -20,19 +20,21 @@ class DeclarativeApp : public wxApp
     bool m_shellOpen = true;
     std::string m_shellStatus = "(the shell is still open)";
     bool m_panelDisabled = false;
+    bool m_wordWrap = true;
 
 public:
     bool OnInit() override
     {
         // The shell is a Window -- a wxFrame, which is the thing a wxDialog
-        // cannot be. Resizable by default, shown against a bool that its own
-        // Close button and the control panel both write.
+        // cannot be, and the only thing a wxMenuBar attaches to. Resizable by
+        // default, shown against a bool that its own Close button, its File >
+        // Close item and the control panel all write.
         drawAppShellUI(m_selectedFile, m_files, m_selectedRow, m_notes, m_shellDisabled,
-            m_shellOpen, m_shellStatus).show(m_shellOpen);
+            m_shellOpen, m_shellStatus, m_wordWrap).show(m_shellOpen);
         // Fixed(), and shown with the plain show() -- the panel stays up so the
         // shell's onClose() report is readable after the shell has gone, and so
         // the app does not exit with its last top-level window.
-        drawWindowBinding(m_shellOpen, m_shellStatus, m_panelDisabled).show();
+        drawWindowBinding(m_shellOpen, m_shellStatus, m_panelDisabled, m_wordWrap).show();
         return true;
     }
 };
