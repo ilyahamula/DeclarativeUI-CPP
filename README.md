@@ -64,6 +64,7 @@ return Dialog {
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
+| Chrome            | `ToolBar` + `ToolItem` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox` |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
@@ -98,6 +99,21 @@ backend to its own accelerator; **`Ctrl` means Cmd on macOS on all three**, so o
 string reads native everywhere. A check item is an ordinary bound value:
 `.checkable(wordWrap)` and a `CheckBox` on the same `bool&` stay in step, and
 `.isDisabled(flag)` greys an item live.
+
+`ToolBar` is the row of commands under the menu bar. It is a container natively — a
+`wxToolBar`, a `QToolBar`, a drawn button row on ImGui — but a **leaf** to the layout
+engine: the native control lays its own tools out, so the engine sizes one rectangle.
+A tool with no icon, or one whose icon fails to load, shows its label instead, so a
+toolbar is never blank.
+
+```cpp
+ToolBar {{
+    ToolItem{"New"}.withIcon("icons/new.png").onClick([&] { newFile(); }),
+    ToolItem::Separator(),
+    ToolItem{"Wrap"}.toggled(wordWrap),          // a check tool, on the caller's bool
+    ToolItem{"Delete"}.isDisabled(locked),       // greys live
+}}
+```
 
 The same `MenuItem` model is a right-click menu on any leaf:
 

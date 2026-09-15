@@ -672,6 +672,11 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
 // bar, a popup is rebuilt from the model every time it opens, so its check mark
 // is read at that moment and nothing polls it.
 //
+// `wordWrap` is the menu-item AND tool-bar binding: the shell's View > Word wrap
+// check item, the shell's "Wrap" tool, the check box below and the tool bar
+// below are four holders of one bool, across two windows. A check tool is an
+// ordinary bound value, polled on wx and Qt exactly as a CheckBox's is.
+//
 // `wordWrap` is the menu-item binding: it is the shell's View > Word wrap check
 // item and the check box at the bottom of this panel, on one bool, across two
 // windows. Tick either and the other follows -- a menu item is an ordinary
@@ -738,6 +743,16 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 4))
                 .withTooltip("Also on the shell's View menu, as Ctrl+Shift+W"),
+            // The third and fourth holders of that same bool: a toolbar CHECK
+            // tool here, and the shell's own toolbar and View menu over there.
+            // Press any one of the four and the other three follow.
+            ToolBar {{
+                ToolItem{"Wrap"}.withTooltip("The same bool as the box above").toggled(wordWrap),
+                ToolItem::Separator(),
+                ToolItem{"On"}.onClick([&wordWrap]() { wordWrap = true; }),
+                ToolItem{"Off"}.onClick([&wordWrap]() { wordWrap = false; }),
+            }}
+                .withFlags(LayoutFlags().Border(Side::Top, 4)),
             Separator{}
                 .withSize({-1, 1})
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),

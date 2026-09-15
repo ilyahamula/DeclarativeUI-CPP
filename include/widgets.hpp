@@ -1262,6 +1262,56 @@ private:
 };
 
 // ToggleButton -----------------------------------------------------------
+// ToolBar --------------------------------------------------------------
+// A horizontal row of command buttons, as an application usually puts under its
+// menu bar. Natively a container on wx and Qt, but a LEAF to the layout engine:
+// the native control lays its own tools out, so the engine sizes one rectangle
+// and the backend fills it.
+//
+// Every backend renders the same ToolItem model (frameworks_core/CoreTypes/),
+// so a tool's icon, label, tooltip, bound toggle and bound disabling are written
+// once. A tool with no icon -- or one whose icon fails to load -- shows its
+// label instead, so a toolbar is never blank.
+struct ToolBar : Widget<ToolBar>
+{
+	using super = Widget<ToolBar>;
+
+	explicit ToolBar(std::vector<ToolItem> tools)
+		: super()
+		, m_tools(std::move(tools))
+	{
+	}
+
+	// The size icons are drawn at; 16x16 unless the caller says otherwise.
+	ToolBar& withIconSize(Size size)
+	{
+		m_iconSize = size;
+		return *this;
+	}
+
+	// Force labels beside the icons. Labels already show for any tool that has
+	// no icon, so this is about the icon'd ones.
+	ToolBar& showLabels(bool show = true)
+	{
+		m_labelsForced = show;
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<ToolBarWrapper>(m_tools, m_iconSize, m_labelsForced, pos, size, style);
+	}
+
+private:
+	std::vector<ToolItem> m_tools;
+	Size m_iconSize { 16, 16 };
+	bool m_labelsForced = false;
+};
+
 struct ToggleButton : Widget<ToggleButton>
 {
 	using super = Widget<ToggleButton>;

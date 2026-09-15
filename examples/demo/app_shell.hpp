@@ -22,6 +22,13 @@
 //     box in the control panel (value_binding.hpp) -- across two windows.
 //   * isDisabled(bool&) greys live: lock the shell and Undo/Redo go with it.
 //
+// The ToolBar under it is the same story again: one ToolItem model, drawn as a
+// wxToolBar, a QToolBar and a hand-drawn ImGui button row. Its "Wrap" tool is a
+// CHECK tool bound to the same bool as the View menu's check item, so pressing
+// either moves the other. Natively a container on wx and Qt, it is a LEAF to
+// the engine -- the native control lays its own tools out, so the engine sizes
+// one rectangle and the backend fills it.
+//
 // The same model serves right-click menus: `.withContextMenu({...})` on the
 // Table and on the Close button below. Two things to watch there:
 //
@@ -162,6 +169,29 @@ inline auto drawAppShellUI(
             LayoutFlags().Expand().Border(Side::All, 10),
             StaticText{"Drag either sash; the panes re-measure, they do not just move."}
                 .withSize({-1, kLabelH}),
+            // The tool bar. No icon files ship with the demo, so every tool
+            // falls back to its label -- which is exactly the R9.3 path a
+            // missing icon takes, and it renders identically on all three.
+            ToolBar {{
+                ToolItem{"New"}.withTooltip("New file")
+                    .onClick([&notes]() { notes = "Toolbar > New"; }),
+                ToolItem{"Open"}.withTooltip("Open file")
+                    .onClick([&notes]() { notes = "Toolbar > Open"; }),
+                ToolItem{"Save"}.withTooltip("Save file")
+                    .onClick([&notes]() { notes = "Toolbar > Save"; }),
+                ToolItem::Separator(),
+                // A check tool: down while the bool is true, and it is the same
+                // bool as the View menu's check item and the control panel's
+                // check box -- a four-way binding once the toolbar joins in.
+                ToolItem{"Wrap"}.withTooltip("Word wrap (Ctrl+Shift+W)")
+                    .toggled(wordWrap),
+                ToolItem::Separator(),
+                // Greys out live when the shell is locked, like Edit > Undo.
+                ToolItem{"Delete"}.withTooltip("Disabled while the shell is locked")
+                    .isDisabled(shellDisabled)
+                    .onClick([&notes]() { notes = "Toolbar > Delete"; }),
+            }}
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
             // 240 is the first pane's width in pixels, snapshotted from a
             // literal -- the splitter keeps its own copy of it. The binding
             // demo in value_binding.hpp is where an int& goes instead.

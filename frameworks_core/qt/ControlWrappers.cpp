@@ -8,6 +8,9 @@
 #include "Logger.hpp"
 #endif
 
+#include <QAction>
+#include <QIcon>
+#include <QToolBar>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QColorDialog>
@@ -664,6 +667,94 @@ void ImageWrapper::realize(void* parentWindow)
 	else if (m_onHoverWithWidget)
 		label->onHover = [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget] { cb(nw); };
 
+}
+
+// ToolBarWrapper -----------------------------------------------------------
+
+void ToolBarWrapper::realize(void* parentWindow)
+{
+	// A CHILD QToolBar, deliberately not QMainWindow::addToolBar(): that one
+	// docks itself into the window's chrome and would be invisible to the
+	// engine, and it would make a toolbar impossible inside a Dialog.
+	auto* bar = new QToolBar(static_cast<QWidget*>(parentWindow));
+	bar->setIconSize(QSize(m_iconSize.width, m_iconSize.height));
+	bar->setMovable(false);
+	bar->setFloatable(false);
+	m_nativeWidget = bar;
+
+	const bool anyLabels = m_labelsForced
+		|| std::any_of(m_tools.begin(), m_tools.end(), [](const ToolItem& tool) {
+			return !tool.isSeparator && tool.iconPath.empty();
+		});
+	bar->setToolButtonStyle(anyLabels
+		? Qt::ToolButtonTextBesideIcon
+		: Qt::ToolButtonIconOnly);
+
+	for (ToolItem& tool : m_tools)
+	{
+		if (tool.isSeparator)
+		{
+			bar->addSeparator();
+			continue;
+		}
+
+		// A tool with no usable icon shows its label instead, so the row is
+		// never blank.
+		QIcon icon;
+		if (!tool.iconPath.empty())
+		{
+			const QPixmap pixmap(qstr(tool.iconPath));
+			if (!pixmap.isNull())
+				icon = QIcon(pixmap);
+#ifdef USE_LOGGER
+			else
+				Logger::instance().log("ToolBarWrapper::realize()\t-> icon \""
+					+ tool.iconPath + "\" failed to load; falling back to the label\n");
+#endif
+		}
+
+		QAction* action = icon.isNull()
+			? bar->addAction(qstr(tool.label))
+			: bar->addAction(icon, qstr(tool.label));
+		if (!tool.tooltip.empty())
+			action->setToolTip(qstr(tool.tooltip));
+
+		ToolItem* model = &tool;
+		if (model->toggledFlag)
+		{
+			action->setCheckable(true);
+			action->setChecked(model->toggledFlag->get());
+		}
+		action->setEnabled(!model->disabledFlag.get());
+
+		QObject::connect(action, &QAction::triggered, bar, [model, action](bool) {
+			// Value first, then the callback.
+			if (model->toggledFlag)
+				model->toggledFlag->set(action->isChecked());
+			if (model->clickHandler)
+				model->clickHandler();
+		});
+
+		// Bound flags are polled, never pushed on disagreement. setChecked()
+		// emits toggled(), not triggered(), so a mirrored write cannot re-enter
+		// the handler above.
+		if (model->toggledFlag && model->toggledFlag->isBound())
+		{
+			const bool* flag = model->toggledFlag->boundValue();
+			bindExternalRefSync(bar,
+				[action] { return action->isChecked(); },
+				[flag] { return *flag; },
+				[action](bool value) { action->setChecked(value); });
+		}
+		if (model->disabledFlag.isBound())
+		{
+			const bool* flag = model->disabledFlag.boundValue();
+			bindExternalRefSync(bar,
+				[action] { return action->isEnabled(); },
+				[flag] { return !*flag; },
+				[action](bool enabled) { action->setEnabled(enabled); });
+		}
+	}
 }
 
 // ColorPickerWrapper -----------------------------------------------------------
