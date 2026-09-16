@@ -6,4 +6,6 @@ target_sources(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/MenuDraw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TextureCache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageBoxWrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FileDialogWrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FileBrowserPopup.cpp
 )

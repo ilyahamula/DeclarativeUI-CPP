@@ -5,6 +5,7 @@
 #include "frameworks_core/CoreTypes/StatusField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
+#include "frameworks_core/CoreTypes/FileFilter.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
 
 #include <algorithm>
@@ -527,6 +528,46 @@ private:
 	BoundValue<Color> m_value;
 	std::function<void(const Color&)> m_onChange;
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+};
+
+// FilePickerWrapper -----------------------------------------------------------
+// A path field with a Browse button. ONE leaf to the engine on all three
+// backends, though none of them builds it the same way: wx has a native picker
+// control, Qt gets a composite QWidget laid out by hand, and ImGui draws a
+// field, a button and -- since there is no OS dialog to open -- a browser popup
+// of its own (imgui/FileBrowserPopup.hpp).
+//
+// Both ways of setting the path write through and fire onChange: picking one in
+// the dialog, and typing one into the field (R11.4). That is why the wx picker
+// asks for its text control and why Qt's composite carries a real QLineEdit
+// rather than a read-only display.
+class FilePickerWrapper : public ControlWrapper
+{
+public:
+	FilePickerWrapper(BoundValue<std::string> value,
+		FileMode mode, std::vector<FileFilter> filters, std::string dialogTitle,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_value(std::move(value))
+		, m_mode(mode)
+		, m_filters(std::move(filters))
+		, m_dialogTitle(std::move(dialogTitle))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	BoundValue<std::string> m_value;
+	FileMode m_mode = FileMode::Open;
+	std::vector<FileFilter> m_filters;
+	std::string m_dialogTitle;
+	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
 
 // SpacerWrapper -----------------------------------------------------------

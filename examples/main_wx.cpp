@@ -5,38 +5,27 @@
 
 class DeclarativeApp : public wxApp
 {
-    // Window demo state: members, so the bound refs outlive the modeless
-    // windows that read them.
-    std::string m_selectedFile = "main.cpp";
-    TableRows m_files {
-        { "main.cpp",    "2 KB",  "entry point" },
-        { "layout.cpp",  "31 KB", "measure/arrange" },
-        { "widgets.hpp", "18 KB", "public API" },
-        { "engine.hpp",  "9 KB",  "" },
-    };
-    int m_selectedRow = 0;
-    std::string m_notes = "Drag a sash, then resize the window: the panes take the room.";
-    bool m_shellDisabled = false;
-    bool m_shellOpen = true;
-    std::string m_shellStatus = "(the shell is still open)";
-    bool m_panelDisabled = false;
-    bool m_wordWrap = true;
-    bool m_showGrid = false;
+    // T3.1 demo state: members, so the bound refs outlive the modeless dialogs
+    // that read them.
+    std::string m_openPath = "examples/main_wx.cpp";
+    std::string m_savePath;
+    std::string m_folderPath;
+    std::string m_lastDialogResult = "(nothing picked yet)";
+    bool m_pickersDisabled = false;
+    std::string m_sharedPath = "include/widgets.hpp";
+    bool m_boundPickersDisabled = false;
 
 public:
     bool OnInit() override
     {
-        // The shell is a Window -- a wxFrame, which is the thing a wxDialog
-        // cannot be, and the only thing a wxMenuBar attaches to. Resizable by
-        // default, shown against a bool that its own Close button, its File >
-        // Close item and the control panel all write.
-        drawAppShellUI(m_selectedFile, m_files, m_selectedRow, m_notes, m_shellDisabled,
-            m_shellOpen, m_shellStatus, m_wordWrap).show(m_shellOpen);
-        // Fixed(), and shown with the plain show() -- the panel stays up so the
-        // shell's onClose() report is readable after the shell has gone, and so
-        // the app does not exit with its last top-level window.
-        drawWindowBinding(m_shellOpen, m_shellStatus, m_panelDisabled, m_wordWrap,
-            m_showGrid).show();
+        // The pickers gallery: FilePicker in all three modes and the one-shot
+        // FileDialog. wx is the one backend with a native picker control
+        // (wxFilePickerCtrl / wxDirPickerCtrl), asked for with USE_TEXTCTRL so
+        // a typed path commits exactly as a picked one does.
+        drawPickersGalleryUI(m_openPath, m_savePath, m_folderPath, m_lastDialogResult,
+            m_pickersDisabled).show();
+        // The binding demo: two FilePickers and a TextCtrl over one string.
+        drawFilePickerBinding(m_sharedPath, m_boundPickersDisabled).show();
         return true;
     }
 };

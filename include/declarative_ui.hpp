@@ -12,6 +12,7 @@
 #include "menus.hpp"
 #include "tabpanel.hpp"
 #include "messagebox.hpp"
+#include "filedialog.hpp"
 
 static_assert(NodeBuildable<Button>);
 static_assert(NodeBuildable<TextCtrl>);
@@ -21,6 +22,7 @@ static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
 static_assert(NodeBuildable<StatusBar>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
+static_assert(NodeBuildable<FilePicker>);
 static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);
 static_assert(NodeBuildable<ListBox<std::vector<int>>>);
@@ -53,6 +55,7 @@ static_assert(!MenuBarHost<Dialog<VStack<Button>>>);
 static_assert(ContextMenuHost<Button>);
 static_assert(ContextMenuHost<ToolBar>);
 static_assert(ContextMenuHost<StatusBar>);
+static_assert(ContextMenuHost<FilePicker>);
 static_assert(ContextMenuHost<Table<int>>);
 static_assert(!ContextMenuHost<VStack<Button>>);
 static_assert(!ContextMenuHost<HStack<Button>>);

@@ -61,12 +61,12 @@ return Dialog {
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
-| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
+| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
-| Top-level         | `Dialog`, `Window`, `MessageBox` |
+| Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
 `ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
@@ -129,6 +129,35 @@ StatusBar {{
 }}
 StatusBar{ status }                     // or one stretched field, the common case
 ```
+
+`FilePicker` is a path field with a Browse button, in one of three modes. **Both** ways
+of setting the path commit identically — picking one in the dialog and typing one into
+the field — so nothing downstream can tell them apart, and **cancelling leaves the path
+alone** rather than clearing it.
+
+```cpp
+FilePicker{ projectPath }                       // bound: edits write through
+    .withMode(FileMode::Open)                   // or Save, or Directory
+    .withFilter("Images (*.png;*.jpg)|*.png;*.jpg|All files|*")
+    .withDialogTitle("Open a project")
+
+FileDialog{"Export"}                            // one-shot, like MessageBox
+    .withMode(FileMode::Save)
+    .onResult([&](const std::string& path) {    // "" on cancel
+        if (!path.empty()) exportTo(path);
+    })
+    .show();
+```
+
+The filter is written once in the wx wildcard spelling and parsed once into a
+`FileFilter`; each backend then rebuilds its *own* wildcard string from the fields,
+because the three disagree on every separator. Browse opens the platform dialog on wx
+and Qt. **On ImGui it opens a browser the framework draws itself** — there is no OS
+dialog and this project takes no new dependency for one — so it is deliberately simpler
+than the native ones: a breadcrumb, a listing, a filter combo, a name field for Save,
+Open/Cancel, and no favourites or previews. `FileDialog` blocks on wx and Qt and does
+not on ImGui, where nothing may stop the frame loop, which is why the answer belongs in
+`onResult` on all three rather than in code after `show()`.
 
 The same `MenuItem` model is a right-click menu on any leaf:
 

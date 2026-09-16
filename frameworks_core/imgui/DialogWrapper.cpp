@@ -3,6 +3,7 @@
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 
 #include <algorithm>
@@ -97,6 +98,15 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 			renderContent.height = std::max(content.height, (int)actual.y - chromeH);
 		}
 		engine.render(root, renderContent);
+
+		// The file browser is drawn HERE, not in the wrapper that asked for it:
+		// ImGuiLayoutBackend::place() wraps every render() in BeginGroup() +
+		// BeginDisabled(), and a modal begun there would inherit the disabled
+		// item flags and sit inside a group it has nothing to do with. This is
+		// the one point inside the window's ID scope but outside every group
+		// and disabled scope, which is what lets OpenPopup and BeginPopupModal
+		// meet in the same scope as ImGui requires.
+		FileBrowser::drawPending();
 	}
 	ImGui::End();
 }

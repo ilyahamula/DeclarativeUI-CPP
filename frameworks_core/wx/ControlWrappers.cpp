@@ -27,6 +27,9 @@
 #include <wx/dataview.h>
 #include <wx/settings.h>
 #include <wx/collheaderctrl.h>
+#include <wx/filepicker.h>
+
+#include "frameworks_core/wx/FileDialogSupport.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -841,6 +844,81 @@ void ColorPickerWrapper::realize(void* parentWindow)
 		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxColourPickerEvent& evt) {
 			const wxColour& c = evt.GetColour();
 			cbw(Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f }, nw);
+		});
+
+}
+
+// FilePickerWrapper -----------------------------------------------------------
+
+void FilePickerWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("FilePickerWrapper::realize()\t-> new wxFilePickerCtrl()/wxDirPickerCtrl()\n");
+#endif
+	auto* parent = static_cast<wxWindow*>(parentWindow);
+	const wxString initial = wxString::FromUTF8(m_value.get());
+	const wxString message = wxString::FromUTF8(m_dialogTitle);
+
+	// USE_TEXTCTRL on both: it is what makes the typed path a first-class way
+	// of setting the value (R11.4). wx raises the same CHANGED event for a
+	// typed edit as for a pick, so one handler serves both.
+	if (m_mode == FileMode::Directory)
+	{
+		auto* picker = new wxDirPickerCtrl(parent, wxID_ANY, initial,
+			message.empty() ? wxString(wxDirSelectorPromptStr) : message,
+			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+			m_style | wxDIRP_USE_TEXTCTRL | wxDIRP_DIR_MUST_EXIST);
+		m_nativeWidget = picker;
+	}
+	else
+	{
+		const long modeStyle = m_mode == FileMode::Save
+			? (wxFLP_SAVE | wxFLP_OVERWRITE_PROMPT)
+			: (wxFLP_OPEN | wxFLP_FILE_MUST_EXIST);
+		auto* picker = new wxFilePickerCtrl(parent, wxID_ANY, initial,
+			message.empty() ? wxString(wxFileSelectorPromptStr) : message,
+			wxWildcardFor(m_filters),
+			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+			m_style | modeStyle | wxFLP_USE_TEXTCTRL);
+		m_nativeWidget = picker;
+	}
+
+	// wxFilePickerCtrl and wxDirPickerCtrl share a base with GetPath/SetPath and
+	// they raise the same wxFileDirPickerEvent, so everything below is written
+	// once against the base -- the branch above is the only place the two modes
+	// differ. Both event types are bound because the base does not say which of
+	// them this instance will send.
+	auto* picker = static_cast<wxFileDirPickerCtrlBase*>(m_nativeWidget);
+	auto bindChanged = [picker](std::function<void(const wxString&)> handler) {
+		picker->Bind(wxEVT_FILEPICKER_CHANGED,
+			[h = handler](wxFileDirPickerEvent& evt) { h(evt.GetPath()); });
+		picker->Bind(wxEVT_DIRPICKER_CHANGED,
+			[h = std::move(handler)](wxFileDirPickerEvent& evt) { h(evt.GetPath()); });
+	};
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		bindChanged([&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
+			nw = m_nativeWidget](const wxString& path) {
+			value = std::string(path.ToUTF8());
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		// SetPath does not raise the CHANGED event, so mirroring an external
+		// write never re-enters the handler above.
+		bindExternalRefSync(picker,
+			[picker] { return std::string(picker->GetPath().ToUTF8()); },
+			[&value] { return value; },
+			[picker](const std::string& v) { picker->SetPath(wxString::FromUTF8(v)); });
+	}
+	else if (m_onChange)
+		bindChanged([cb = std::move(m_onChange)](const wxString& path) {
+			cb(std::string(path.ToUTF8()));
+		});
+	else if (m_onChangeWithWidget)
+		bindChanged([cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const wxString& path) {
+			cbw(std::string(path.ToUTF8()), nw);
 		});
 
 }

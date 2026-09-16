@@ -788,3 +788,78 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
     // The inverse of a Dialog: a Window resizes unless it is told not to.
     .Fixed();
 }
+
+// FilePicker + TextCtrl over one path string, plus a second picker on the same
+// value. Three controls, one std::string: pick a file in either picker, or type
+// into the plain field, and the other two follow.
+//
+// This is the binding demo T3.1 owes (rules.md G2), and it shows the one thing
+// a FilePicker does that a plain field cannot: both ways of setting the path --
+// the dialog and the keyboard -- commit through the same value, so nothing
+// downstream can tell them apart.
+//
+// The disabled pair is bound too: tick the box and both pickers grey out,
+// leaving the plain field as the only way to change the value. That is the
+// clearest way to see the three controls really are one value.
+inline auto drawFilePickerBinding(std::string& path, bool& pickersDisabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 96;
+    constexpr Size kFieldSize { 360, 28 };
+
+    return Dialog {
+        "FilePicker + TextCtrl (shared path)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One std::string behind all three controls:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Picker:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                FilePicker{path}
+                    .withMode(FileMode::Open)
+                    .withFilter("Sources (*.cpp;*.hpp)|*.cpp;*.hpp|All files|*")
+                    .withDialogTitle("Pick the shared path")
+                    .withSize(kFieldSize)
+                    .isDisabled(pickersDisabled)
+            },
+
+            // A second picker on the SAME value, in Save mode. Pick in one and
+            // the other's field follows -- no callback wiring, no copy-back.
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"Save as:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                FilePicker{path}
+                    .withMode(FileMode::Save)
+                    .withDialogTitle("Save the shared path as")
+                    .withSize(kFieldSize)
+                    .isDisabled(pickersDisabled)
+            },
+
+            // The plain field: the same string again, and the one control that
+            // stays live when the box below is ticked.
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"As text:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                TextCtrl{path}
+                    .withSize(kFieldSize)
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            CheckBox{pickersDisabled, "Disable both pickers (the text field stays live)"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

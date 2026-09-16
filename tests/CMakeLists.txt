@@ -17,6 +17,7 @@ add_executable(layout_tests
     layout_engine_expander_test.cpp
     golden_cross_backend_test.cpp
     shortcut_parse_test.cpp
+    file_filter_parse_test.cpp
     # Engine sources under test are compiled directly (not linked from
     # DeclarativeUI) so they provably build without any backend.
     ${CMAKE_SOURCE_DIR}/frameworks_core/LayoutFlags.cpp

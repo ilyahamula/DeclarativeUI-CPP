@@ -1463,6 +1463,92 @@ private:
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
 
+// FilePicker -----------------------------------------------------------
+// A path field with a Browse button, in one of three modes. Browse opens the
+// native dialog on wx and Qt and a framework-drawn browser on ImGui, which has
+// no OS dialog to open (docs/specs/widget_catalogue_completion/design.md §12).
+//
+// BOTH ways of setting the path write through to the bound string and fire
+// onChange: picking one in the dialog, and typing one into the field. That is
+// the whole point of the text half -- a picker whose field were read-only would
+// be a button with a label.
+//
+//     FilePicker{projectPath}
+//         .withMode(FileMode::Open)
+//         .withFilter("Projects (*.dui)|*.dui|All files|*")
+//
+// The filter is parsed once here and each backend maps the FIELDS through its
+// own wildcard spelling; it is ignored in Directory mode, where there are no
+// files to filter.
+struct FilePicker : Widget<FilePicker>
+{
+	using super = Widget<FilePicker>;
+
+	explicit FilePicker(const std::string& path)
+		: super()
+		, m_value(path)
+	{
+	}
+
+	explicit FilePicker(std::string& path)
+		: super()
+		, m_value(path)
+	{
+	}
+
+	FilePicker& withMode(FileMode mode)
+	{
+		m_mode = mode;
+		return *this;
+	}
+
+	// "Images (*.png;*.jpg)|*.png;*.jpg|All files|*" -- the wx wildcard
+	// spelling, parsed by CoreTypes/FileFilter.hpp.
+	FilePicker& withFilter(const std::string& spec)
+	{
+		m_filters = FileFilter::parse(spec);
+		return *this;
+	}
+
+	// The Browse dialog's title. Empty lets each backend use its own default,
+	// which is the localised one on wx and Qt.
+	FilePicker& withDialogTitle(const std::string& title)
+	{
+		m_dialogTitle = title;
+		return *this;
+	}
+
+	FilePicker& onChange(std::function<void(const std::string&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	FilePicker& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<FilePickerWrapper>(m_value, m_mode, m_filters, m_dialogTitle,
+			pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	BoundValue<std::string> m_value;
+	FileMode m_mode = FileMode::Open;
+	std::vector<FileFilter> m_filters;
+	std::string m_dialogTitle;
+	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+};
+
 // Spacer -----------------------------------------------------------
 // Pure geometry: no native window on any backend and nothing drawn, only a
 // rectangle the engine hands out. Default-constructed it is flexible -- it

@@ -15,37 +15,27 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // Window demo state. Bound by reference, so it has to outlive the frame
+    // T3.1 demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
-    std::string selectedFile = "main.cpp";
-    TableRows files {
-        { "main.cpp",   "2 KB",  "entry point" },
-        { "layout.cpp", "31 KB", "measure/arrange" },
-        { "widgets.hpp", "18 KB", "public API" },
-        { "engine.hpp", "9 KB",  "" },
-    };
-    int selectedRow = 0;
-    std::string notes = "Drag a sash, then resize the window: the panes take the room.";
-    bool shellDisabled = false;
-    bool shellOpen = true;
-    std::string shellStatus = "(the shell is still open)";
-    bool panelDisabled = false;
-    bool wordWrap = true;
-    bool showGrid = false;
+    std::string openPath = "examples/main_imgui.cpp";
+    std::string savePath;
+    std::string folderPath;
+    std::string lastDialogResult = "(nothing picked yet)";
+    bool pickersDisabled = false;
+    std::string sharedPath = "include/widgets.hpp";
+    bool boundPickersDisabled = false;
 
     runImGuiApp([&]
     {
-        // The shell is a Window: resizable by default, carrying a menu bar
-        // drawn inside it, and shown against a bool that its own Close button,
-        // its File > Close item and the control panel all write.
-        drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
-            shellOpen, shellStatus, wordWrap).show(shellOpen);
-        // Fixed(), and shown with the plain show() -- the panel stays up so the
-        // shell's onClose() report is readable after the shell has gone.
-        //
-        // Only on ImGui does re-ticking the box bring the shell back: the frame
-        // loop calls show() again. wx and Qt destroyed the frame.
-        drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap, showGrid).show();
+        // The pickers gallery: FilePicker in all three modes and the one-shot
+        // FileDialog. On ImGui, Browse opens the framework-drawn browser --
+        // there is no OS dialog to open and the project takes no dependency
+        // for one. It is drawn by the top-level window after the engine has
+        // rendered, never from inside a wrapper's render().
+        drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
+            pickersDisabled).show();
+        // The binding demo: two FilePickers and a TextCtrl over one string.
+        drawFilePickerBinding(sharedPath, boundPickersDisabled).show();
     });
 
     return 0;

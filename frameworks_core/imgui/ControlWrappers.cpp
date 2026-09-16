@@ -14,6 +14,7 @@
 #include "frameworks_core/imgui/SnapshotStore.hpp"
 
 #include "frameworks_core/imgui/TextureCache.hpp"
+#include "frameworks_core/imgui/FileBrowserPopup.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // pos, size, style: not directly applicable in ImGui immediate mode.
@@ -1422,6 +1423,86 @@ void ColorPickerWrapper::render(const Rect& frame)
 			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
+}
+
+// FilePickerWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// The Browse button's width, shared by measure and render so the two agree to
+// the pixel -- the same reason ToolBarWrapper has a toolWidth() helper, and the
+// thing the drift guard catches when they stop agreeing.
+float browseButtonWidth()
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	return ImGui::CalcTextSize("...").x + style.FramePadding.x * 2.0f;
+}
+
+} // unnamed namespace
+
+Size FilePickerWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	// The field measures a content-independent floor like every other editable
+	// one: the tree is rebuilt every frame, so measuring the live path would
+	// grow the picker as the user typed into it.
+	const float width = (float)editableFloorWidth() + style.ItemInnerSpacing.x + browseButtonWidth();
+	return Size { ceilInt(width), frameHeight() };
+}
+
+void FilePickerWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<std::string> snapshot(m_value);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float buttonWidth = browseButtonWidth();
+
+	char buf[512] = {};
+	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+
+	ImGui::PushID(snapshot.id());
+	if (sized(frame))
+		ImGui::SetNextItemWidth(std::max(1.0f,
+			(float)frame.width - buttonWidth - style.ItemInnerSpacing.x));
+	if (ImGui::InputText("##path", buf, sizeof(buf)))
+	{
+		// A typed path is as much a selection as a picked one (R11.4).
+		m_value.set(buf);
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+	ImGui::SameLine(0, style.ItemInnerSpacing.x);
+	const bool browse = ImGui::Button("...", ImVec2(buttonWidth, 0));
+	ImGui::PopID();
+
+	if (!browse)
+		return;
+
+	// The browser answers on a LATER frame, by which time this wrapper is gone
+	// -- the tree is rebuilt every frame. So the result has to be written
+	// somewhere that outlives it, and that is exactly the split BoundValue
+	// already makes: a bound path is the caller's variable, and an unbound one
+	// lives in the SnapshotStore under the key this render() is using.
+	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
+	const std::uint64_t snapshotKey = snapshot.slotKey(0);
+	FileBrowser::request(m_dialogTitle, m_mode, m_filters, m_value.get(),
+		[bound, snapshotKey, cb = m_onChange, cbw = m_onChangeWithWidget](const std::string& chosen) {
+			if (chosen.empty())
+				return; // cancel leaves the path alone -- it is not a selection of ""
+			if (bound != nullptr)
+				*bound = chosen;
+			else
+			{
+				BoundValue<std::string> committed(chosen);
+				SnapshotStore<std::string>::commit(snapshotKey, committed);
+			}
+			// Value first, then the callback, as everywhere else: a handler
+			// reading the bound value sees the new one.
+			if (cb) cb(chosen);
+			else if (cbw) cbw(chosen, nullptr);
+		});
 }
 
 // SpacerWrapper -----------------------------------------------------------

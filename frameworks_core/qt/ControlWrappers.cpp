@@ -37,6 +37,9 @@
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
+#include <QHBoxLayout>
+
+#include "frameworks_core/qt/FileDialogSupport.hpp"
 
 // realize() creates the QWidget under the given parent window and connects
 // its signals (plain lambda connects — no moc). The layout engine measures
@@ -851,6 +854,86 @@ void ColorPickerWrapper::realize(void* parentWindow)
 			if (cb) cb(color);
 			else if (cbw) cbw(color, nw);
 		});
+
+}
+
+// FilePickerWrapper -----------------------------------------------------------
+
+void FilePickerWrapper::realize(void* parentWindow)
+{
+	// Qt has no picker control, so the composite is built by hand: a field and
+	// a Browse button in one QWidget, which is the single leaf the engine sees.
+	// The QHBoxLayout is what makes place()'s setGeometry re-lay the two halves
+	// -- the engine sizes the composite and Qt distributes inside it.
+	auto* composite = new QWidget(static_cast<QWidget*>(parentWindow));
+	auto* row = new QHBoxLayout(composite);
+	row->setContentsMargins(0, 0, 0, 0);
+	row->setSpacing(4);
+
+	auto* edit = new QLineEdit(qstr(m_value.get()), composite);
+	auto* browse = new QToolButton(composite);
+	browse->setText(QStringLiteral("..."));
+	browse->setFocusPolicy(Qt::TabFocus);
+	row->addWidget(edit, 1);
+	row->addWidget(browse, 0);
+	m_nativeWidget = composite;
+
+	// One commit path for both halves: the dialog writes the field, and the
+	// field is what everything else reads. That is what makes a typed path and
+	// a picked one indistinguishable downstream (R11.4).
+	auto commit = [edit](const std::string& path) { edit->setText(qstr(path)); };
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		// textEdited, not textChanged: it fires for user typing only, so the
+		// dialog's own setText below re-enters this through exactly one route
+		// rather than two.
+		QObject::connect(edit, &QLineEdit::textEdited,
+			[&value, cb = m_onChange, cbw = m_onChangeWithWidget, nw = m_nativeWidget](const QString& text) {
+				value = text.toStdString();
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
+	}
+
+	// The dialog leg. It writes the field and then reports, in that order, so a
+	// handler reading the bound value already sees the new one (rules.md C4).
+	// Everything it needs is captured by value -- the wrapper is not, since its
+	// teardown order against the widget is not fixed.
+	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
+	QObject::connect(browse, &QToolButton::clicked,
+		[composite, edit, commit, bound, mode = m_mode, filters = m_filters,
+			title = m_dialogTitle, cb = m_onChange, cbw = m_onChangeWithWidget,
+			nw = m_nativeWidget]() {
+			const std::string current = edit->text().toStdString();
+			const std::string chosen = qtRunFileDialog(composite, title, mode, filters, current);
+			if (chosen.empty())
+				return; // cancel leaves the path alone -- it is not a selection of ""
+			commit(chosen);
+			if (bound)
+				*bound = chosen;
+			if (cb) cb(chosen);
+			else if (cbw) cbw(chosen, nw);
+		});
+
+	// Unbound and with a callback: the field is still the value, so typing has
+	// to report too. (Bound values took this leg above.)
+	if (!m_value.isBound())
+	{
+		if (m_onChange)
+			QObject::connect(edit, &QLineEdit::textEdited,
+				[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
+		else if (m_onChangeWithWidget)
+			QObject::connect(edit, &QLineEdit::textEdited,
+				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
+					cbw(text.toStdString(), nw);
+				});
+	}
 
 }
 

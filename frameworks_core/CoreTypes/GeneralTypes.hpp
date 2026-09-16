@@ -195,3 +195,12 @@ enum class MessageBoxStyle { Info, Warning, Error, Question };
 enum class MessageBoxButtons { OK, OKCancel, YesNo, YesNoCancel };
 
 enum class MessageBoxResult { OK, Cancel, Yes, No };
+
+// What a file dialog is for. Drives which native dialog the retained backends
+// open and which of its three shapes the ImGui browser draws.
+enum class FileMode
+{
+	Open,       // pick an existing file
+	Save,       // name a file, existing or not (overwrite prompt is the platform's)
+	Directory   // pick a folder
+};

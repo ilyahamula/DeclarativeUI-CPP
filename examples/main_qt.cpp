@@ -8,33 +8,25 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // Window demo state: locals of main, so the bound refs outlive the modeless
-    // windows that read them for the whole of exec().
-    std::string selectedFile = "main.cpp";
-    TableRows files {
-        { "main.cpp",    "2 KB",  "entry point" },
-        { "layout.cpp",  "31 KB", "measure/arrange" },
-        { "widgets.hpp", "18 KB", "public API" },
-        { "engine.hpp",  "9 KB",  "" },
-    };
-    int selectedRow = 0;
-    std::string notes = "Drag a sash, then resize the window: the panes take the room.";
-    bool shellDisabled = false;
-    bool shellOpen = true;
-    std::string shellStatus = "(the shell is still open)";
-    bool panelDisabled = false;
-    bool wordWrap = true;
-    bool showGrid = false;
+    // T3.1 demo state: locals of main, so the bound refs outlive the modeless
+    // dialogs that read them for the whole of exec().
+    std::string openPath = "examples/main_qt.cpp";
+    std::string savePath;
+    std::string folderPath;
+    std::string lastDialogResult = "(nothing picked yet)";
+    bool pickersDisabled = false;
+    std::string sharedPath = "include/widgets.hpp";
+    bool boundPickersDisabled = false;
 
-    // The shell is a Window -- a QMainWindow, which is where its QMenuBar
-    // attaches. Resizable by default, shown against a bool that its own Close
-    // button, its File > Close item and the control panel all write.
-    drawAppShellUI(selectedFile, files, selectedRow, notes, shellDisabled,
-        shellOpen, shellStatus, wordWrap).show(shellOpen);
-    // Fixed(), and shown with the plain show() -- the panel stays up so the
-    // shell's onClose() report is readable after the shell has gone, and so the
-    // app does not exit with its last window.
-    drawWindowBinding(shellOpen, shellStatus, panelDisabled, wordWrap, showGrid).show();
+    // The pickers gallery: FilePicker in all three modes and the one-shot
+    // FileDialog. On Qt the picker is a QLineEdit + QToolButton composite --
+    // there is no native picker control -- and Browse runs the BLOCKING
+    // QFileDialog, so the control flow matches wx exactly.
+    drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
+        pickersDisabled).show();
+    // The binding demo: two FilePickers and a TextCtrl over one string. Pick in
+    // either picker, or type in the field, and the other two follow.
+    drawFilePickerBinding(sharedPath, boundPickersDisabled).show();
 
     return app.exec();
 }
