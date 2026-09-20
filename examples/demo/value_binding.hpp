@@ -863,3 +863,78 @@ inline auto drawFilePickerBinding(std::string& path, bool& pickersDisabled)
         }
     };
 }
+
+// Two CheckListBoxes over ONE std::vector<std::string>: tick a box in either and
+// the other follows, because both are bound to the same caller-owned value and
+// the checked set IS that value. A third control, a plain ListBox on the same
+// vector, shows the set read as a multi-selection -- the two widgets decode the
+// bound type through the same helpers, so "ticked" and "selected" are the same
+// list of items spelled two ways.
+//
+// The lists deliberately carry the SAME items in a different order: the checked
+// set names items by text, not by position, so the second list ticks the right
+// rows anyway. A std::vector<int> binding would name them by position and the
+// two lists would disagree -- which is the whole reason both spellings exist.
+inline auto drawCheckListBinding(std::vector<std::string>& modules, bool& listsDisabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kListW = 190;
+
+    return Dialog {
+        "CheckListBox x2 (shared checked set)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One std::vector<std::string> behind all three lists:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"Declared order:"}.withSize({-1, kLabelH}),
+                    CheckListBox{
+                        {"Core", "Network", "Storage", "Rendering", "Audio"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                        .isDisabled(listsDisabled)
+                },
+                Spacer{Size{12, 0}},
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"Reversed:"}.withSize({-1, kLabelH}),
+                    CheckListBox{
+                        {"Audio", "Rendering", "Storage", "Network", "Core"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                        .isDisabled(listsDisabled)
+                },
+                Spacer{Size{12, 0}},
+                // The same vector as a multi-select ListBox: what the check
+                // lists call "ticked" this one calls "selected".
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"As a ListBox:"}.withSize({-1, kLabelH}),
+                    ListBox{
+                        {"Core", "Network", "Storage", "Rendering", "Audio"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                }
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            CheckBox{listsDisabled, "Disable both check lists (the ListBox stays live)"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

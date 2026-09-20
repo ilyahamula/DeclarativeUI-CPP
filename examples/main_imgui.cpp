@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -15,27 +16,28 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // T3.1 demo state. Bound by reference, so it has to outlive the frame
+    // T3.2 demo state. Bound by reference, so it has to outlive the frame
     // loop -- ImGui rebuilds the tree every frame and reads these live.
     std::string openPath = "examples/main_imgui.cpp";
     std::string savePath;
     std::string folderPath;
     std::string lastDialogResult = "(nothing picked yet)";
     bool pickersDisabled = false;
-    std::string sharedPath = "include/widgets.hpp";
-    bool boundPickersDisabled = false;
+    std::vector<std::string> enabledPlugins { "Formatter", "Debugger" };
+    std::string enabledSummary = pluginSummary(enabledPlugins);
+    std::vector<std::string> modules { "Core", "Storage" };
+    bool moduleListsDisabled = false;
 
     runImGuiApp([&]
     {
-        // The pickers gallery: FilePicker in all three modes and the one-shot
-        // FileDialog. On ImGui, Browse opens the framework-drawn browser --
-        // there is no OS dialog to open and the project takes no dependency
-        // for one. It is drawn by the top-level window after the engine has
-        // rendered, never from inside a wrapper's render().
+        // The pickers gallery, now carrying T3.2's CheckListBox: a list with a
+        // checkbox on every row, drawn on ImGui as Checkbox rows inside the
+        // same child region BeginListBox gives the plain list.
         drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
-            pickersDisabled).show();
-        // The binding demo: two FilePickers and a TextCtrl over one string.
-        drawFilePickerBinding(sharedPath, boundPickersDisabled).show();
+            pickersDisabled, enabledPlugins, enabledSummary).show();
+        // The binding demo: two CheckListBoxes and a ListBox over one
+        // std::vector<std::string>.
+        drawCheckListBinding(modules, moduleListsDisabled).show();
     });
 
     return 0;

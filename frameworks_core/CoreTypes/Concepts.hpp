@@ -30,6 +30,15 @@ concept ListBoxValue = ListBoxSelection<T>
 template <typename T>
 concept MultiSelectListBoxValue = ListBoxValue<T> && !ListBoxSelection<T>;
 
+// A CheckListBox binds the CHECKED SET, and a set is always a vector: unlike
+// ListBoxValue there is no single-value spelling to pick a mode with, because
+// "one box ticked" is not a different control. int names an item by position,
+// std::string by its text -- the same two readings ListBox's multi bindings
+// have, decoded by the same helpers.
+template <typename T>
+concept CheckListValue = std::same_as<T, std::vector<int>>
+	|| std::same_as<T, std::vector<std::string>>;
+
 // Element type behind a ListBox binding: the bound type itself when single,
 // the vector's element when multi.
 template <typename T>

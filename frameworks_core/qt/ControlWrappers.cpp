@@ -1200,6 +1200,92 @@ template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
 
+// CheckListBoxWrapper -----------------------------------------------------------
+
+namespace
+{
+
+std::vector<int> checkListChecked(const QListWidget* list)
+{
+	std::vector<int> indices;
+	for (int i = 0; i < list->count(); ++i)
+	{
+		if (list->item(i)->checkState() == Qt::Checked)
+			indices.push_back(i);
+	}
+	return indices;
+}
+
+void setCheckListChecked(QListWidget* list, const std::vector<int>& indices)
+{
+	for (int i = 0; i < list->count(); ++i)
+	{
+		const bool checked = std::find(indices.begin(), indices.end(), i) != indices.end();
+		list->item(i)->setCheckState(checked ? Qt::Checked : Qt::Unchecked);
+	}
+}
+
+} // unnamed namespace
+
+template <CheckListValue T>
+void CheckListBoxWrapper<T>::realize(void* parentWindow)
+{
+	// The same sizeHint override ListBoxWrapper needs, for the same reason:
+	// QListWidget's own hint is a fixed ~256x192 that reads neither the item
+	// text nor the item count.
+	auto* list = new SizedListWidget(static_cast<QWidget*>(parentWindow));
+	list->visibleRows = m_visibleRows;
+	// Single-SELECTION, whatever the checked set holds: the highlight and the
+	// ticks are independent, as on wx.
+	list->setSelectionMode(QAbstractItemView::SingleSelection);
+
+	const std::vector<int> checked = indicesFor(m_items, boundValue());
+	for (int i = 0; i < static_cast<int>(m_items.size()); ++i)
+	{
+		auto* item = new QListWidgetItem(qstr(m_items[i]), list);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+		item->setCheckState(std::find(checked.begin(), checked.end(), i) != checked.end()
+			? Qt::Checked : Qt::Unchecked);
+	}
+	m_nativeWidget = list;
+
+	// itemChanged is connected only AFTER the population above: every
+	// setCheckState() there emits it, so connecting first would read the
+	// initial state as a series of user ticks.
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[&value, list, items = m_items, cb = std::move(m_onChange),
+				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
+				value = valueFor(items, checkListChecked(list));
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		bindExternalRefSync(list,
+			[list] { return checkListChecked(list); },
+			[&value, items = m_items] { return indicesFor(items, value); },
+			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
+	}
+	else if (m_onChange)
+	{
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[list, items = m_items, cb = std::move(m_onChange)](QListWidgetItem*) {
+				cb(valueFor(items, checkListChecked(list)));
+			});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[list, items = m_items, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
+				cbw(valueFor(items, checkListChecked(list)), nw);
+			});
+	}
+}
+
+template class CheckListBoxWrapper<std::vector<int>>;
+template class CheckListBoxWrapper<std::vector<std::string>>;
+
 // TreeViewWrapper -----------------------------------------------------------
 
 namespace

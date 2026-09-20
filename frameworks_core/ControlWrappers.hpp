@@ -768,11 +768,85 @@ private:
 extern template class ComboBoxWrapper<std::string>;
 extern template class ComboBoxWrapper<int>;
 
+// Item-set decode/encode -----------------------------------------------------
+// Indices are how every list-shaped wrapper carries a set of items internally,
+// and these two functions are the only places the bound type is decoded, so
+// every backend -- and both ListBox and CheckListBox -- share one reading of
+// it. Free functions rather than members of either wrapper for the reason B6
+// gives: the retained backends call them from event handlers and idle syncs,
+// which must not capture a wrapper (wrapper and window teardown order is not
+// fixed, see wx/RefSync.hpp), only the item list they copy.
+
+// Item indices the control should show for `value`. Out-of-range entries are
+// dropped rather than clamped: a stale index means "not in this list", and
+// silently selecting a neighbour would be worse than selecting nothing.
+template <ListBoxValue T>
+std::vector<int> listIndicesFor(const std::vector<std::string>& items, const T& value)
+{
+	std::vector<int> indices;
+	const int count = static_cast<int>(items.size());
+	const auto addIndexOf = [&](const ListBoxItem<T>& item) {
+		if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+		{
+			if (item >= 0 && item < count)
+				indices.push_back(item);
+		}
+		else
+		{
+			for (int i = 0; i < count; ++i)
+			{
+				if (items[i] == item)
+				{
+					indices.push_back(i);
+					break;
+				}
+			}
+		}
+	};
+
+	if constexpr (MultiSelectListBoxValue<T>)
+	{
+		for (const auto& item : value)
+			addIndexOf(item);
+	}
+	else
+	{
+		addIndexOf(value);
+	}
+	return indices;
+}
+
+// The inverse: the bound value for a set of indices. A single-value binding
+// with nothing selected reports -1 / "" -- the same "no selection"
+// wxNOT_FOUND spelling the retained backends use.
+template <ListBoxValue T>
+T listValueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
+{
+	const auto itemAt = [&](int i) -> ListBoxItem<T> {
+		if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+			return i;
+		else
+			return (i >= 0 && i < static_cast<int>(items.size())) ? items[i] : std::string{};
+	};
+
+	if constexpr (MultiSelectListBoxValue<T>)
+	{
+		T value;
+		value.reserve(indices.size());
+		for (int i : indices)
+			value.push_back(itemAt(i));
+		return value;
+	}
+	else
+	{
+		return indices.empty() ? itemAt(-1) : itemAt(indices.front());
+	}
+}
+
 // ListBoxWrapper -----------------------------------------------------------
 // Single- or multi-select depending on T (see ListBoxValue). The selection is
-// carried as item indices everywhere inside the wrapper -- indicesFor() and
-// valueFor() are the only two places the bound type is decoded, so all three
-// backends share one interpretation of it.
+// carried as item indices everywhere inside the wrapper, decoded through the
+// shared pair above.
 template <ListBoxValue T>
 class ListBoxWrapper : public ControlWrapper
 {
@@ -794,73 +868,15 @@ public:
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
-	// Item indices the control should show for `value`. Out-of-range entries
-	// are dropped rather than clamped: a stale index means "not in this list",
-	// and silently selecting a neighbour would be worse than selecting nothing.
-	//
-	// Static, and taking the items explicitly, because the retained backends call
-	// it from event handlers and idle syncs: those must not capture the wrapper
-	// (see the note in wx/RefSync.hpp -- wrapper and window teardown order is not
-	// fixed), only the item list they copy.
+	// The backends reach the shared decode/encode pair through these names.
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
 	{
-		std::vector<int> indices;
-		const int count = static_cast<int>(items.size());
-		const auto addIndexOf = [&](const ListBoxItem<T>& item) {
-			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
-			{
-				if (item >= 0 && item < count)
-					indices.push_back(item);
-			}
-			else
-			{
-				for (int i = 0; i < count; ++i)
-				{
-					if (items[i] == item)
-					{
-						indices.push_back(i);
-						break;
-					}
-				}
-			}
-		};
-
-		if constexpr (kMultiSelect)
-		{
-			for (const auto& item : value)
-				addIndexOf(item);
-		}
-		else
-		{
-			addIndexOf(value);
-		}
-		return indices;
+		return listIndicesFor<T>(items, value);
 	}
 
-	// The inverse: the bound value for a set of selected indices. A single-select
-	// binding with nothing selected reports -1 / "" -- the same "no selection"
-	// wxNOT_FOUND spelling the retained backends use.
 	static T valueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
 	{
-		const auto itemAt = [&](int i) -> ListBoxItem<T> {
-			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
-				return i;
-			else
-				return (i >= 0 && i < static_cast<int>(items.size())) ? items[i] : std::string{};
-		};
-
-		if constexpr (kMultiSelect)
-		{
-			T value;
-			value.reserve(indices.size());
-			for (int i : indices)
-				value.push_back(itemAt(i));
-			return value;
-		}
-		else
-		{
-			return indices.empty() ? itemAt(-1) : itemAt(indices.front());
-		}
+		return listValueFor<T>(items, indices);
 	}
 
 	// Commit a new selection: the value first, then the user callback, so a
@@ -888,6 +904,66 @@ extern template class ListBoxWrapper<int>;
 extern template class ListBoxWrapper<std::string>;
 extern template class ListBoxWrapper<std::vector<int>>;
 extern template class ListBoxWrapper<std::vector<std::string>>;
+
+// CheckListBoxWrapper -----------------------------------------------------------
+// A list with a checkbox per row. The CHECKED SET is the value -- always a
+// vector (see CheckListValue) -- and it is carried as indices inside the
+// wrapper, decoded through the same listIndicesFor()/listValueFor() pair
+// ListBoxWrapper uses. Highlight selection is whatever the native list does
+// with a click and is deliberately not part of the value: a row can be
+// highlighted without being ticked, and the caller only ever asked about ticks.
+template <CheckListValue T>
+class CheckListBoxWrapper : public ControlWrapper
+{
+public:
+	CheckListBoxWrapper(std::vector<std::string> items,
+		BoundValue<T> checked, int visibleRows, const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_visibleRows(visibleRows)
+		, m_value(std::move(checked))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
+	{
+		return listIndicesFor<T>(items, value);
+	}
+
+	static T valueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
+	{
+		return listValueFor<T>(items, indices);
+	}
+
+	// Commit a new checked set: the value first, then the user callback, so a
+	// handler reading the bound value sees the new one.
+	void commit(const std::vector<int>& indices)
+	{
+		m_value.set(valueFor(m_items, indices));
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+
+	const T& boundValue() const { return m_value.get(); }
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = 1;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+extern template class CheckListBoxWrapper<std::vector<int>>;
+extern template class CheckListBoxWrapper<std::vector<std::string>>;
 
 // TreeViewWrapper -----------------------------------------------------------
 // Hierarchical, collapsible item list. The selection is carried as item PATHS

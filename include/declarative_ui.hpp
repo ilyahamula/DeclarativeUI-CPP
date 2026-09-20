@@ -27,6 +27,14 @@ static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);
 static_assert(NodeBuildable<ListBox<std::vector<int>>>);
 static_assert(NodeBuildable<ListBox<std::vector<std::string>>>);
+static_assert(NodeBuildable<CheckListBox<std::vector<int>>>);
+static_assert(NodeBuildable<CheckListBox<std::vector<std::string>>>);
+// A checked SET is always a vector: there is no single-value CheckListBox
+// spelling, so the two ListBox selection types must not compile here.
+static_assert(CheckListValue<std::vector<int>>);
+static_assert(CheckListValue<std::vector<std::string>>);
+static_assert(!CheckListValue<int>);
+static_assert(!CheckListValue<std::string>);
 static_assert(NodeBuildable<TreeView<std::string>>);
 static_assert(NodeBuildable<TreeView<std::vector<std::string>>>);
 static_assert(NodeBuildable<Table<int>>);
@@ -57,6 +65,7 @@ static_assert(ContextMenuHost<ToolBar>);
 static_assert(ContextMenuHost<StatusBar>);
 static_assert(ContextMenuHost<FilePicker>);
 static_assert(ContextMenuHost<Table<int>>);
+static_assert(ContextMenuHost<CheckListBox<std::vector<int>>>);
 static_assert(!ContextMenuHost<VStack<Button>>);
 static_assert(!ContextMenuHost<HStack<Button>>);
 static_assert(!ContextMenuHost<TabPanel<Tab<VStack<Button>>>>);

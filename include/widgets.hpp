@@ -739,6 +739,88 @@ ListBox(std::vector<std::string>, T&) -> ListBox<T>;
 template <ListBoxValue T>
 ListBox(std::vector<std::string>, const T&) -> ListBox<T>;
 
+// CheckListBox -----------------------------------------------------------
+// A list with a checkbox on every row. The bound value is the CHECKED SET, so
+// it is always a vector: std::vector<int> names the ticked items by position,
+// std::vector<std::string> by their text -- the same two readings a
+// multi-select ListBox binding has, decoded by the same helpers. There is no
+// single-value spelling because "one box ticked" is not a different control.
+//
+// Highlight selection is not part of the value: clicking a row highlights it on
+// every backend, but only the box says checked.
+template <CheckListValue T>
+struct CheckListBox : Widget<CheckListBox<T>>
+{
+	using super = Widget<CheckListBox<T>>;
+
+	// Rows shown before the list scrolls, driving the intrinsic height on all
+	// three backends for the reason ListBox needs the same knob: their native
+	// hints disagree far too much for the same tree to lay out identically.
+	static constexpr int kDefaultVisibleRows = ListBox<T>::kDefaultVisibleRows;
+
+	explicit CheckListBox(std::vector<std::string> items)
+		: super()
+		, m_items(std::move(items))
+	{
+		// Nothing ticked is the honest default: a checked set the caller never
+		// asked for would be a decision made on their behalf.
+	}
+
+	CheckListBox(std::vector<std::string> items, const T& checked)
+		: super()
+		, m_items(std::move(items))
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox(std::vector<std::string> items, T& checked)
+		: super()
+		, m_items(std::move(items))
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	CheckListBox& onChange(std::function<void(const T&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	CheckListBox& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<CheckListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = kDefaultVisibleRows;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+template <CheckListValue T>
+CheckListBox(std::vector<std::string>, T&) -> CheckListBox<T>;
+
+template <CheckListValue T>
+CheckListBox(std::vector<std::string>, const T&) -> CheckListBox<T>;
+
 // TreeView -----------------------------------------------------------
 // Hierarchical, collapsible list. Items are a nested TreeItem literal and the
 // selection is an item's PATH -- its labels from the root joined by '/' --

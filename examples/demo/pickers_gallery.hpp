@@ -1,8 +1,8 @@
 #pragma once
 
-// Pickers: the gallery dialog for FilePicker and the one-shot FileDialog,
-// alongside a few already-implemented controls for context (StaticText,
-// TextCtrl, Button, CheckBox, Separator).
+// Pickers: the gallery dialog for FilePicker, the CheckListBox and the one-shot
+// FileDialog, alongside a few already-implemented controls for context
+// (StaticText, TextCtrl, Button, CheckBox, Separator).
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so the
 // pickers land here instead.
@@ -27,6 +27,12 @@
 //   * CANCELLING leaves the path alone. Cancel is not a selection of "" -- the
 //     empty string is what onResult reports, but nothing is written.
 //
+// The CheckListBox in the middle is a list with a checkbox on every row. Its
+// value is the CHECKED SET and so is always a vector: std::vector<std::string>
+// here names the ticked plugins by their text, std::vector<int> would name them
+// by position. Highlight selection is NOT part of it -- a row can be
+// highlighted without being ticked on all three backends.
+//
 // The FileDialog button below is the other half of T3.1: a one-shot dialog that
 // is not a widget at all, called from a handler exactly as MessageBox is. Note
 // it is BLOCKING on wx and Qt and non-blocking on ImGui, where nothing may stop
@@ -41,9 +47,23 @@
 #include "filedialog.hpp"
 
 #include <string>
+#include <vector>
+
+// The checked set read back as one line. Callers seed their summary string with
+// it so the field below starts out agreeing with the boxes.
+inline std::string pluginSummary(const std::vector<std::string>& plugins)
+{
+    if (plugins.empty())
+        return "(none)";
+    std::string text = plugins.front();
+    for (std::size_t i = 1; i < plugins.size(); ++i)
+        text += ", " + plugins[i];
+    return text;
+}
 
 inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
-    std::string& folderPath, std::string& lastDialogResult, bool& pickersDisabled)
+    std::string& folderPath, std::string& lastDialogResult, bool& pickersDisabled,
+    std::vector<std::string>& enabledPlugins, std::string& enabledSummary)
 {
     constexpr int kRowH = 28;
     constexpr int kLabelH = 20;
@@ -51,6 +71,8 @@ inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
     constexpr int kLabelW = 96;
     constexpr Size kPickerSize { 380, 28 };
     constexpr Size kButtonSize { 150, 28 };
+    constexpr int kPluginsW = 220;
+    constexpr int kSummaryW = 270;
 
     return Dialog {
         "Pickers Gallery",
@@ -109,6 +131,52 @@ inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
                 CheckBox{pickersDisabled, "Disable the pickers above"}
                     .withSize({-1, kRowH})
                     .withFlags(LayoutFlags().Border(Side::Top, 8))
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            VGroupBox { "CheckListBox",
+                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                StaticText{"A checkbox per row; the bound vector IS the checked set."}
+                    .withSize({-1, kLabelH}),
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    // withVisibleRows() drives the intrinsic HEIGHT on all three
+                    // backends -- their native hints disagree far too much
+                    // otherwise (wx sizes to the item count, Qt returns a fixed
+                    // ~192 px, ImGui has no hint at all). The width is pinned
+                    // for the same reason the pickers above are.
+                    CheckListBox{
+                        {"Formatter", "Linter", "Debugger", "Profiler", "Spell check"},
+                        enabledPlugins}
+                        .withVisibleRows(4)
+                        .withSize({kPluginsW, -1})
+                        .withTooltip("Tick the plugins to load at startup")
+                        .isDisabled(pickersDisabled)
+                        // Value first, then the callback: the bound vector is
+                        // already the new set when this runs, so it is also
+                        // what the handler is handed.
+                        .onChange([&enabledSummary](const std::vector<std::string>& plugins) {
+                            enabledSummary = pluginSummary(plugins);
+                        }),
+                    Spacer{Size{12, 0}},
+                    // The same set as text. A BOUND, disabled field rather than
+                    // a ReadonlyTextCtrl, for the reason the FileDialog result
+                    // below is one: the readonly control owns a copy of its text
+                    // and would never show a value that arrives later on wx and
+                    // Qt, where the tree is built once.
+                    VStack {
+                        LayoutFlags().Expand(),
+                        StaticText{"Enabled:"}.withSize({-1, kLabelH}),
+                        TextCtrl{enabledSummary}
+                            .withSize({kSummaryW, kRowH})
+                            .withFlags(LayoutFlags().Border(Side::Top, 4))
+                            .isDisabled(),
+                        Spacer{}
+                    }
+                }
             },
 
             Separator{}

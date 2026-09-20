@@ -3,30 +3,32 @@
 #include <QApplication>
 
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // T3.1 demo state: locals of main, so the bound refs outlive the modeless
+    // T3.2 demo state: locals of main, so the bound refs outlive the modeless
     // dialogs that read them for the whole of exec().
     std::string openPath = "examples/main_qt.cpp";
     std::string savePath;
     std::string folderPath;
     std::string lastDialogResult = "(nothing picked yet)";
     bool pickersDisabled = false;
-    std::string sharedPath = "include/widgets.hpp";
-    bool boundPickersDisabled = false;
+    std::vector<std::string> enabledPlugins { "Formatter", "Debugger" };
+    std::string enabledSummary = pluginSummary(enabledPlugins);
+    std::vector<std::string> modules { "Core", "Storage" };
+    bool moduleListsDisabled = false;
 
-    // The pickers gallery: FilePicker in all three modes and the one-shot
-    // FileDialog. On Qt the picker is a QLineEdit + QToolButton composite --
-    // there is no native picker control -- and Browse runs the BLOCKING
-    // QFileDialog, so the control flow matches wx exactly.
+    // The pickers gallery, now carrying T3.2's CheckListBox: on Qt a
+    // QListWidget whose items are ItemIsUserCheckable, with itemChanged
+    // connected only after population.
     drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
-        pickersDisabled).show();
-    // The binding demo: two FilePickers and a TextCtrl over one string. Pick in
-    // either picker, or type in the field, and the other two follow.
-    drawFilePickerBinding(sharedPath, boundPickersDisabled).show();
+        pickersDisabled, enabledPlugins, enabledSummary).show();
+    // The binding demo: two CheckListBoxes and a ListBox over one
+    // std::vector<std::string>. Tick in either list and the others follow.
+    drawCheckListBinding(modules, moduleListsDisabled).show();
 
     return app.exec();
 }

@@ -28,6 +28,7 @@
 #include <wx/settings.h>
 #include <wx/collheaderctrl.h>
 #include <wx/filepicker.h>
+#include <wx/checklst.h>
 
 #include "frameworks_core/wx/FileDialogSupport.hpp"
 
@@ -1246,6 +1247,92 @@ template class ListBoxWrapper<int>;
 template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
+
+// CheckListBoxWrapper -----------------------------------------------------------
+
+namespace
+{
+
+std::vector<int> checkListChecked(const wxCheckListBox* list)
+{
+	std::vector<int> indices;
+	for (unsigned int i = 0; i < list->GetCount(); ++i)
+	{
+		if (list->IsChecked(i))
+			indices.push_back(static_cast<int>(i));
+	}
+	return indices;
+}
+
+// Programmatic ticking: wxCheckListBox::Check() does not fire
+// wxEVT_CHECKLISTBOX, so this never re-enters the user's onChange -- which is
+// what the ref sync needs of a push.
+void setCheckListChecked(wxCheckListBox* list, const std::vector<int>& indices)
+{
+	for (unsigned int i = 0; i < list->GetCount(); ++i)
+		list->Check(i, std::find(indices.begin(), indices.end(), static_cast<int>(i)) != indices.end());
+}
+
+} // unnamed namespace
+
+template <CheckListValue T>
+void CheckListBoxWrapper<T>::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("CheckListBoxWrapper::realize()\t-> new wxCheckListBox()\n");
+#endif
+	wxArrayString items;
+	for (const auto& item : m_items)
+		items.Add(item);
+
+	// Single-SELECTION, whatever the checked set holds: the highlight and the
+	// ticks are independent, and a multi-selection highlight would only suggest
+	// otherwise.
+	auto* list = new wxCheckListBox(static_cast<wxWindow*>(parentWindow), wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items,
+		m_style | wxLB_SINGLE | wxLB_NEEDED_SB);
+	setCheckListChecked(list, indicesFor(m_items, boundValue()));
+	m_nativeWidget = list;
+
+	// Same reason ListBoxWrapper pins its height: the native best size grows
+	// with the item count, so a long list would ask for a window taller than
+	// the screen. visibleRows is what makes the three backends agree.
+	constexpr int kListBoxFrame = 6; // border the native box draws around its rows
+	const wxSize best = list->GetBestSize();
+	const int rowHeight = list->GetCharHeight() + 2;
+	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		list->Bind(wxEVT_CHECKLISTBOX, [&value, list, items = m_items, cb = std::move(m_onChange),
+			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
+			value = valueFor(items, checkListChecked(list));
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		bindExternalRefSync(list,
+			[list] { return checkListChecked(list); },
+			[&value, items = m_items] { return indicesFor(items, value); },
+			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
+	}
+	else if (m_onChange)
+	{
+		list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, cb = std::move(m_onChange)](wxCommandEvent&) {
+			cb(valueFor(items, checkListChecked(list)));
+		});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, cbw = std::move(m_onChangeWithWidget),
+			nw = m_nativeWidget](wxCommandEvent&) {
+			cbw(valueFor(items, checkListChecked(list)), nw);
+		});
+	}
+}
+
+template class CheckListBoxWrapper<std::vector<int>>;
+template class CheckListBoxWrapper<std::vector<std::string>>;
 
 // TreeViewWrapper -----------------------------------------------------------
 

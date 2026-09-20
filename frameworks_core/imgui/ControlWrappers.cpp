@@ -787,6 +787,70 @@ template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
 
+// CheckListBoxWrapper -----------------------------------------------------------
+
+template <CheckListValue T>
+Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	// ListBoxWrapper's shape plus what the boxes cost: ImGui draws a checkbox
+	// square of one frame height followed by ItemInnerSpacing before the label.
+	const ImGuiStyle& style = ImGui::GetStyle();
+	float widest = 0.0f;
+	for (const auto& item : m_items)
+		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
+	const float boxWidth = ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
+	const float w = widest + boxWidth + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
+		+ style.FramePadding.y * 2.0f;
+	return Size { ceilInt(w), ceilInt(h) };
+}
+
+template <CheckListValue T>
+void CheckListBoxWrapper<T>::render(const Rect& frame)
+{
+	WidgetSnapshot<T> snapshot(m_value);
+	// Read the checked set back from the binding every frame: the tree is
+	// rebuilt per frame anyway, so a value written from anywhere else is picked
+	// up for free -- no ref sync needed here, unlike the retained backends.
+	std::vector<int> checked = indicesFor(m_items, boundValue());
+
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, 0.0f); // 0 = ImGui's default list-box size
+	ImGui::PushID(snapshot.id());
+	if (ImGui::BeginListBox("##checklistbox", box))
+	{
+		for (int i = 0; i < (int)m_items.size(); ++i)
+		{
+			const auto at = std::find(checked.begin(), checked.end(), i);
+			bool ticked = at != checked.end();
+			// Per-row id: two items may legitimately carry the same label, and
+			// the label is all Checkbox has to key itself by.
+			ImGui::PushID(i);
+			const bool toggled = ImGui::Checkbox(m_items[i].c_str(), &ticked);
+			ImGui::PopID();
+			if (!toggled)
+				continue;
+
+			// Kept sorted, so the bound vector reads in list order whichever
+			// way the user ticked it -- the retained backends report it that
+			// way because they walk the rows.
+			std::vector<int> next = checked;
+			if (const auto it = std::find(next.begin(), next.end(), i); it != next.end())
+				next.erase(it);
+			else
+				next.insert(std::upper_bound(next.begin(), next.end(), i), i);
+			commit(next);
+			checked = std::move(next);
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopID();
+}
+
+template class CheckListBoxWrapper<std::vector<int>>;
+template class CheckListBoxWrapper<std::vector<std::string>>;
+
 // TreeViewWrapper -----------------------------------------------------------
 
 template <TreeViewValue T>

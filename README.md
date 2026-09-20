@@ -59,7 +59,7 @@ return Dialog {
 | Text              | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput`, `MultiLineTextCtrl` |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
-| Lists & tables    | `ListBox<T>`, `TreeView<T>`, `Table<T>` |
+| Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
@@ -69,11 +69,30 @@ return Dialog {
 | Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
-`ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
-intrinsic height identically on every backend — the native hints disagree far too much
-for the same tree to lay out the same way otherwise. `TreeView` addresses items by path
-(`"src/engine"`) rather than index; `Table` columns are individually sortable and
-editable, and rows keep their original index so a binding survives sorting.
+`ListBox`, `CheckListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which
+drives their intrinsic height identically on every backend — the native hints disagree
+far too much for the same tree to lay out the same way otherwise. `TreeView` addresses
+items by path (`"src/engine"`) rather than index; `Table` columns are individually
+sortable and editable, and rows keep their original index so a binding survives sorting.
+
+`CheckListBox` is a list with a checkbox on every row, and its bound value **is** the
+checked set — so it is always a vector, and there is no single-value spelling because
+"one box ticked" is not a different control. Highlight selection is deliberately not
+part of it: a row can be highlighted without being ticked.
+
+```cpp
+CheckListBox{ {"Formatter", "Linter", "Debugger"}, enabledPlugins }  // vector<string>: by text
+    .withVisibleRows(4)
+    .onChange([&](const std::vector<std::string>& on) { reload(on); })
+
+CheckListBox{ items, checkedRows }                                   // vector<int>: by position
+```
+
+Which vector you bind decides how the ticks are named: `std::vector<std::string>` names
+them by item *text*, so two lists holding the same items in a different order tick the
+same rows; `std::vector<int>` names them by *position*, which is the right choice when
+the labels are not unique. Both decode through the same helpers `ListBox`'s multi-select
+bindings use, so what one control calls "ticked" the other calls "selected".
 
 `HSplitter` / `VSplitter` are arranged by the engine rather than by a native
 splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, which
