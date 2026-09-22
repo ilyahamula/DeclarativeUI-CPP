@@ -228,8 +228,18 @@ void StaticTextWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("StaticTextWrapper::realize()\t-> new wxStaticText()\n");
 #endif
+	// wxST_NO_AUTORESIZE rides with the alignment bits and only with them: a
+	// wxStaticText shrinks itself back to its text on every SetLabel otherwise,
+	// and there would be no slack left in the frame to align in. A Left label
+	// keeps exactly the style it always had.
+	long align = 0;
+	if (m_align == TextAlign::Center)
+		align = wxALIGN_CENTRE_HORIZONTAL | wxST_NO_AUTORESIZE;
+	else if (m_align == TextAlign::Right)
+		align = wxALIGN_RIGHT | wxST_NO_AUTORESIZE;
+
 	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | align);
 
 }
 
@@ -621,6 +631,85 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 
 // ImageWrapper -----------------------------------------------------------
 
+namespace
+{
+	// A wxStaticBitmap that remembers the picture it was given.
+	//
+	// It has to: a wxStaticBitmap draws its bitmap at its top-left and clips,
+	// so it can do Stretch and nothing else -- every other mode needs the
+	// picture COMPOSED against the frame first, and composing repeatedly from
+	// an already-composed bitmap would lose everything the last crop threw away.
+	//
+	// There is deliberately no wxEVT_SIZE handler here. wxStaticBitmap does not
+	// deliver one on wxOSX, so the frame arrives through ControlWrapper::placed()
+	// instead -- which is the engine telling us directly, and therefore the same
+	// moment on every wx port.
+	// NOTE the leading "::" on every ScaleMode below. wxStaticBitmap has a
+	// nested ScaleMode of its own (Scale_AspectFit and friends) which would
+	// otherwise shadow ours -- and it is not a substitute: it has no Center,
+	// and the point of R13.3 is that all three backends compute the same
+	// rectangle from the same helper rather than each trusting its own native
+	// idea of what "fit" means.
+	class ScaledBitmapCtrl : public wxStaticBitmap
+	{
+	public:
+		ScaledBitmapCtrl(wxWindow* parent, const wxImage& source,
+			::ScaleMode mode, const wxPoint& pos, const wxSize& size, long style)
+			: wxStaticBitmap(parent, wxID_ANY, wxBitmap(source), pos, size, style)
+			, m_source(source)
+			, m_mode(mode)
+		{
+			// The natural size is what the measure pass should read, and a
+			// wxStaticBitmap derives it from whatever bitmap it holds -- which
+			// stops being the original as soon as we compose. Pinned here, the
+			// same move applyHint() makes across SetHint(). An explicit
+			// withSize() still overrides it per axis in measureContent().
+			CacheBestSize(wxSize(source.GetWidth(), source.GetHeight()));
+		}
+
+		// Guarded on the size it last composed at, so a relayout that did not
+		// move this picture costs no scaling at all -- and SetBitmap's own
+		// best-size update can never drive a second pass, since the composed
+		// bitmap is exactly the size the control already has.
+		void composeFor(const wxSize& box)
+		{
+			if (!m_source.IsOk() || box.x <= 0 || box.y <= 0 || box == m_composed)
+				return;
+			m_composed = box;
+
+			const Rect target = scaledImageRect(m_mode,
+				Size { m_source.GetWidth(), m_source.GetHeight() },
+				Size { box.x, box.y });
+
+			wxImage picture = (target.width == m_source.GetWidth()
+					&& target.height == m_source.GetHeight())
+				? m_source
+				: m_source.Scale(target.width, target.height, wxIMAGE_QUALITY_HIGH);
+			if (!picture.HasAlpha())
+				picture.InitAlpha();   // opaque, so the paste below carries it over
+
+			// Everything the mode does not cover stays transparent, so a Fit
+			// letterbox shows the parent through it exactly as Qt's does and as
+			// undrawn pixels do on ImGui.
+			wxImage canvas(box.x, box.y);
+			canvas.SetRGB(wxRect(0, 0, box.x, box.y), 0, 0, 0);
+			canvas.InitAlpha();
+			std::memset(canvas.GetAlpha(), wxIMAGE_ALPHA_TRANSPARENT,
+				static_cast<size_t>(box.x) * static_cast<size_t>(box.y));
+
+			// Paste clips on every side by itself, which IS the crop for Fill
+			// and Center: the target rect is deliberately allowed to overflow.
+			canvas.Paste(picture, target.x, target.y, wxIMAGE_ALPHA_BLEND_OVER);
+			SetBitmap(wxBitmap(canvas));
+		}
+
+	private:
+		wxImage m_source;
+		::ScaleMode m_mode = ::ScaleMode::Stretch;
+		wxSize m_composed { -1, -1 };
+	};
+}
+
 void ImageWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
@@ -632,11 +721,12 @@ void ImageWrapper::realize(void* parentWindow)
 		wxInitAllImageHandlers();
 		s_handlersInit = true;
 	}
-	wxImage wxImg(m_filePath, wxBITMAP_TYPE_ANY);
-	if (wxImg.IsOk() && m_size.width > 0 && m_size.height > 0)
-		wxImg = wxImg.Scale(m_size.width, m_size.height, wxIMAGE_QUALITY_HIGH);
-	wxBitmap bmp(wxImg.IsOk() ? wxImg : wxImage(16, 16));
-	auto* bmpCtrl = new wxStaticBitmap(static_cast<wxWindow*>(parentWindow), wxID_ANY, bmp,
+
+	// The ORIGINAL picture goes in, unscaled: the scaling needs the frame, and
+	// the frame is not decided until the engine places the control.
+	wxImage source(m_filePath, wxBITMAP_TYPE_ANY);
+	auto* bmpCtrl = new ScaledBitmapCtrl(static_cast<wxWindow*>(parentWindow),
+		source.IsOk() ? source : wxImage(16, 16), m_scaleMode,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = bmpCtrl;
 
@@ -650,6 +740,12 @@ void ImageWrapper::realize(void* parentWindow)
 	else if (m_onHoverWithWidget)
 		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
+}
+
+void ImageWrapper::placed(const Rect& frame)
+{
+	if (auto* bmpCtrl = static_cast<ScaledBitmapCtrl*>(m_nativeWidget))
+		bmpCtrl->composeFor(wxSize(frame.width, frame.height));
 }
 
 // ToolBarWrapper -----------------------------------------------------------

@@ -3,40 +3,47 @@
 #include <QApplication>
 
 #include <string>
-#include <vector>
 
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
 
-    // T3.2 demo state: locals of main, so the bound refs outlive the modeless
-    // dialogs that read them for the whole of exec().
-    std::string openPath = "examples/main_qt.cpp";
-    std::string savePath;
-    std::string folderPath;
-    std::string lastDialogResult = "(nothing picked yet)";
-    bool pickersDisabled = false;
-    std::vector<std::string> enabledPlugins { "Formatter", "Debugger" };
-    std::string enabledSummary = pluginSummary(enabledPlugins);
-    // T3.3: both start EMPTY, which is the state a placeholder is for.
-    std::string searchTerm;
-    std::string apiKey;
-    // T3.4: the shared float and the two halves of the busy flag. `idle` is
-    // the complement isDisabled() cannot express -- it binds a bool, not `!bool`.
-    float progress = 35.0f;
-    bool busy = false;
-    bool idle = true;
+    // T3.5 demo state: locals of main, so the bound refs outlive the modeless
+    // dialogs that read them for the whole of exec(). The scale/align dialog
+    // needs one flag -- neither a picture nor a label has a value of its own
+    // to share, so isDisabled() is
+    // the binding those two read-only widgets can offer. The Account form's
+    // three strings are what make its right-aligned labels a real form rather
+    // than a ruler.
+    bool displaysDisabled = false;
+    std::string accountName = "Ada Lovelace";
+    std::string accountEmail = "ada@example.com";
+    std::string accountPassword = "analytical";
+    bool accountLocked = false;
+    // Controls-gallery state, for the Preview picture that now carries Fit.
+    std::string multilineText = "Type something here...";
+    std::string galleryPassword;
+    int spinInt = 42;
+    float spinFloat = 1.5f;
+    Date date { .year = 2026, .month = 9, .day = 22 };
+    Time time { .hour = 9, .minute = 30, .second = 0 };
+    bool toggle = false;
+    float galleryProgress = 0.35f;
+    std::string tabNote = "Add notes here...";
+    bool tabLogging = false;
+    Color themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // T3.4's gallery: a determinate bar next to a busy one. On Qt the busy
-    // half is an empty range and nothing else -- QProgressBar animates the
-    // indicator itself and ignores setValue().
-    drawIndeterminateProgressUI().show();
-    // The pickers gallery it was split out of, for the surrounding context.
-    drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
-        pickersDisabled, enabledPlugins, enabledSummary, searchTerm, apiKey).show();
-    // The binding demo: a determinate bar sharing a float with a slider, next
-    // to a valueless one, with a checkbox picking which half is live.
-    drawIndeterminateProgressBinding(progress, busy, idle).show();
+    // T3.5's gallery: one file in one frame under all four scale modes, and
+    // one band under all three alignments. On Qt the picture is composed into
+    // a frame-sized QPixmap on resizeEvent -- a QLabel scales only by
+    // setScaledContents(), which is Stretch and nothing else.
+    drawScaleAndAlignUI(displaysDisabled).show();
+    // withAlign() in a real form: the labels stretch across column 0 of the
+    // Grid, so their colons line up against the fields.
+    drawAccountFormUI(accountName, accountEmail, accountPassword, accountLocked).show();
+    // The controls gallery, whose Preview picture now carries Fit.
+    drawControlsUI(multilineText, galleryPassword, spinInt, spinFloat, date, time,
+        toggle, galleryProgress, tabNote, tabLogging, themeColor).show();
 
     return app.exec();
 }

@@ -40,3 +40,22 @@ template <typename T>
 concept PlaceholderHost = requires(T element, std::string hint) {
 	{ element.withPlaceholder(std::move(hint)) } -> std::same_as<T&>;
 };
+
+// A picture that can say what happens to its pixels inside the frame the
+// engine gave it. Image alone: every other leaf either has no pixels of its
+// own to scale (a label, a field) or hands them to a native control that
+// decides for itself (a tool's icon), so the modifier lives on the one widget
+// that can keep the promise on all three backends.
+template <typename T>
+concept ScaleModeHost = requires(T element) {
+	{ element.withScaleMode(ScaleMode::Fit) } -> std::same_as<T&>;
+};
+
+// A label whose text can be aligned inside its frame. StaticText alone: a
+// button, a check box or a field centres or left-aligns its own text by
+// platform convention, and overriding that would look wrong rather than
+// consistent.
+template <typename T>
+concept TextAlignHost = requires(T element) {
+	{ element.withAlign(TextAlign::Right) } -> std::same_as<T&>;
+};

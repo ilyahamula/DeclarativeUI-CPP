@@ -209,13 +209,17 @@ private:
 };
 
 // StaticTextWrapper -----------------------------------------------------------
+// The alignment is a plain TextAlign, not a BoundValue, for the same reason a
+// placeholder is a plain string: it is decided when the tree is described and
+// nothing writes it afterwards, so there is nothing for a ref sync to poll.
 class StaticTextWrapper : public ControlWrapper
 {
 public:
-	StaticTextWrapper(const std::string& text,
+	StaticTextWrapper(const std::string& text, TextAlign align,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
+		, m_align(align)
 	{
 	}
 
@@ -223,6 +227,7 @@ public:
 
 private:
 	std::string m_text;
+	TextAlign m_align = TextAlign::Left;
 };
 
 // DatePickerWrapper -----------------------------------------------------------
@@ -436,7 +441,7 @@ private:
 class ImageWrapper : public ControlWrapper
 {
 public:
-	ImageWrapper(const std::string& filePath,
+	ImageWrapper(const std::string& filePath, ScaleMode scaleMode,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {},
 		std::function<void(void*)> onClickWithWidget = {},
@@ -444,6 +449,7 @@ public:
 		std::function<void(void*)> onHoverWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_filePath(filePath)
+		, m_scaleMode(scaleMode)
 		, m_displayWidth(size.width)
 		, m_displayHeight(size.height)
 		, m_onClick(std::move(onClick))
@@ -454,9 +460,19 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+#if defined(USE_WX) || defined(USE_QT)
+	// The one wrapper that needs the frame AFTER the engine has computed it:
+	// every mode but Stretch decides what the pixels do from the frame's shape,
+	// and neither a wxStaticBitmap nor a QLabel can work that out for itself.
+	void placed(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_filePath;
+	// What the pixels do inside the engine's frame. The frame itself is not
+	// known until the control is placed, which is why every backend applies
+	// this later than realize()/measure -- see the wrappers.
+	ScaleMode m_scaleMode = ScaleMode::Stretch;
 	void* m_textureId = nullptr; // ImTextureID (void*) holding the GL texture handle
 	int m_imgWidth = 0;
 	int m_imgHeight = 0;

@@ -172,17 +172,29 @@ struct StaticText : Widget<StaticText>
 	{
 	}
 
+	// Where the text sits in the frame the engine assigned this label.
+	//
+	// It only shows once the frame is WIDER than the text, and a leaf sits at
+	// its desired width by default -- so this is written alongside Expand(), a
+	// SizeGroup or a Grid band, which is what gives it the slack to align in.
+	StaticText& withAlign(TextAlign align)
+	{
+		m_align = align;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<StaticTextWrapper>(m_text, pos, size, style);
+		return std::make_unique<StaticTextWrapper>(m_text, m_align, pos, size, style);
 	}
 
 private:
 	std::string m_text;
+	TextAlign m_align = TextAlign::Left;
 };
 
 // TextCtrl -----------------------------------------------------------
@@ -1817,17 +1829,28 @@ struct Image : Widget<Image>
 		return *this;
 	}
 
+	// What happens to the picture inside the frame withSize() and the flags
+	// gave it. The frame is unchanged by every mode -- the engine owns that --
+	// so this is about pixels only. Stretch is the default, which is what the
+	// framework did before there was a choice.
+	Image& withScaleMode(ScaleMode mode)
+	{
+		m_scaleMode = mode;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ImageWrapper>(m_filePath, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
+		return std::make_unique<ImageWrapper>(m_filePath, m_scaleMode, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
 	}
 
 private:
 	std::string m_filePath;
+	ScaleMode m_scaleMode = ScaleMode::Stretch;
 	std::function<void()> m_onClick;
 	std::function<void()> m_onHover;
 	std::function<void(void*)> m_onClickWithWidget;

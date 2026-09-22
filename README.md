@@ -56,13 +56,13 @@ return Dialog {
 
 | Category          | Widgets |
 |-------------------|---------|
-| Text              | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
+| Text              | `StaticText` (`.withAlign()`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
-| Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` |
+| Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
@@ -178,6 +178,39 @@ Each backend answers with its own drawing mode — `wxGauge::Pulse()`, an empty
 `QProgressBar` range, a negative ImGui fraction — and **wx is the only one that needs a
 clock**: wxGTK advances the marquee one step per `Pulse()`, so the wrapper runs a 100 ms
 timer rather than riding the idle sync, which stops when the event queue drains.
+
+`Image{...}.withScaleMode(...)` says what happens to the **pixels** inside the frame the
+engine gave the picture. The frame itself never moves — `withSize()` and the flags decide
+that, as they do for every other leaf — so the four modes differ only in what is drawn in
+it, and all three backends compute the rectangle from the same helper.
+
+```cpp
+Image{ "images/Cat03.jpg" }.withSize({ 180, 100 }).withScaleMode(ScaleMode::Fit)
+```
+
+| Mode | What fills the frame |
+|------|----------------------|
+| `Stretch` | the whole picture, aspect ratio ignored — the default |
+| `Fit` | the largest uniform scale that fits **inside** the frame; letterboxed |
+| `Fill` | the smallest uniform scale that **covers** the frame; cropped |
+| `Center` | no scaling at all; centred, and cropped where it overflows |
+
+Anything the mode does not cover is left transparent, so a letterbox shows whatever is
+behind the picture. **No native control does this by itself** — a `wxStaticBitmap` draws
+its bitmap at the top-left and clips, a `QLabel` scales only by `setScaledContents()`
+(which is `Stretch` and nothing else) — so the retained backends compose the picture
+against the frame when the engine places it.
+
+`StaticText{...}.withAlign(...)` puts a label's text at the `Left`, `Center` or `Right` of
+its frame. It only shows once the frame is **wider** than the text, and a leaf sits at its
+desired width by default, so it is written alongside `Expand()`, a `SizeGroup` or a `Grid`
+band — whichever is giving the label its slack.
+
+```cpp
+StaticText{ "Password:" }
+    .withAlign(TextAlign::Right)
+    .withFlags(LayoutFlags().Expand().CenterVertical())   // fill the Grid's label column
+```
 
 `FilePicker` is a path field with a Browse button, in one of three modes. **Both** ways
 of setting the path commit identically — picking one in the dialog and typing one into

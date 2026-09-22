@@ -178,6 +178,12 @@ inline auto drawLayoutPrimitivesUI(bool& rowsDisabled)
 // The labels are CenterVertical() so they sit against the middle of the taller
 // field beside them; a cell's alignment resolves per axis, exactly as it does
 // on a Stack's cross axis.
+//
+// They are also the demo for withAlign(). Right-aligned labels only read as
+// right-aligned once there is slack to align in, which is the Expand() beside
+// the CenterVertical(): that stretches each label across the whole of column 0
+// -- one band sized to "Password:" -- so the three colons line up against the
+// fields instead of ragging out from the left edge.
 inline auto drawAccountFormUI(
     std::string& name,
     std::string& email,
@@ -195,8 +201,9 @@ inline auto drawAccountFormUI(
             LayoutFlags().Expand().Border(Side::All, 12),
             Grid { 3, LayoutFlags().Expand().MinSize({520, -1}),
                 StaticText{"Name:"}
+                    .withAlign(TextAlign::Right)
                     .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().CenterVertical()),
+                    .withFlags(LayoutFlags().Expand().CenterVertical()),
                 TextCtrl{name}
                     .withSize({-1, kFieldH})
                     .withFlags(LayoutFlags().Proportion(1).Expand())
@@ -207,8 +214,9 @@ inline auto drawAccountFormUI(
                     .isDisabled(formDisabled),
 
                 StaticText{"E-mail:"}
+                    .withAlign(TextAlign::Right)
                     .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().CenterVertical()),
+                    .withFlags(LayoutFlags().Expand().CenterVertical()),
                 TextCtrl{email}
                     .withSize({-1, kFieldH})
                     .withFlags(LayoutFlags().Proportion(1).Expand())
@@ -219,8 +227,9 @@ inline auto drawAccountFormUI(
                     .isDisabled(formDisabled),
 
                 StaticText{"Password:"}
+                    .withAlign(TextAlign::Right)
                     .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().CenterVertical()),
+                    .withFlags(LayoutFlags().Expand().CenterVertical()),
                 PasswordInput{password}
                     .withSize({-1, kFieldH})
                     .withFlags(LayoutFlags().Proportion(1).Expand())

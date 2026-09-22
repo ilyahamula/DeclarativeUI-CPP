@@ -28,6 +28,7 @@ static_assert(NodeBuildable<ProgressBar>);
 // Indeterminate() needs the valueless spelling: a busy bar has no number to show.
 static_assert(std::is_default_constructible_v<ProgressBar>);
 static_assert(NodeBuildable<FilePicker>);
+static_assert(NodeBuildable<Image>);
 static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);
 static_assert(NodeBuildable<ListBox<std::vector<int>>>);
@@ -81,6 +82,14 @@ static_assert(PlaceholderHost<TextCtrl>);
 static_assert(PlaceholderHost<PasswordInput>);
 static_assert(!PlaceholderHost<MultiLineTextCtrl>);
 static_assert(!PlaceholderHost<ReadonlyTextCtrl>);
+// withScaleMode() belongs to the one widget that owns pixels of its own, and
+// withAlign() to the one that is nothing but text in a frame -- asking any
+// other leaf for either must not compile.
+static_assert(ScaleModeHost<Image>);
+static_assert(!ScaleModeHost<StaticText>);
+static_assert(TextAlignHost<StaticText>);
+static_assert(!TextAlignHost<Image>);
+static_assert(!TextAlignHost<Button>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

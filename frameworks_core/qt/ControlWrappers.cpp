@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
@@ -74,6 +75,54 @@ protected:
 			onHover();
 		QLabel::enterEvent(event);
 	}
+};
+
+// A QLabel that remembers the picture it was given.
+//
+// It has to: a QLabel scales its pixmap only through setScaledContents(),
+// which is exactly ScaleMode::Stretch and nothing else, so every other mode
+// needs the picture COMPOSED against the frame -- and composing repeatedly
+// from an already-composed pixmap would lose whatever the last crop discarded.
+//
+// The frame arrives through ControlWrapper::placed(), the same hook the wx
+// twin uses: realize() runs before the engine has decided anything, and a
+// resizeEvent would be one backend learning it a different way.
+class ScaledImageLabel : public ClickableLabel
+{
+public:
+	using ClickableLabel::ClickableLabel;
+
+	QPixmap source;
+	ScaleMode mode = ScaleMode::Stretch;
+
+	// Guarded on the size it last composed at, so a relayout that did not move
+	// this picture costs no scaling -- and setPixmap's updateGeometry() can
+	// never drive a second pass.
+	void composeFor(const QSize& box)
+	{
+		if (source.isNull() || box.isEmpty() || box == m_composed)
+			return;
+		m_composed = box;
+
+		const Rect target = scaledImageRect(mode,
+			Size { source.width(), source.height() },
+			Size { box.width(), box.height() });
+
+		// Everything the mode does not cover stays transparent, so a Fit
+		// letterbox shows the parent through it exactly as wx's does.
+		QPixmap canvas(box);
+		canvas.fill(Qt::transparent);
+		QPainter painter(&canvas);
+		painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+		// Clipped by the canvas on every side, which IS the crop for Fill and
+		// Center: the target rect is deliberately allowed to overflow.
+		painter.drawPixmap(QRect(target.x, target.y, target.width, target.height), source);
+		painter.end();
+		setPixmap(canvas);
+	}
+
+private:
+	QSize m_composed;
 };
 
 // The Splitter's sash: a sunken line the user drags, with the mouse handling
@@ -304,7 +353,14 @@ void LinkTextWrapper::realize(void* parentWindow)
 
 void StaticTextWrapper::realize(void* parentWindow)
 {
-	m_nativeWidget = new QLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	auto* label = new QLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	// AlignVCenter is QLabel's own default and is kept, so a Left label reads
+	// exactly as it always did; only the horizontal half follows withAlign().
+	const Qt::Alignment horizontal = m_align == TextAlign::Center ? Qt::AlignHCenter
+		: m_align == TextAlign::Right ? Qt::AlignRight
+		: Qt::AlignLeft;
+	label->setAlignment(horizontal | Qt::AlignVCenter);
+	m_nativeWidget = label;
 
 }
 
@@ -653,13 +709,16 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 
 void ImageWrapper::realize(void* parentWindow)
 {
-	auto* label = new ClickableLabel(static_cast<QWidget*>(parentWindow));
+	auto* label = new ScaledImageLabel(static_cast<QWidget*>(parentWindow));
 	QPixmap pixmap(qstr(m_filePath));
 	if (!pixmap.isNull())
 	{
-		if (m_displayWidth > 0 && m_displayHeight > 0)
-			pixmap = pixmap.scaled(m_displayWidth, m_displayHeight,
-				Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		label->source = pixmap;
+		label->mode = m_scaleMode;
+		// The ORIGINAL goes in so sizeHint() reports the natural size, which is
+		// what the measure pass reads; an explicit withSize() overrides it per
+		// axis in measureContent(). The composed picture replaces it the moment
+		// the engine places the label.
 		label->setPixmap(pixmap);
 	}
 	else
@@ -677,6 +736,15 @@ void ImageWrapper::realize(void* parentWindow)
 	else if (m_onHoverWithWidget)
 		label->onHover = [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget] { cb(nw); };
 
+}
+
+void ImageWrapper::placed(const Rect& frame)
+{
+	// static_cast, not qobject_cast: there is no Q_OBJECT anywhere in this
+	// backend, and realize() creates a ScaledImageLabel unconditionally -- a
+	// picture that failed to load is one holding a null source, not a QLabel.
+	if (auto* label = static_cast<ScaledImageLabel*>(m_nativeWidget))
+		label->composeFor(QSize(frame.width, frame.height));
 }
 
 // ToolBarWrapper -----------------------------------------------------------

@@ -113,8 +113,11 @@ inline auto drawControlsUI(
                     LayoutFlags().Border(Side::Left, 12),
                     VGroupBox { "Preview",
                         LayoutFlags().MinSize({kBoxW, 200}),
+                        // Fit: the 960x959 cat letterboxes into the 300x160
+                        // band rather than being squashed into it.
                         Image{"images/Cat03.jpg"}
                             .withSize({300, 160})
+                            .withScaleMode(ScaleMode::Fit)
                             .withFlags(LayoutFlags().CenterHorizontal())
                             .onClick([]() {})
                             .onHover([]() {})
@@ -199,6 +202,96 @@ inline auto drawControlsUI(
 
                 })
             }
+        }
+    };
+}
+
+// Scale modes and text alignment: a dialog of its own, next to the gallery
+// above rather than inside it. The gallery already fills the demo's viewport
+// on ImGui, and four pictures plus an alignment ruler is more than the ~20
+// element mark rule 4 puts on one dialog.
+//
+// Every picture is the SAME file in the SAME 180x100 frame, so the only thing
+// that differs between the four is the mode. Cat03.jpg is 960x959 -- near
+// enough square that a non-square frame is what makes the four read apart:
+//
+//   Fit      100x100 centred, transparent bars left and right
+//   Fill     180x180 centred, cropped top and bottom
+//   Stretch  180x100 exactly, squashed -- the framework's long-standing default
+//   Center   960x959 centred and cropped hard, so only the middle survives
+//
+// The alignment box is three labels in one band. The band is what matters:
+// each label carries Expand(), so it stretches across the whole box and the
+// slack inside its frame is what withAlign() moves the text around in. Without
+// that a leaf sits at its desired width and all three would look identical.
+//
+// `displaysDisabled` binds the whole dialog's leaves to one caller-owned flag,
+// which is the value-binding shape a read-only widget can offer: neither a
+// picture nor a label has a value to share, so isDisabled() is the binding.
+inline auto drawScaleAndAlignUI(bool& displaysDisabled)
+{
+    constexpr int kBoxW = 420;
+    constexpr Size kPicture { 180, 100 };
+    constexpr int kCaptionH = 20;
+    constexpr int kLabelH = 22;
+
+    auto picture = [&](const char* caption, ScaleMode mode) {
+        return VStack {
+            LayoutFlags().Border(Side::Right, 10),
+            StaticText{caption}
+                .withAlign(TextAlign::Center)
+                .withSize({kPicture.width, kCaptionH})
+                .withFlags(LayoutFlags().Expand()),
+            Image{"images/Cat03.jpg"}
+                .withSize(kPicture)
+                .withScaleMode(mode)
+                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                .isDisabled(displaysDisabled)
+                .withTooltip("The same 960x959 file in the same 180x100 frame.")
+        };
+    };
+
+    return Dialog {
+        "Scale modes & text alignment",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            VGroupBox { "Image::withScaleMode -- one file, one frame, four modes",
+                LayoutFlags().Expand(),
+                HStack {
+                    LayoutFlags().Border(Side::All, 6),
+                    picture("Fit", ScaleMode::Fit),
+                    picture("Fill", ScaleMode::Fill),
+                    picture("Stretch", ScaleMode::Stretch),
+                    picture("Center", ScaleMode::Center)
+                }
+            },
+            VGroupBox { "StaticText::withAlign -- one band, three alignments",
+                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                StaticText{"Left -- the default, and where every label starts"}
+                    .withAlign(TextAlign::Left)
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().Expand().Border(Side::All, 6))
+                    .isDisabled(displaysDisabled),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand()),
+                StaticText{"Centre"}
+                    .withAlign(TextAlign::Center)
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().Expand().Border(Side::All, 6))
+                    .isDisabled(displaysDisabled),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand()),
+                StaticText{"Right"}
+                    .withAlign(TextAlign::Right)
+                    .withSize({-1, kLabelH})
+                    .withFlags(LayoutFlags().Expand().Border(Side::All, 6))
+                    .isDisabled(displaysDisabled)
+            },
+            CheckBox{displaysDisabled, "Disable the pictures and the labels"}
+                .withSize({-1, 26})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
         }
     };
 }

@@ -64,6 +64,18 @@ public:
 		(void)frame;
 	}
 
+	// Called by the retained backends immediately after the native window has
+	// been moved to the frame the engine computed. Almost no wrapper wants it:
+	// a native control lays its own contents out and only needs to be told how
+	// big it is. A widget whose CONTENT depends on the frame -- a picture that
+	// letterboxes or crops against it -- has no other moment to learn it, since
+	// realize() runs before the engine has decided anything. ImGui needs no
+	// equivalent: render() is handed the frame directly.
+	virtual void placed(const Rect& frame)
+	{
+		(void)frame;
+	}
+
 	void* nativeHandle() const
 	{
 		return m_nativeWidget;

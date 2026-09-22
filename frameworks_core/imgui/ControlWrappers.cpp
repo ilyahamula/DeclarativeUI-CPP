@@ -310,8 +310,20 @@ Size StaticTextWrapper::measureIntrinsic(const Constraints& c)
 
 void StaticTextWrapper::render(const Rect& frame)
 {
-	const bool wrap = sized(frame)
-		&& ImGui::CalcTextSize(m_text.c_str()).x > (float)frame.width;
+	const float textWidth = ImGui::CalcTextSize(m_text.c_str()).x;
+	const bool wrap = sized(frame) && textWidth > (float)frame.width;
+
+	// Alignment IS the leftover width, so a block that wraps has none to give
+	// -- it already fills the frame. Nothing is pushed for Left, which keeps
+	// the common case byte-identical to what it drew before.
+	if (!wrap && sized(frame) && m_align != TextAlign::Left)
+	{
+		const float slack = (float)frame.width - textWidth;
+		if (slack > 0.0f)
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX()
+				+ (m_align == TextAlign::Center ? slack * 0.5f : slack));
+	}
+
 	if (wrap)
 		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + (float)frame.width);
 	ImGui::TextUnformatted(m_text.c_str());
@@ -635,18 +647,38 @@ void ImageWrapper::render(const Rect& frame)
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (m_textureId != nullptr)
 	{
-		float w, h;
-		if (sized(frame))
-		{
-			w = (float)frame.width;
-			h = (float)frame.height;
-		}
-		else
-		{
-			w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
-			h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
-		}
-		ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)), ImVec2(w, h));
+		const Size box = sized(frame)
+			? Size { frame.width, frame.height }
+			: Size {
+				(m_displayWidth  > 0) ? m_displayWidth  : m_imgWidth,
+				(m_displayHeight > 0) ? m_displayHeight : m_imgHeight
+			};
+		const Rect target = scaledImageRect(m_scaleMode, Size { m_imgWidth, m_imgHeight }, box);
+
+		// ImGui::Image() draws its whole texture at the size it is given, which
+		// is exactly Stretch and nothing else -- it cannot letterbox and has no
+		// way to crop. The picture is therefore drawn on the window draw list
+		// at the computed rect, clipped to the frame, with a Dummy of the frame
+		// supplying the item rect that hover, the tooltip, the context menu and
+		// the drift guard all read. Same move SeparatorWrapper makes, and for
+		// the same reason. place() has already put the cursor at the frame's
+		// top-left, so the cursor's screen position is the frame origin.
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+		const ImVec2 clipMin(origin.x, origin.y);
+		const ImVec2 clipMax(origin.x + (float)box.width, origin.y + (float)box.height);
+		const ImVec2 drawMin(origin.x + (float)target.x, origin.y + (float)target.y);
+		const ImVec2 drawMax(drawMin.x + (float)target.width, drawMin.y + (float)target.height);
+
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		// intersect_with_current_clip_rect: inside a ScrollPanel's child the
+		// window's own clip must still win.
+		drawList->PushClipRect(clipMin, clipMax, true);
+		drawList->AddImage(
+			static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)),
+			drawMin, drawMax);
+		drawList->PopClipRect();
+
+		ImGui::Dummy(ImVec2((float)box.width, (float)box.height));
 		if (ImGui::IsItemHovered())
 		{
 			if (m_onHover)
