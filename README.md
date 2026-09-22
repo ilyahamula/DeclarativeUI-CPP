@@ -159,12 +159,12 @@ A tool with no icon, or one whose icon fails to load, shows its label instead, s
 toolbar is never blank.
 
 ```cpp
-ToolBar {{
+ToolBar {
     ToolItem{"New"}.withIcon("icons/new.png").onClick([&] { newFile(); }),
     ToolItem::Separator(),
     ToolItem{"Wrap"}.toggled(wordWrap),          // a check tool, on the caller's bool
     ToolItem{"Delete"}.isDisabled(locked),       // greys live
-}}
+}
 ```
 
 `StatusBar` is the row of text along the bottom. It is the one widget that defaults to
@@ -174,11 +174,11 @@ written from somewhere else, so measuring it would let an arriving message resiz
 auto-fit window. Fields with a fixed width keep it; the rest share what is left.
 
 ```cpp
-StatusBar {{
+StatusBar {
     StatusField{ status },              // bound: anything that writes it shows live
     StatusField{ "Ln 1, Col 1", 120 },  // fixed width
     StatusField{ "UTF-8", 70 },
-}}
+}
 StatusBar{ status }                     // or one stretched field, the common case
 ```
 

@@ -759,12 +759,12 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
             // The third and fourth holders of that same bool: a toolbar CHECK
             // tool here, and the shell's own toolbar and View menu over there.
             // Press any one of the four and the other three follow.
-            ToolBar {{
+            ToolBar {
                 ToolItem{"Wrap"}.withTooltip("The same bool as the box above").toggled(wordWrap),
                 ToolItem::Separator(),
                 ToolItem{"On"}.onClick([&wordWrap]() { wordWrap = true; }),
                 ToolItem{"Off"}.onClick([&wordWrap]() { wordWrap = false; }),
-            }}
+            }
                 .withFlags(LayoutFlags().Border(Side::Top, 4)),
             Separator{}
                 .withSize({-1, 1})

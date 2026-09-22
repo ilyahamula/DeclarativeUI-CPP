@@ -179,7 +179,7 @@ inline auto drawAppShellUI(
             // The tool bar. No icon files ship with the demo, so every tool
             // falls back to its label -- which is exactly the R9.3 path a
             // missing icon takes, and it renders identically on all three.
-            ToolBar {{
+            ToolBar {
                 ToolItem{"New"}.withTooltip("New file")
                     .onClick([&notes]() { notes = "Toolbar > New"; }),
                 ToolItem{"Open"}.withTooltip("Open file")
@@ -197,7 +197,7 @@ inline auto drawAppShellUI(
                 ToolItem{"Delete"}.withTooltip("Disabled while the shell is locked")
                     .isDisabled(shellDisabled)
                     .onClick([&notes]() { notes = "Toolbar > Delete"; }),
-            }}
+            }
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
             // 240 is the first pane's width in pixels, snapshotted from a
             // literal -- the splitter keeps its own copy of it. The binding
@@ -265,11 +265,11 @@ inline auto drawAppShellUI(
             // tree view writes its selection into, so clicking a file in the
             // project pane updates the bar live -- nothing polls it in the
             // demo, the backends do. The other two are fixed-width snapshots.
-            StatusBar {{
+            StatusBar {
                 StatusField{ selectedFile },
                 StatusField{ "Ln 1, Col 1", 120 },
                 StatusField{ "UTF-8", 70 },
-            }}
+            }
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
             HStack {
                 LayoutFlags().Border(Side::Top, 10),

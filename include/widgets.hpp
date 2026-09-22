@@ -5,6 +5,7 @@
 #include "frameworks_core/LayoutNode.hpp"
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -1402,9 +1403,10 @@ struct StatusBar : Widget<StatusBar>
 {
 	using super = Widget<StatusBar>;
 
-	explicit StatusBar(StatusFields fields)
+	// StatusBar{ StatusField{...}, StatusField{...} } -- one brace pair.
+	explicit StatusBar(std::initializer_list<StatusField> fields)
 		: super()
-		, m_fields(std::move(fields))
+		, m_fields(fields)
 	{
 	}
 
@@ -1447,9 +1449,10 @@ struct ToolBar : Widget<ToolBar>
 {
 	using super = Widget<ToolBar>;
 
-	explicit ToolBar(std::vector<ToolItem> tools)
+	// ToolBar{ ToolItem{...}, ToolItem::Separator() } -- one brace pair.
+	explicit ToolBar(std::initializer_list<ToolItem> tools)
 		: super()
-		, m_tools(std::move(tools))
+		, m_tools(tools)
 	{
 	}
 
