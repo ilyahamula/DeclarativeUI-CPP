@@ -44,6 +44,7 @@ return Dialog {
 - **Sensible defaults, no flags required** — widgets size to their content (text fields never collapse below their text), sibling group boxes in a column equalize to the widest one (tallest in a row), and dialogs auto-fit their content
 - **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
 - **Dialog sizing policy** — dialogs are not user-resizable by default; opt in with `Dialog::Resizable()`, where the auto-fit size becomes the initial *and minimum* size so content can never be clipped
+- **Dialog lifecycle** — `show(bool& open)` makes a caller-owned bool the single truth about whether a dialog is up, `onClose()` fires exactly once however it closed, and `Modal()` locks the other windows out **without blocking** on any backend
 - **CRTP widget hierarchy** — `Widget<T>` base with fluent `.withFlags()`, `.withSize()`, `.withPosition()`, `.withStyle()` modifiers
 - **Two-way data binding** — how you pass the value decides: `Slider{range, 50}` takes a snapshot, `Slider{range, myValue}` *binds* to your variable and writes edits straight back to it. Two controls sharing one variable stay in step with no callback wiring, and a value changed from anywhere else is picked up live
 - **Selection mode from the bound type** — `ListBox<std::string>` selects one item, `ListBox<std::vector<int>>` selects many; `Table` binds either a row index or a key column. There is no mode flag to keep in step with the value
@@ -109,6 +110,38 @@ and `Fixed()` is what opts out. A `Window` is also the only thing a menu bar can
 attach to on wx. `show(bool& open)` makes a caller-owned bool the single truth
 about whether the window is up: clearing it closes the window, closing the window
 clears it, and `onClose()` fires exactly once either way.
+
+A `Dialog` adds `Modal()`, which is what makes an OK/Cancel form possible.
+**Modality never blocks**: `show()` returns immediately on every backend, so a
+modal dialog has no result to return and reports what the user chose by writing a
+bound value instead — which means the parent can show the answer while the box is
+still on screen.
+
+```cpp
+bool confirmOpen = false;
+std::string answer;
+
+// ... from a button: confirmOpen = true, then show it
+Dialog { "Delete file?",
+    VStack {
+        StaticText{"This cannot be undone."},
+        HStack {
+            Spacer{},
+            Button{"Cancel"}.onClick([&] { answer = "cancelled"; confirmOpen = false; }),
+            Button{"Delete"}.onClick([&] { answer = "deleted";   confirmOpen = false; }),
+        }
+    }
+}
+.Modal()                                     // locks the other windows out, does not block
+.onClose([&] { /* fires exactly once, whichever side closed it */ })
+.show(confirmOpen);                          // clear the flag -> the dialog closes
+```
+
+Closing works the same on all three backends; **re-opening does not, and the
+difference is one call.** On ImGui `show()` is the frame, so setting the flag back
+is enough. wx and Qt destroy the native dialog when it closes, so there a second
+`show(open)` call is what brings one back — one `show()` per open on a retained
+backend, one per frame on an immediate one.
 
 `Window::withMenuBar()` attaches nested menus with separators, submenus, checkable
 items and per-item disabling — native chrome outside the content area on wx and Qt,

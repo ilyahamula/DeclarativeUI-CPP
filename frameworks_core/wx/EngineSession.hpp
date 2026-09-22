@@ -31,12 +31,19 @@ struct EngineSession
 	bool busy = false; // re-entrancy guard: SetClientSize fires wxEVT_SIZE
 
 	// Lifecycle the caller fills in. `openFlag` is a caller-owned bool the
-	// window is shown against (Window::show(bool&), and Dialog's in T3.6):
-	// clearing it closes the window, closing the window clears it. `onClose`
-	// fires exactly once when the window goes away.
+	// window is shown against (Dialog/Window::show(bool&)): clearing it closes
+	// the window, closing the window clears it. `onClose` fires exactly once
+	// when the window goes away.
 	bool* openFlag = nullptr;
 	std::function<void()> onClose;
 	bool closed = false; // one-shot guard for notifyClosed()
+
+	// Dialog::Modal(). Held for as long as the window is up, because that is
+	// exactly how long the rest of the application stays disabled: the disabler
+	// re-enables every window it touched when it dies. Only a Dialog ever sets
+	// one -- an application frame that locked the application out would be a
+	// dialog by another name.
+	std::unique_ptr<wxWindowDisabler> modalGuard;
 
 	// The one close path, whatever triggered it -- the user's close button or
 	// the caller clearing `openFlag`. Both clear the flag and fire onClose
@@ -46,6 +53,12 @@ struct EngineSession
 		if (closed)
 			return;
 		closed = true;
+		// Before the callback, not after: a handler that opens the next dialog
+		// must not find the application still locked out behind this one. The
+		// native window is only destroyed later (wx defers it to idle), so
+		// waiting for the session's own teardown would leave the lock on for
+		// longer than the dialog was up.
+		modalGuard.reset();
 		if (openFlag != nullptr)
 			*openFlag = false;
 		if (onClose)

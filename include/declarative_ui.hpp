@@ -59,7 +59,16 @@ static_assert(NodeBuildable<VStack<StaticText, Button>>);
 
 static_assert(TopLevel<Dialog<VStack<Button>>>);
 static_assert(TopLevel<Window<VStack<Button>>>);
+// A lifecycle is not something the two top-level spellings disagree about: both
+// can be shown against a caller-owned flag and both report their own closing.
+static_assert(FlagShowable<Dialog<VStack<Button>>>);
 static_assert(FlagShowable<Window<VStack<Button>>>);
+static_assert(CloseObservable<Dialog<VStack<Button>>>);
+static_assert(CloseObservable<Window<VStack<Button>>>);
+// Modality is a Dialog's alone: a Window is the application frame, and a frame
+// that refuses input to every other window is a dialog by another name.
+static_assert(ModalWindow<Dialog<VStack<Button>>>);
+static_assert(!ModalWindow<Window<VStack<Button>>>);
 // A menu bar attaches to a Window and only a Window: wxMenuBar needs a wxFrame,
 // which is the reason Window exists next to Dialog.
 static_assert(MenuBarHost<Window<VStack<Button>>>);

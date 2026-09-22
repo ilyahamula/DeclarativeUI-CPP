@@ -15,19 +15,22 @@ namespace
 
 int main(int argc, char** argv)
 {
-    // T3.5 demo state. Bound by reference, so it has to outlive the frame loop
-    // -- ImGui rebuilds the tree every frame and reads these live. The
-    // scale/align dialog needs one flag -- neither a picture nor a label has a
-    // value of its own to share, so isDisabled() is
-    // the binding those two read-only widgets can offer. The Account form's
-    // three strings are what make its right-aligned labels a real form rather
-    // than a ruler.
-    bool displaysDisabled = false;
-    std::string accountName = "Ada Lovelace";
-    std::string accountEmail = "ada@example.com";
-    std::string accountPassword = "analytical";
-    bool accountLocked = false;
-    // Controls-gallery state, for the Preview picture that now carries Fit.
+    // T3.6 demo state. Bound by reference, so it has to outlive the frame loop
+    // -- ImGui rebuilds the tree every frame and reads these live. The two
+    // `open` bools are the single truth about whether their dialog is up; the
+    // two counters are what make onClose()'s "exactly once" readable.
+    std::string deleteFile = "main.cpp";
+    std::string deleteAnswer = "(no answer yet)";
+    std::string confirmReport = "(the modal has not been closed yet)";
+    int confirmCloseCount = 0;
+    bool confirmOpen = false;
+    bool deleteFormDisabled = false;
+    bool detailsOpen = false;
+    std::string detailsNote = "Shared by the panel and the dialog.";
+    std::string detailsReport = "(the dialog has not been closed yet)";
+    int detailsCloseCount = 0;
+    bool panelDisabled = false;
+    // Controls-gallery state, for context beside the new dialogs.
     std::string multilineText = "Type something here...";
     std::string galleryPassword;
     int spinInt = 42;
@@ -40,17 +43,38 @@ int main(int argc, char** argv)
     bool tabLogging = false;
     Color themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
+    // The one piece of per-backend wiring T3.6 needs, and the whole of it.
+    // On an immediate backend show() IS the frame: the loop below calls it every
+    // frame, so asking for a dialog is nothing more than setting its flag. (The
+    // retained mains hand these lambdas a show() call as well, because wx and Qt
+    // destroyed the native dialog when it closed.)
+    auto openConfirm = [&confirmOpen] { confirmOpen = true; };
+    auto openDetails = [&detailsOpen] { detailsOpen = true; };
+
     runImGuiApp([&]
     {
-        // T3.5's gallery: one file in one frame under all four scale modes,
-        // and one band under all three alignments. On ImGui both are drawn by
-        // hand -- the picture on the window draw list inside a clip rect,
-        // the label by offsetting the cursor across the frame's slack.
-        drawScaleAndAlignUI(displaysDisabled).show();
-        // withAlign() in a real form: the labels stretch across column 0 of
-        // the Grid, so their colons line up against the fields.
-        drawAccountFormUI(accountName, accountEmail, accountPassword, accountLocked).show();
-        // The controls gallery, whose Preview picture now carries Fit.
+        // T3.6's gallery: a form that asks, and an application-modal box that
+        // answers. On ImGui the box is a BeginPopupModal rather than a plain
+        // window -- nothing else dims the windows behind it and refuses them
+        // input -- and it is still non-blocking, because a popup is drawn, not
+        // run.
+        drawDeleteFormUI(deleteFile, deleteAnswer, confirmReport, deleteFormDisabled,
+            openConfirm).show();
+        // The binding demo: a dialog's open flag as an ordinary bound bool,
+        // shared with a check box and a toggle in this panel.
+        drawDialogBinding(detailsOpen, detailsNote, detailsReport, panelDisabled,
+            openDetails).show();
+        // Both flag-shown dialogs are called EVERY FRAME, open or not: the
+        // wrapper draws nothing while the flag is clear and reports the close
+        // once. This is what makes re-opening free here and a show() call on wx
+        // and Qt.
+        drawDetailsUI(detailsOpen, detailsNote, detailsReport, detailsCloseCount)
+            .show(detailsOpen);
+        // Drawn last, and from OUTSIDE every window: OpenPopup and
+        // BeginPopupModal have to meet in one ID scope, and this is it.
+        drawConfirmDeleteUI(confirmOpen, deleteFile, deleteAnswer, confirmReport,
+            confirmCloseCount).show(confirmOpen);
+        // The controls gallery, for context beside the new dialogs.
         drawControlsUI(multilineText, galleryPassword, spinInt, spinFloat, date, time,
             toggle, galleryProgress, tabNote, tabLogging, themeColor).show();
     });

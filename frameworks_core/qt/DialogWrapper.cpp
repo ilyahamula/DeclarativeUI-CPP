@@ -10,8 +10,10 @@
 #include "Logger.hpp"
 #endif
 
+#include <QCloseEvent>
 #include <QDialog>
 #include <QGuiApplication>
+#include <QResizeEvent>
 #include <QScreen>
 #include <QWindow>
 
@@ -32,12 +34,14 @@ void DialogWrapper::show()
 namespace
 {
 
-// QDialog with a resize hook (virtual override — no moc needed).
+// QDialog with resize and close hooks (virtual overrides — no moc needed, the
+// same shape EngineWindow uses in WindowWrapper.cpp).
 class EngineDialog : public QDialog
 {
 public:
 	using QDialog::QDialog;
 	std::function<void()> onResize;
+	std::function<void()> onClosing;
 
 protected:
 	void resizeEvent(QResizeEvent* event) override
@@ -46,12 +50,20 @@ protected:
 		if (onResize)
 			onResize();
 	}
+
+	void closeEvent(QCloseEvent* event) override
+	{
+		if (onClosing)
+			onClosing();
+		QDialog::closeEvent(event);
+	}
 };
 
 } // unnamed namespace
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position)
+	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position,
+	bool modal, std::function<void()> onClose, bool* open)
 {
 	auto* dialog = new EngineDialog(nullptr);
 	dialog->setWindowTitle(QString::fromStdString(title));
@@ -63,6 +75,8 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine = std::make_unique<LayoutEngine>(*session->backend);
 	session->root = std::move(root);
 	session->resizable = resizable;
+	session->openFlag = open;
+	session->onClose = std::move(onClose);
 
 	if (const QScreen* screen = QGuiApplication::primaryScreen())
 		session->engine->setMaxAutoFitWidth((screen->availableGeometry().width() * 9) / 10);
@@ -95,13 +109,36 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 
 	// invalidation wiring -------------------------------------------------
 	session->bindInvalidation(*session->root);
+	session->bindOpenFlag();
 	dialog->onResize = [session] { session->rearrange(); };
-	QObject::connect(dialog, &QObject::destroyed, [session] { delete session; });
+	// The single close path: the user's close button lands here, and so does
+	// bindOpenFlag()'s close() when the caller clears the flag.
+	dialog->onClosing = [session] { session->notifyClosed(); };
+	// And the path that does NOT send a close event: Escape reaches a QDialog as
+	// reject(), which goes straight to done() -- so the close would otherwise go
+	// unreported. finished() is the one signal every dismissal passes through.
+	// deleteLater() beside it because done() only hides: a closed Dialog is gone,
+	// as it is on wx, and the session has to go with it.
+	QObject::connect(dialog, &QDialog::finished, [session, dialog](int) {
+		session->notifyClosed();
+		dialog->deleteLater();
+	});
+	QObject::connect(dialog, &QObject::destroyed, [session] {
+		// destroyed without a close event (the app tearing down) still counts
+		session->notifyClosed();
+		delete session;
+	});
 
 	// after sizing, so a window sized from the engine still opens where the
 	// caller asked rather than where the platform put the default-positioned one
 	if (position)
 		dialog->move(position->x, position->y);
+
+	// show(), never exec(): the modality is a window property, so Qt locks the
+	// other windows out while this call still returns immediately -- which is
+	// what makes Modal() non-blocking on every backend.
+	if (modal)
+		dialog->setWindowModality(Qt::ApplicationModal);
 
 	dialog->show();
 

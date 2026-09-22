@@ -13,6 +13,7 @@
 #include "value_binding.hpp"
 #include "layout_containers.hpp"
 #include "pickers_gallery.hpp"
+#include "feedback_gallery.hpp"
 #include "app_shell.hpp"
 #include "layout_probes.hpp"
 

@@ -7,6 +7,8 @@
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 
 #include <algorithm>
+#include <string>
+#include <unordered_map>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -36,9 +38,70 @@ void DialogWrapper::show()
 	ImGui::End();
 }
 
-void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> rootPtr, bool resizable, const std::optional<Position>& position)
+namespace
 {
+
+// The tree is rebuilt every frame, so "is this dialog still up?" and "has its
+// close already been reported?" have no home in the wrapper. They live here,
+// keyed by title, which is the same thing ImGui keys the window's own state by
+// -- so the two stay exactly as stable as each other. The identical move
+// imgui/WindowWrapper.cpp makes, for the identical reason.
+struct DialogState
+{
+	bool open = true;      // used only when the caller bound no flag
+	bool closeFired = false;
+};
+
+std::unordered_map<std::string, DialogState>& dialogStates()
+{
+	static std::unordered_map<std::string, DialogState> states;
+	return states;
+}
+
+} // unnamed namespace
+
+void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
+	std::unique_ptr<LayoutNode> rootPtr, bool resizable, const std::optional<Position>& position,
+	bool modal, std::function<void()> onClose, bool* open)
+{
+	DialogState& state = dialogStates()[title];
+
+	// A dialog has a close button on wx and Qt whether or not the caller bound
+	// a flag to it, so it has one here too: with no caller flag the store owns
+	// the bool. Either way ONE bool is the truth about whether the dialog is up,
+	// which is also what gives onClose() something to fire on.
+	bool* flag = open != nullptr ? open : &state.open;
+
+	auto fireClose = [&state, &onClose] {
+		if (state.closeFired)
+			return;
+		state.closeFired = true;
+		if (onClose)
+			onClose();
+	};
+
+	if (!*flag)
+	{
+		// Closed, but the caller still calls show() every frame: draw nothing
+		// and report the close exactly once.
+		//
+		// A modal needs one last BeginPopupModal to actually GO, though, and
+		// this is that call. ImGui never closes a popup merely because nobody
+		// submitted it -- GetTopMostPopupModal() reads the entry, not the
+		// window's activity -- so a popup left in the stack would keep blocking
+		// input to everything behind a dialog that has already reported itself
+		// closed. Handed the cleared flag, BeginPopupModal pops the entry and
+		// returns false, which is why nothing pairs an EndPopup with it.
+		if (modal && ImGui::IsPopupOpen(title.c_str()))
+		{
+			if (ImGui::BeginPopupModal(title.c_str(), flag))
+				ImGui::EndPopup();
+		}
+		fireClose();
+		return;
+	}
+	state.closeFired = false; // open (again): re-arm
+
 	// immediate mode: the tree lives for this frame only
 	LayoutNode& root = *rootPtr;
 	ImGuiLayoutBackend backend;
@@ -87,7 +150,29 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	if (position)
 		ImGui::SetNextWindowPos(ImVec2((float)position->x, (float)position->y), ImGuiCond_Once);
 
-	if (ImGui::Begin(title.c_str(), nullptr, winFlags))
+	// Modal() is a different CALL, not another window flag: only a popup dims
+	// the windows behind it and refuses them input. OpenPopup and
+	// BeginPopupModal have to meet in one ID scope, and the caller's show() --
+	// outside every window, group and disabled scope -- is that scope.
+	//
+	// Asked to open only while it is not already open. ImGui treats an
+	// OpenPopup() every frame as a programming mistake and suppresses the
+	// reopen to stay usable; leaning on that would mean leaning on a fallback.
+	//
+	// `flag` goes to both spellings, so the title bar's close button clears the
+	// caller's own bool -- the same single truth the wx and Qt polls maintain.
+	bool visible = false;
+	if (modal)
+	{
+		if (!ImGui::IsPopupOpen(title.c_str()))
+			ImGui::OpenPopup(title.c_str());
+		visible = ImGui::BeginPopupModal(title.c_str(), flag, winFlags);
+	}
+	else
+	{
+		visible = ImGui::Begin(title.c_str(), flag, winFlags);
+	}
+	if (visible)
 	{
 		Size renderContent = content;
 		if (resizable)
@@ -108,5 +193,19 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		// meet in the same scope as ImGui requires.
 		FileBrowser::drawPending();
 	}
-	ImGui::End();
+	// EndPopup pairs with a BeginPopupModal that RETURNED TRUE -- it closes
+	// itself on the way out otherwise -- while End pairs with Begin either way.
+	if (modal)
+	{
+		if (visible)
+			ImGui::EndPopup();
+	}
+	else
+	{
+		ImGui::End();
+	}
+
+	// the close button cleared it during this frame
+	if (!*flag)
+		fireClose();
 }
