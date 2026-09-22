@@ -33,6 +33,14 @@
 // by position. Highlight selection is NOT part of it -- a row can be
 // highlighted without being ticked on all three backends.
 //
+// The placeholder box below it is T3.3: greyed text shown only while a field is
+// EMPTY. It is a label, not a value -- nothing reads it back, and no backend
+// measures it, so the wording can be as long as it likes without moving this
+// auto-fit dialog. wx is the one backend whose field could notice (its best
+// size is pinned across SetHint for exactly that reason). Single-line only:
+// MultiLineTextCtrl does not declare the modifier, because wxTextCtrl::SetHint
+// does nothing on a wxTE_MULTILINE control on any wx port.
+//
 // The FileDialog button below is the other half of T3.1: a one-shot dialog that
 // is not a widget at all, called from a handler exactly as MessageBox is. Note
 // it is BLOCKING on wx and Qt and non-blocking on ImGui, where nothing may stop
@@ -63,7 +71,8 @@ inline std::string pluginSummary(const std::vector<std::string>& plugins)
 
 inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
     std::string& folderPath, std::string& lastDialogResult, bool& pickersDisabled,
-    std::vector<std::string>& enabledPlugins, std::string& enabledSummary)
+    std::vector<std::string>& enabledPlugins, std::string& enabledSummary,
+    std::string& searchTerm, std::string& apiKey)
 {
     constexpr int kRowH = 28;
     constexpr int kLabelH = 20;
@@ -176,6 +185,51 @@ inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
                             .isDisabled(),
                         Spacer{}
                     }
+                }
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            VGroupBox { "withPlaceholder (single-line fields)",
+                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                StaticText{"The hint shows while a field is empty and vanishes as you type."}
+                    .withSize({-1, kLabelH}),
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    StaticText{"Search:"}
+                        .withSize({kLabelW, kLabelH})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    // Starts empty, so this is the one showing its hint.
+                    TextCtrl{searchTerm}
+                        .withPlaceholder("Search files…")
+                        .withSize(kPickerSize)
+                        .withTooltip("Type to hide the hint; clear it to bring it back")
+                },
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 6),
+                    StaticText{"API key:"}
+                        .withSize({kLabelW, kLabelH})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    // A password field is what most wants a hint: the echo
+                    // hides the value, so there is nothing else to say what
+                    // belongs here.
+                    PasswordInput{apiKey}
+                        .withPlaceholder("Paste your key")
+                        .withSize(kPickerSize)
+                },
+                // The same modifier with the field NOT empty, so the hint is
+                // hidden from the first frame -- the state the two above only
+                // reach once the user types.
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 6),
+                    StaticText{"Prefilled:"}
+                        .withSize({kLabelW, kLabelH})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    TextCtrl{std::string{"already has text"}}
+                        .withPlaceholder("you should not see this")
+                        .withSize(kPickerSize)
                 }
             },
 

@@ -212,6 +212,16 @@ struct TextCtrl : Widget<TextCtrl>
 	{
 	}
 
+	// Greyed text shown only while the field is EMPTY -- a label for what to
+	// type, not a value. Single-line only: wxTextCtrl::SetHint does nothing on
+	// a multi-line control on every wx port, so MultiLineTextCtrl does not
+	// declare this and asking it for one is a compile error (PlaceholderHost).
+	TextCtrl& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
 	TextCtrl& onChange(std::function<void(const std::string&)> callback)
 	{
 		m_onChange = std::move(callback);
@@ -230,11 +240,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -261,6 +272,15 @@ struct PasswordInput : Widget<PasswordInput>
 	{
 	}
 
+	// As TextCtrl's: shown only while the field is empty. A password field is
+	// the one that most wants it -- there is no value to read back for a hint
+	// of what is expected, because the echo hides it.
+	PasswordInput& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
 	PasswordInput& onChange(std::function<void(const std::string&)> callback)
 	{
 		m_onChange = std::move(callback);
@@ -279,11 +299,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<PasswordInputWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };

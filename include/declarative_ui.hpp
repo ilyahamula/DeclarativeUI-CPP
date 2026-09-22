@@ -69,6 +69,13 @@ static_assert(ContextMenuHost<CheckListBox<std::vector<int>>>);
 static_assert(!ContextMenuHost<VStack<Button>>);
 static_assert(!ContextMenuHost<HStack<Button>>);
 static_assert(!ContextMenuHost<TabPanel<Tab<VStack<Button>>>>);
+// withPlaceholder() is single-line only: wxTextCtrl::SetHint does nothing on a
+// wxTE_MULTILINE control on any wx port, so the modifier is declared on the two
+// single-line fields and asking a multi-line one for it must not compile.
+static_assert(PlaceholderHost<TextCtrl>);
+static_assert(PlaceholderHost<PasswordInput>);
+static_assert(!PlaceholderHost<MultiLineTextCtrl>);
+static_assert(!PlaceholderHost<ReadonlyTextCtrl>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

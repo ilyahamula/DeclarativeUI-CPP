@@ -4,6 +4,7 @@
 
 #include <concepts>
 #include <memory>
+#include <string>
 
 // A declarative element that can emit its layout node (widgets, stacks,
 // group boxes, tab panels). The node tree is the only path into the layout
@@ -27,4 +28,15 @@ concept TopLevel = requires(T element) {
 template <typename T>
 concept FlagShowable = TopLevel<T> && requires(T element, bool& open) {
 	{ element.show(open) } -> std::same_as<void>;
+};
+
+// A single-line text field that can carry placeholder text. Declared per
+// widget rather than on Widget<W>, because the modifier genuinely does not
+// exist for a multi-line field: wxTextCtrl::SetHint does nothing on a
+// wxTE_MULTILINE control on every wx port, so MultiLineTextCtrl would have to
+// promise something one backend could not keep. A compile error is the honest
+// answer, and this is the concept that states it.
+template <typename T>
+concept PlaceholderHost = requires(T element, std::string hint) {
+	{ element.withPlaceholder(std::move(hint)) } -> std::same_as<T&>;
 };

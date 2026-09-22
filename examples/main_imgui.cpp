@@ -27,6 +27,9 @@ int main(int argc, char** argv)
     std::string enabledSummary = pluginSummary(enabledPlugins);
     std::vector<std::string> modules { "Core", "Storage" };
     bool moduleListsDisabled = false;
+    // T3.3: both start EMPTY, which is the state a placeholder is for.
+    std::string searchTerm;
+    std::string apiKey;
 
     runImGuiApp([&]
     {
@@ -34,7 +37,7 @@ int main(int argc, char** argv)
         // checkbox on every row, drawn on ImGui as Checkbox rows inside the
         // same child region BeginListBox gives the plain list.
         drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
-            pickersDisabled, enabledPlugins, enabledSummary).show();
+            pickersDisabled, enabledPlugins, enabledSummary, searchTerm, apiKey).show();
         // The binding demo: two CheckListBoxes and a ListBox over one
         // std::vector<std::string>.
         drawCheckListBinding(modules, moduleListsDisabled).show();

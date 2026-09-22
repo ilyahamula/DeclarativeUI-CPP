@@ -17,6 +17,9 @@ class DeclarativeApp : public wxApp
     std::string m_enabledSummary = pluginSummary(m_enabledPlugins);
     std::vector<std::string> m_modules { "Core", "Storage" };
     bool m_moduleListsDisabled = false;
+    // T3.3: both start EMPTY, which is the state a placeholder is for.
+    std::string m_searchTerm;
+    std::string m_apiKey;
 
 public:
     bool OnInit() override
@@ -25,7 +28,7 @@ public:
         // wxCheckListBox, whose Check() setter deliberately fires no event, so
         // the ref-sync push cannot re-enter the user's onChange.
         drawPickersGalleryUI(m_openPath, m_savePath, m_folderPath, m_lastDialogResult,
-            m_pickersDisabled, m_enabledPlugins, m_enabledSummary).show();
+            m_pickersDisabled, m_enabledPlugins, m_enabledSummary, m_searchTerm, m_apiKey).show();
         // The binding demo: two CheckListBoxes and a ListBox over one
         // std::vector<std::string>.
         drawCheckListBinding(m_modules, m_moduleListsDisabled).show();

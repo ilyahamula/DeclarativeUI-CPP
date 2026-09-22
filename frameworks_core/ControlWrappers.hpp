@@ -67,15 +67,22 @@ private:
 };
 
 // TextCtrlWrapper -----------------------------------------------------------
+// The placeholder is a plain string, not a BoundValue: it is a fixed label for
+// the empty field rather than a value anything writes, so there is nothing for
+// a ref sync to poll. It is deliberately NOT measured on any backend -- a hint
+// is usually longer than the text it stands in for, and measuring it would let
+// wording resize an auto-fit dialog, which is the trap the editable fields'
+// content-independent floors already avoid.
 class TextCtrlWrapper : public ControlWrapper
 {
 public:
-	TextCtrlWrapper(BoundValue<std::string> value,
+	TextCtrlWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -85,6 +92,7 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -93,12 +101,13 @@ private:
 class PasswordInputWrapper : public ControlWrapper
 {
 public:
-	PasswordInputWrapper(BoundValue<std::string> value,
+	PasswordInputWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -108,6 +117,7 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };

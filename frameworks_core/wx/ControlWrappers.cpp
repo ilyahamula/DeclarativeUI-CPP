@@ -57,6 +57,25 @@ void ButtonWrapper::realize(void* parentWindow)
 
 // TextCtrlWrapper -----------------------------------------------------------
 
+namespace
+{
+
+// wxTextCtrl::SetHint, with the field's best size pinned across it. wx is the
+// only backend whose measurement could notice a hint at all (ImGui never
+// measures one and QLineEdit's sizeHint is a fixed character count), and a
+// placeholder is usually longer than the text it stands in for -- so pinning
+// first is what keeps an auto-fit dialog the same size on all three.
+void applyHint(wxTextCtrl* txt, const std::string& hint)
+{
+	if (hint.empty())
+		return;
+	const wxSize best = txt->GetBestSize();
+	txt->SetHint(hint);
+	txt->CacheBestSize(best);
+}
+
+} // unnamed namespace
+
 void TextCtrlWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
@@ -65,6 +84,7 @@ void TextCtrlWrapper::realize(void* parentWindow)
 	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
 	if (m_value.isBound())
@@ -97,6 +117,7 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_PASSWORD);
+	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
 	if (m_value.isBound())

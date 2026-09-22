@@ -165,6 +165,10 @@ void TextCtrlWrapper::realize(void* parentWindow)
 {
 	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
+	// QLineEdit's sizeHint is a fixed character count, so the hint text cannot
+	// reach the layout here -- no pinning needed, unlike wx.
+	if (!m_placeholder.empty())
+		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
 	if (m_value.isBound())
@@ -197,6 +201,8 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	edit->setEchoMode(QLineEdit::Password);
+	if (!m_placeholder.empty())
+		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
 	if (m_value.isBound())

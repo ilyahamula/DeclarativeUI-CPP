@@ -57,7 +57,7 @@ return Dialog {
 | Category          | Widgets |
 |-------------------|---------|
 | Text              | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
-| Text input        | `TextCtrl`, `PasswordInput`, `MultiLineTextCtrl` |
+| Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
@@ -148,6 +148,21 @@ StatusBar {{
 }}
 StatusBar{ status }                     // or one stretched field, the common case
 ```
+
+`.withPlaceholder("Search files…")` puts greyed hint text in a **single-line** field,
+shown only while it is empty (`SetHint` / `setPlaceholderText` / `InputTextWithHint`).
+It is a label, not a value: nothing reads it back, and **no backend measures it**, so the
+wording can be as long as it likes without moving an auto-fit dialog.
+
+```cpp
+TextCtrl{ searchTerm }.withPlaceholder("Search files…")
+PasswordInput{ apiKey }.withPlaceholder("Paste your key")
+MultiLineTextCtrl{ notes }.withPlaceholder("…")   // compile error, by design
+```
+
+`MultiLineTextCtrl` does not have the modifier at all: `wxTextCtrl::SetHint` does nothing
+on a multi-line control on every wx port, so promising it would be a promise one backend
+could not keep. The `PlaceholderHost` concept is what states that.
 
 `FilePicker` is a path field with a Browse button, in one of three modes. **Both** ways
 of setting the path commit identically — picking one in the dialog and typing one into

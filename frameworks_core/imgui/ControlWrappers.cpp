@@ -151,7 +151,13 @@ void TextCtrlWrapper::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
-	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
+	// InputTextWithHint draws the hint only while the buffer is empty, exactly
+	// as SetHint and setPlaceholderText do, and measures nothing -- the item is
+	// the width SetNextItemWidth gave it either way.
+	const bool edited = m_placeholder.empty()
+		? ImGui::InputText("##textctrl", buf, sizeof(buf))
+		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), buf, sizeof(buf));
+	if (edited)
 	{
 		m_value.set(buf);
 		if (m_onChange)
@@ -177,7 +183,11 @@ void PasswordInputWrapper::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
-	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
+	const bool edited = m_placeholder.empty()
+		? ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password)
+		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), buf, sizeof(buf),
+			ImGuiInputTextFlags_Password);
+	if (edited)
 	{
 		m_value.set(buf);
 		if (m_onChange)
