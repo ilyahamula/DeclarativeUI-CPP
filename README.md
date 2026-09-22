@@ -62,7 +62,7 @@ return Dialog {
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
-| Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
+| Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
@@ -163,6 +163,21 @@ MultiLineTextCtrl{ notes }.withPlaceholder("…")   // compile error, by design
 `MultiLineTextCtrl` does not have the modifier at all: `wxTextCtrl::SetHint` does nothing
 on a multi-line control on every wx port, so promising it would be a promise one backend
 could not keep. The `PlaceholderHost` concept is what states that.
+
+`ProgressBar{}.Indeterminate()` is the **busy** bar: work of unknown length, animating on
+its own with no value at all. It is a mode rather than a number, so it is a capitalised
+no-arg call and nothing polls it — and it needs the valueless constructor, since there is
+nothing to bind.
+
+```cpp
+ProgressBar{ percentDone }          // 0..100, bound or a snapshot
+ProgressBar{}.Indeterminate()       // busy: no value, animates by itself
+```
+
+Each backend answers with its own drawing mode — `wxGauge::Pulse()`, an empty
+`QProgressBar` range, a negative ImGui fraction — and **wx is the only one that needs a
+clock**: wxGTK advances the marquee one step per `Pulse()`, so the wrapper runs a 100 ms
+timer rather than riding the idle sync, which stops when the event queue drains.
 
 `FilePicker` is a path field with a Browse button, in one of three modes. **Both** ways
 of setting the path commit identically — picking one in the dialog and typing one into

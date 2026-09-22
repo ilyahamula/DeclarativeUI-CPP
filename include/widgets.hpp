@@ -1736,6 +1736,14 @@ struct ProgressBar : Widget<ProgressBar>
 {
 	using super = Widget<ProgressBar>;
 
+	// No value at all -- the spelling Indeterminate() is written against. A
+	// determinate bar with nothing bound would sit empty forever, so this
+	// constructor is only useful with the mode below.
+	ProgressBar()
+		: super()
+	{
+	}
+
 	explicit ProgressBar(const float& value)
 		: super()
 		, m_value(value)
@@ -1748,17 +1756,30 @@ struct ProgressBar : Widget<ProgressBar>
 	{
 	}
 
+	// Busy mode: the bar animates on its own and the value is ignored.
+	//
+	// A plain bool rather than a BoundValue, unlike isDisabled(): every backend
+	// switches the native control into a different DRAWING MODE for this
+	// (wxGauge::Pulse, an empty QProgressBar range, ImGui's negative fraction),
+	// which is a decision about what the control is, not a number it displays.
+	ProgressBar& Indeterminate()
+	{
+		m_indeterminate = true;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ProgressBarWrapper>(m_value, pos, size, style);
+		return std::make_unique<ProgressBarWrapper>(m_value, m_indeterminate, pos, size, style);
 	}
 
 private:
 	BoundValue<float> m_value;
+	bool m_indeterminate = false;
 };
 
 // Image -----------------------------------------------------------

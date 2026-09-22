@@ -1027,9 +1027,19 @@ void ProgressBarWrapper::realize(void* parentWindow)
 
 	const float initial = m_value.get();
 	auto* bar = new QProgressBar(static_cast<QWidget*>(parentWindow));
+	m_nativeWidget = bar;
+
+	if (m_indeterminate)
+	{
+		// An empty range is Qt's busy indicator: the bar animates itself, draws no
+		// percentage and ignores setValue(), so there is no value to mirror and
+		// nothing to bind.
+		bar->setRange(0, 0);
+		return;
+	}
+
 	bar->setRange(0, 100);
 	bar->setValue(toBar(initial));
-	m_nativeWidget = bar;
 
 	// A progress bar has no input of its own -- the bound float is only ever
 	// written from outside -- so the sync is the whole story here.

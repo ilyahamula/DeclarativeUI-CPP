@@ -1817,7 +1817,13 @@ void ProgressBarWrapper::render(const Rect& frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	auto clampedValue = std::clamp(value / 100.0f, 0.0f, 1.0f);
-	ImGui::ProgressBar(clampedValue, size);
+	// A NEGATIVE fraction is ImGui's busy mode, and the band's position is read
+	// straight out of it -- ImGui keeps no animation state of its own here, so
+	// the clock has to be fed in. The tree is rebuilt every frame, which is
+	// exactly what makes that free on this backend.
+	const float fraction = m_indeterminate
+		? -1.0f * (float)ImGui::GetTime()
+		: std::clamp(value / 100.0f, 0.0f, 1.0f);
+	ImGui::ProgressBar(fraction, size);
 	ImGui::PopID();
 }

@@ -706,10 +706,11 @@ private:
 class ProgressBarWrapper : public ControlWrapper
 {
 public:
-	ProgressBarWrapper(BoundValue<float> value,
+	ProgressBarWrapper(BoundValue<float> value, bool indeterminate,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_indeterminate(indeterminate)
 	{
 	}
 
@@ -717,6 +718,9 @@ public:
 
 private:
 	BoundValue<float> m_value;
+	// Busy mode: the value is ignored and the bar animates instead. Nothing polls
+	// it, so it is a plain bool -- see ProgressBar::Indeterminate().
+	bool m_indeterminate = false;
 };
 
 // ComboBoxWrapper -----------------------------------------------------------

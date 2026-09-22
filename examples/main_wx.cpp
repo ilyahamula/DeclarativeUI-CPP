@@ -15,23 +15,28 @@ class DeclarativeApp : public wxApp
     bool m_pickersDisabled = false;
     std::vector<std::string> m_enabledPlugins { "Formatter", "Debugger" };
     std::string m_enabledSummary = pluginSummary(m_enabledPlugins);
-    std::vector<std::string> m_modules { "Core", "Storage" };
-    bool m_moduleListsDisabled = false;
     // T3.3: both start EMPTY, which is the state a placeholder is for.
     std::string m_searchTerm;
     std::string m_apiKey;
+    // T3.4: the shared float and the two halves of the busy flag. `m_idle` is
+    // the complement isDisabled() cannot express -- it binds a bool, not `!bool`.
+    float m_progress = 35.0f;
+    bool m_busy = false;
+    bool m_idle = true;
 
 public:
     bool OnInit() override
     {
-        // The pickers gallery, now carrying T3.2's CheckListBox: on wx a native
-        // wxCheckListBox, whose Check() setter deliberately fires no event, so
-        // the ref-sync push cannot re-enter the user's onChange.
+        // T3.4's gallery: a determinate bar next to a busy one. wx is the one
+        // backend that needs a clock of its own for the busy half, since wxGTK
+        // advances the marquee once per Pulse() call.
+        drawIndeterminateProgressUI().show();
+        // The pickers gallery it was split out of, for the surrounding context.
         drawPickersGalleryUI(m_openPath, m_savePath, m_folderPath, m_lastDialogResult,
             m_pickersDisabled, m_enabledPlugins, m_enabledSummary, m_searchTerm, m_apiKey).show();
-        // The binding demo: two CheckListBoxes and a ListBox over one
-        // std::vector<std::string>.
-        drawCheckListBinding(m_modules, m_moduleListsDisabled).show();
+        // The binding demo: a determinate bar sharing a float with a slider,
+        // next to a valueless one, with a checkbox picking which half is live.
+        drawIndeterminateProgressBinding(m_progress, m_busy, m_idle).show();
         return true;
     }
 };

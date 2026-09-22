@@ -29,6 +29,7 @@
 #include <wx/collheaderctrl.h>
 #include <wx/filepicker.h>
 #include <wx/checklst.h>
+#include <wx/timer.h>
 
 #include "frameworks_core/wx/FileDialogSupport.hpp"
 
@@ -1069,6 +1070,13 @@ void ExpanderHeaderWrapper::realize(void* parentWindow)
 
 // ProgressBarWrapper -----------------------------------------------------------
 
+// How often an indeterminate gauge is pulsed. wxGTK advances the marquee one
+// pulse step per call, so this is the animation's frame rate there; wxOSX and
+// wxMSW switch the native control into a self-animating mode on the first call
+// and ignore the rest. 100 ms is a full sweep per second on GTK and costs
+// nothing on the two ports that do not need it.
+static constexpr int kGaugePulseIntervalMs = 100;
+
 void ProgressBarWrapper::realize(void* parentWindow)
 {
 #ifdef USE_LOGGER
@@ -1080,8 +1088,28 @@ void ProgressBarWrapper::realize(void* parentWindow)
 	const float initial = m_value.get();
 	auto* gauge = new wxGauge(static_cast<wxWindow*>(parentWindow), wxID_ANY, 100,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxGA_HORIZONTAL | wxGA_SMOOTH);
-	gauge->SetValue(toGauge(initial));
 	m_nativeWidget = gauge;
+
+	if (m_indeterminate)
+	{
+		// Busy mode. wx is the one backend that will not animate by itself
+		// everywhere, so the pulse needs a clock -- and the idle sync every other
+		// binding rides on is the wrong one: it fires when the event queue drains
+		// and deliberately never asks for more, so an untouched window would
+		// freeze the animation outright. A timer keeps ticking while nothing
+		// happens.
+		//
+		// The gauge owns the timer through the handler's capture: the dynamic
+		// event table dies with the window, which drops the last reference and
+		// stops the timer. Nothing here outlives the gauge.
+		auto timer = std::make_shared<wxTimer>(gauge);
+		gauge->Bind(wxEVT_TIMER, [gauge, timer](wxTimerEvent&) { gauge->Pulse(); });
+		gauge->Pulse();
+		timer->Start(kGaugePulseIntervalMs);
+		return;
+	}
+
+	gauge->SetValue(toGauge(initial));
 
 	// A progress bar has no input events of its own -- the bound float is only ever
 	// written from outside -- so the idle sync is the whole story here.

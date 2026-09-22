@@ -18,20 +18,25 @@ int main(int argc, char** argv)
     bool pickersDisabled = false;
     std::vector<std::string> enabledPlugins { "Formatter", "Debugger" };
     std::string enabledSummary = pluginSummary(enabledPlugins);
-    std::vector<std::string> modules { "Core", "Storage" };
-    bool moduleListsDisabled = false;
     // T3.3: both start EMPTY, which is the state a placeholder is for.
     std::string searchTerm;
     std::string apiKey;
+    // T3.4: the shared float and the two halves of the busy flag. `idle` is
+    // the complement isDisabled() cannot express -- it binds a bool, not `!bool`.
+    float progress = 35.0f;
+    bool busy = false;
+    bool idle = true;
 
-    // The pickers gallery, now carrying T3.2's CheckListBox: on Qt a
-    // QListWidget whose items are ItemIsUserCheckable, with itemChanged
-    // connected only after population.
+    // T3.4's gallery: a determinate bar next to a busy one. On Qt the busy
+    // half is an empty range and nothing else -- QProgressBar animates the
+    // indicator itself and ignores setValue().
+    drawIndeterminateProgressUI().show();
+    // The pickers gallery it was split out of, for the surrounding context.
     drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
         pickersDisabled, enabledPlugins, enabledSummary, searchTerm, apiKey).show();
-    // The binding demo: two CheckListBoxes and a ListBox over one
-    // std::vector<std::string>. Tick in either list and the others follow.
-    drawCheckListBinding(modules, moduleListsDisabled).show();
+    // The binding demo: a determinate bar sharing a float with a slider, next
+    // to a valueless one, with a checkbox picking which half is live.
+    drawIndeterminateProgressBinding(progress, busy, idle).show();
 
     return app.exec();
 }

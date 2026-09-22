@@ -14,6 +14,8 @@
 #include "messagebox.hpp"
 #include "filedialog.hpp"
 
+#include <type_traits>
+
 static_assert(NodeBuildable<Button>);
 static_assert(NodeBuildable<TextCtrl>);
 static_assert(NodeBuildable<StaticText>);
@@ -22,6 +24,9 @@ static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
 static_assert(NodeBuildable<StatusBar>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
+static_assert(NodeBuildable<ProgressBar>);
+// Indeterminate() needs the valueless spelling: a busy bar has no number to show.
+static_assert(std::is_default_constructible_v<ProgressBar>);
 static_assert(NodeBuildable<FilePicker>);
 static_assert(NodeBuildable<ListBox<int>>);
 static_assert(NodeBuildable<ListBox<std::string>>);

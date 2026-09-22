@@ -938,3 +938,81 @@ inline auto drawCheckListBinding(std::vector<std::string>& modules, bool& listsD
         }
     };
 }
+
+// T3.4: the two ProgressBar spellings over one caller-owned float and one
+// caller-owned bool.
+//
+// `progress` is shared by the Slider and the determinate bar, so dragging the
+// slider fills the bar with no wiring at all. The indeterminate bar beside it
+// is bound to nothing: there is no number, and that is the point.
+//
+// `busy` is what picks which of the two is live. isDisabled() binds a bool, not
+// an expression, so the complement is a second caller-owned bool the checkbox
+// keeps in step -- writing `!busy` into the call would snapshot the value at
+// build time and never change again.
+//
+// macOS caveat, the same one this file opens with: a disabled wxGauge or
+// QProgressBar is drawn exactly like an enabled one, so watch the SLIDER to see
+// the toggle land. The animation itself is visible everywhere.
+inline auto drawIndeterminateProgressBinding(float& progress, bool& busy, bool& idle)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 96;
+    constexpr Size kBarSize { 320, 20 };
+
+    return Dialog {
+        "ProgressBar: value vs Indeterminate()",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One float behind the slider below and the top bar:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Progress:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                ProgressBar{progress}
+                    .withSize(kBarSize)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(busy)
+            },
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"Indexing…"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                // No value, so nothing to share: the mode replaces the number.
+                ProgressBar{}
+                    .Indeterminate()
+                    .withSize(kBarSize)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(idle)
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                StaticText{"Drag:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                Slider { Range<float>{ .min = 0.0f, .max = 100.0f }, progress }
+                    .withFlags(LayoutFlags().Expand().CenterVertical())
+                    .isDisabled(busy)
+            },
+
+            // The one write that keeps the complement honest. `busy` is bound,
+            // so the checkbox has already stored the new state by the time this
+            // runs -- value first, then the callback, as everywhere else.
+            CheckBox{busy, "Busy (work of unknown length) -- disables the determinate half"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+                .onChange([&idle](bool nowBusy) { idle = !nowBusy; })
+        }
+    };
+}

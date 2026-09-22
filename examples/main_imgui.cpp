@@ -25,22 +25,27 @@ int main(int argc, char** argv)
     bool pickersDisabled = false;
     std::vector<std::string> enabledPlugins { "Formatter", "Debugger" };
     std::string enabledSummary = pluginSummary(enabledPlugins);
-    std::vector<std::string> modules { "Core", "Storage" };
-    bool moduleListsDisabled = false;
     // T3.3: both start EMPTY, which is the state a placeholder is for.
     std::string searchTerm;
     std::string apiKey;
+    // T3.4: the shared float and the two halves of the busy flag. `idle` is
+    // the complement isDisabled() cannot express -- it binds a bool, not `!bool`.
+    float progress = 35.0f;
+    bool busy = false;
+    bool idle = true;
 
     runImGuiApp([&]
     {
-        // The pickers gallery, now carrying T3.2's CheckListBox: a list with a
-        // checkbox on every row, drawn on ImGui as Checkbox rows inside the
-        // same child region BeginListBox gives the plain list.
+        // T3.4's gallery: a determinate bar next to a busy one. On ImGui the
+        // busy half is a NEGATIVE fraction fed from GetTime(), which the
+        // per-frame rebuild makes free -- the band's position IS the number.
+        drawIndeterminateProgressUI().show();
+        // The pickers gallery it was split out of, for the surrounding context.
         drawPickersGalleryUI(openPath, savePath, folderPath, lastDialogResult,
             pickersDisabled, enabledPlugins, enabledSummary, searchTerm, apiKey).show();
-        // The binding demo: two CheckListBoxes and a ListBox over one
-        // std::vector<std::string>.
-        drawCheckListBinding(modules, moduleListsDisabled).show();
+        // The binding demo: a determinate bar sharing a float with a slider,
+        // next to a valueless one, with a checkbox picking which half is live.
+        drawIndeterminateProgressBinding(progress, busy, idle).show();
     });
 
     return 0;

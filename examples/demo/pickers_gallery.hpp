@@ -292,3 +292,75 @@ inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
         }
     };
 }
+
+// T3.4: ProgressBar::Indeterminate(), the busy spelling with no value at all.
+//
+// Its own dialog rather than a fifth box in the gallery above: that one already
+// auto-fits to 777 px, which is the whole of the ImGui demo viewport, so
+// anything more would be drawn off the bottom (rule 4's ~20-element mark, read
+// as the height it actually produces). The determinate bar, the labels and the
+// separator are the already-implemented controls it carries for context.
+//
+// Indeterminate() is a MODE, not a number, so it is a capitalised no-arg call
+// and nothing polls it. Every backend answers with a different drawing mode:
+//
+//   * wx    -- wxGauge::Pulse(), the one that needs a clock of its own. wxGTK
+//              advances the marquee one step per call, so the wrapper runs a
+//              100 ms wxTimer; the idle sync every other binding rides on
+//              stops when the queue drains and would freeze the animation.
+//   * Qt    -- setRange(0, 0). QProgressBar animates the busy indicator itself,
+//              draws no percentage and ignores setValue().
+//   * ImGui -- a NEGATIVE fraction, fed from GetTime(). ImGui keeps no
+//              animation state, so the clock is passed in -- free here, since
+//              the tree is rebuilt every frame anyway.
+inline auto drawIndeterminateProgressUI()
+{
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 96;
+    constexpr int kBoxW = 520;
+    // Pinned like every other leaf in this file: the three backends' intrinsic
+    // gauge heights disagree, and a busy bar has no content to measure at all.
+    constexpr Size kBarSize { 380, 20 };
+
+    return Dialog {
+        "ProgressBar (determinate and busy)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 10),
+            VGroupBox { "ProgressBar::Indeterminate() (busy mode)",
+                LayoutFlags().Expand().MinSize({kBoxW, -1}),
+                StaticText{"The top bar knows how far along it is; the bottom one does not."}
+                    .withSize({-1, kLabelH}),
+
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    StaticText{"Copying:"}
+                        .withSize({kLabelW, kLabelH})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    ProgressBar{60.0f}
+                        .withSize(kBarSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .withTooltip("An ordinary 0..100 value")
+                },
+
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
+
+                HStack {
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    StaticText{"Indexing…"}
+                        .withSize({kLabelW, kLabelH})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                    // ProgressBar{} -- no value, because there is none to show.
+                    // Without the valueless constructor Indeterminate() would
+                    // leave a number nothing reads.
+                    ProgressBar{}
+                        .Indeterminate()
+                        .withSize(kBarSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .withTooltip("No value: the animation is the whole message")
+                }
+            }
+        }
+    };
+}
