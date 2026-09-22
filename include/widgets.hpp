@@ -967,7 +967,7 @@ TreeView(std::vector<TreeItem>, const T&) -> TreeView<T>;
 // text of the first column (std::string / std::vector<std::string>), and -- as
 // with ListBox -- the bound type is what picks single- vs multi-select. Index
 // bindings address the row's position in `rows`, never its position on screen,
-// so they survive sorting; see TableValue in Concepts.hpp for when to prefer
+// so they survive sorting; see TableValue in ValueConcepts.hpp for when to prefer
 // which.
 //
 // Passing `rows` as a non-const lvalue BINDS them, which is what makes an

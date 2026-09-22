@@ -1,6 +1,6 @@
 #pragma once
 
-#include "frameworks_core/CoreTypes/Concepts.hpp"
+#include "frameworks_core/CoreTypes/ValueConcepts.hpp"
 
 #include <algorithm>
 #include <cmath>
