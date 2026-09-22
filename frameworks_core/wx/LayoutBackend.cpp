@@ -230,6 +230,9 @@ void WxLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 		wxOsxAllowTallButton(window);
 #endif
 	window->SetSize(local.x, local.y, local.width, local.height);
+	// After the move, so a wrapper that composes its content against the frame
+	// is composing against the frame it actually got.
+	leaf.widget->placed(local);
 }
 
 wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)

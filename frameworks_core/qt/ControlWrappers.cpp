@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
@@ -37,6 +38,9 @@
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
+#include <QHBoxLayout>
+
+#include "frameworks_core/qt/FileDialogSupport.hpp"
 
 // realize() creates the QWidget under the given parent window and connects
 // its signals (plain lambda connects — no moc). The layout engine measures
@@ -71,6 +75,54 @@ protected:
 			onHover();
 		QLabel::enterEvent(event);
 	}
+};
+
+// A QLabel that remembers the picture it was given.
+//
+// It has to: a QLabel scales its pixmap only through setScaledContents(),
+// which is exactly ScaleMode::Stretch and nothing else, so every other mode
+// needs the picture COMPOSED against the frame -- and composing repeatedly
+// from an already-composed pixmap would lose whatever the last crop discarded.
+//
+// The frame arrives through ControlWrapper::placed(), the same hook the wx
+// twin uses: realize() runs before the engine has decided anything, and a
+// resizeEvent would be one backend learning it a different way.
+class ScaledImageLabel : public ClickableLabel
+{
+public:
+	using ClickableLabel::ClickableLabel;
+
+	QPixmap source;
+	ScaleMode mode = ScaleMode::Stretch;
+
+	// Guarded on the size it last composed at, so a relayout that did not move
+	// this picture costs no scaling -- and setPixmap's updateGeometry() can
+	// never drive a second pass.
+	void composeFor(const QSize& box)
+	{
+		if (source.isNull() || box.isEmpty() || box == m_composed)
+			return;
+		m_composed = box;
+
+		const Rect target = scaledImageRect(mode,
+			Size { source.width(), source.height() },
+			Size { box.width(), box.height() });
+
+		// Everything the mode does not cover stays transparent, so a Fit
+		// letterbox shows the parent through it exactly as wx's does.
+		QPixmap canvas(box);
+		canvas.fill(Qt::transparent);
+		QPainter painter(&canvas);
+		painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+		// Clipped by the canvas on every side, which IS the crop for Fill and
+		// Center: the target rect is deliberately allowed to overflow.
+		painter.drawPixmap(QRect(target.x, target.y, target.width, target.height), source);
+		painter.end();
+		setPixmap(canvas);
+	}
+
+private:
+	QSize m_composed;
 };
 
 // The Splitter's sash: a sunken line the user drags, with the mouse handling
@@ -162,6 +214,10 @@ void TextCtrlWrapper::realize(void* parentWindow)
 {
 	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
+	// QLineEdit's sizeHint is a fixed character count, so the hint text cannot
+	// reach the layout here -- no pinning needed, unlike wx.
+	if (!m_placeholder.empty())
+		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
 	if (m_value.isBound())
@@ -194,6 +250,8 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	const std::string& initial = m_value.get();
 	auto* edit = new QLineEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	edit->setEchoMode(QLineEdit::Password);
+	if (!m_placeholder.empty())
+		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
 	if (m_value.isBound())
@@ -295,7 +353,14 @@ void LinkTextWrapper::realize(void* parentWindow)
 
 void StaticTextWrapper::realize(void* parentWindow)
 {
-	m_nativeWidget = new QLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	auto* label = new QLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	// AlignVCenter is QLabel's own default and is kept, so a Left label reads
+	// exactly as it always did; only the horizontal half follows withAlign().
+	const Qt::Alignment horizontal = m_align == TextAlign::Center ? Qt::AlignHCenter
+		: m_align == TextAlign::Right ? Qt::AlignRight
+		: Qt::AlignLeft;
+	label->setAlignment(horizontal | Qt::AlignVCenter);
+	m_nativeWidget = label;
 
 }
 
@@ -644,13 +709,16 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 
 void ImageWrapper::realize(void* parentWindow)
 {
-	auto* label = new ClickableLabel(static_cast<QWidget*>(parentWindow));
+	auto* label = new ScaledImageLabel(static_cast<QWidget*>(parentWindow));
 	QPixmap pixmap(qstr(m_filePath));
 	if (!pixmap.isNull())
 	{
-		if (m_displayWidth > 0 && m_displayHeight > 0)
-			pixmap = pixmap.scaled(m_displayWidth, m_displayHeight,
-				Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		label->source = pixmap;
+		label->mode = m_scaleMode;
+		// The ORIGINAL goes in so sizeHint() reports the natural size, which is
+		// what the measure pass reads; an explicit withSize() overrides it per
+		// axis in measureContent(). The composed picture replaces it the moment
+		// the engine places the label.
 		label->setPixmap(pixmap);
 	}
 	else
@@ -668,6 +736,15 @@ void ImageWrapper::realize(void* parentWindow)
 	else if (m_onHoverWithWidget)
 		label->onHover = [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget] { cb(nw); };
 
+}
+
+void ImageWrapper::placed(const Rect& frame)
+{
+	// static_cast, not qobject_cast: there is no Q_OBJECT anywhere in this
+	// backend, and realize() creates a ScaledImageLabel unconditionally -- a
+	// picture that failed to load is one holding a null source, not a QLabel.
+	if (auto* label = static_cast<ScaledImageLabel*>(m_nativeWidget))
+		label->composeFor(QSize(frame.width, frame.height));
 }
 
 // ToolBarWrapper -----------------------------------------------------------
@@ -854,6 +931,86 @@ void ColorPickerWrapper::realize(void* parentWindow)
 
 }
 
+// FilePickerWrapper -----------------------------------------------------------
+
+void FilePickerWrapper::realize(void* parentWindow)
+{
+	// Qt has no picker control, so the composite is built by hand: a field and
+	// a Browse button in one QWidget, which is the single leaf the engine sees.
+	// The QHBoxLayout is what makes place()'s setGeometry re-lay the two halves
+	// -- the engine sizes the composite and Qt distributes inside it.
+	auto* composite = new QWidget(static_cast<QWidget*>(parentWindow));
+	auto* row = new QHBoxLayout(composite);
+	row->setContentsMargins(0, 0, 0, 0);
+	row->setSpacing(4);
+
+	auto* edit = new QLineEdit(qstr(m_value.get()), composite);
+	auto* browse = new QToolButton(composite);
+	browse->setText(QStringLiteral("..."));
+	browse->setFocusPolicy(Qt::TabFocus);
+	row->addWidget(edit, 1);
+	row->addWidget(browse, 0);
+	m_nativeWidget = composite;
+
+	// One commit path for both halves: the dialog writes the field, and the
+	// field is what everything else reads. That is what makes a typed path and
+	// a picked one indistinguishable downstream (R11.4).
+	auto commit = [edit](const std::string& path) { edit->setText(qstr(path)); };
+
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		// textEdited, not textChanged: it fires for user typing only, so the
+		// dialog's own setText below re-enters this through exactly one route
+		// rather than two.
+		QObject::connect(edit, &QLineEdit::textEdited,
+			[&value, cb = m_onChange, cbw = m_onChangeWithWidget, nw = m_nativeWidget](const QString& text) {
+				value = text.toStdString();
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
+	}
+
+	// The dialog leg. It writes the field and then reports, in that order, so a
+	// handler reading the bound value already sees the new one (rules.md C4).
+	// Everything it needs is captured by value -- the wrapper is not, since its
+	// teardown order against the widget is not fixed.
+	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
+	QObject::connect(browse, &QToolButton::clicked,
+		[composite, edit, commit, bound, mode = m_mode, filters = m_filters,
+			title = m_dialogTitle, cb = m_onChange, cbw = m_onChangeWithWidget,
+			nw = m_nativeWidget]() {
+			const std::string current = edit->text().toStdString();
+			const std::string chosen = qtRunFileDialog(composite, title, mode, filters, current);
+			if (chosen.empty())
+				return; // cancel leaves the path alone -- it is not a selection of ""
+			commit(chosen);
+			if (bound)
+				*bound = chosen;
+			if (cb) cb(chosen);
+			else if (cbw) cbw(chosen, nw);
+		});
+
+	// Unbound and with a callback: the field is still the value, so typing has
+	// to report too. (Bound values took this leg above.)
+	if (!m_value.isBound())
+	{
+		if (m_onChange)
+			QObject::connect(edit, &QLineEdit::textEdited,
+				[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
+		else if (m_onChangeWithWidget)
+			QObject::connect(edit, &QLineEdit::textEdited,
+				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
+					cbw(text.toStdString(), nw);
+				});
+	}
+
+}
+
 // SeparatorWrapper -----------------------------------------------------------
 
 void SeparatorWrapper::realize(void* parentWindow)
@@ -938,9 +1095,19 @@ void ProgressBarWrapper::realize(void* parentWindow)
 
 	const float initial = m_value.get();
 	auto* bar = new QProgressBar(static_cast<QWidget*>(parentWindow));
+	m_nativeWidget = bar;
+
+	if (m_indeterminate)
+	{
+		// An empty range is Qt's busy indicator: the bar animates itself, draws no
+		// percentage and ignores setValue(), so there is no value to mirror and
+		// nothing to bind.
+		bar->setRange(0, 0);
+		return;
+	}
+
 	bar->setRange(0, 100);
 	bar->setValue(toBar(initial));
-	m_nativeWidget = bar;
 
 	// A progress bar has no input of its own -- the bound float is only ever
 	// written from outside -- so the sync is the whole story here.
@@ -1116,6 +1283,92 @@ template class ListBoxWrapper<int>;
 template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
+
+// CheckListBoxWrapper -----------------------------------------------------------
+
+namespace
+{
+
+std::vector<int> checkListChecked(const QListWidget* list)
+{
+	std::vector<int> indices;
+	for (int i = 0; i < list->count(); ++i)
+	{
+		if (list->item(i)->checkState() == Qt::Checked)
+			indices.push_back(i);
+	}
+	return indices;
+}
+
+void setCheckListChecked(QListWidget* list, const std::vector<int>& indices)
+{
+	for (int i = 0; i < list->count(); ++i)
+	{
+		const bool checked = std::find(indices.begin(), indices.end(), i) != indices.end();
+		list->item(i)->setCheckState(checked ? Qt::Checked : Qt::Unchecked);
+	}
+}
+
+} // unnamed namespace
+
+template <CheckListValue T>
+void CheckListBoxWrapper<T>::realize(void* parentWindow)
+{
+	// The same sizeHint override ListBoxWrapper needs, for the same reason:
+	// QListWidget's own hint is a fixed ~256x192 that reads neither the item
+	// text nor the item count.
+	auto* list = new SizedListWidget(static_cast<QWidget*>(parentWindow));
+	list->visibleRows = m_visibleRows;
+	// Single-SELECTION, whatever the checked set holds: the highlight and the
+	// ticks are independent, as on wx.
+	list->setSelectionMode(QAbstractItemView::SingleSelection);
+
+	const std::vector<int> checked = indicesFor(m_items, boundValue());
+	for (int i = 0; i < static_cast<int>(m_items.size()); ++i)
+	{
+		auto* item = new QListWidgetItem(qstr(m_items[i]), list);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+		item->setCheckState(std::find(checked.begin(), checked.end(), i) != checked.end()
+			? Qt::Checked : Qt::Unchecked);
+	}
+	m_nativeWidget = list;
+
+	// itemChanged is connected only AFTER the population above: every
+	// setCheckState() there emits it, so connecting first would read the
+	// initial state as a series of user ticks.
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[&value, list, items = m_items, cb = std::move(m_onChange),
+				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
+				value = valueFor(items, checkListChecked(list));
+				if (cb) cb(value);
+				else if (cbw) cbw(value, nw);
+			});
+		bindExternalRefSync(list,
+			[list] { return checkListChecked(list); },
+			[&value, items = m_items] { return indicesFor(items, value); },
+			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
+	}
+	else if (m_onChange)
+	{
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[list, items = m_items, cb = std::move(m_onChange)](QListWidgetItem*) {
+				cb(valueFor(items, checkListChecked(list)));
+			});
+	}
+	else if (m_onChangeWithWidget)
+	{
+		QObject::connect(list, &QListWidget::itemChanged, list,
+			[list, items = m_items, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
+				cbw(valueFor(items, checkListChecked(list)), nw);
+			});
+	}
+}
+
+template class CheckListBoxWrapper<std::vector<int>>;
+template class CheckListBoxWrapper<std::vector<std::string>>;
 
 // TreeViewWrapper -----------------------------------------------------------
 

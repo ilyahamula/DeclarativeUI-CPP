@@ -30,7 +30,8 @@ void DialogWrapper::show()
 }
 
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
-	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position)
+	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position,
+	bool modal, std::function<void()> onClose, bool* open)
 {
 	long style = wxDEFAULT_DIALOG_STYLE; // not user-resizable by default
 	if (resizable)
@@ -43,6 +44,8 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine = std::make_unique<LayoutEngine>(*session->backend);
 	session->root = std::move(root);
 	session->resizable = resizable;
+	session->openFlag = open;
+	session->onClose = std::move(onClose);
 
 	const wxRect workArea = wxGetClientDisplayRect();
 	session->engine->setMaxAutoFitWidth((workArea.width * 9) / 10);
@@ -74,6 +77,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 
 	// invalidation wiring -------------------------------------------------
 	session->bindInvalidation(*session->root);
+	session->bindOpenFlag();
 
 	// user resize (Resizable only): arrange-only within the new client area
 	dialog->Bind(wxEVT_SIZE, [session](wxSizeEvent& event) {
@@ -92,9 +96,27 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		session->relayout();
 		event.Skip();
 	});
+	// The single close path: the user's close button lands here, and so does
+	// bindOpenFlag()'s Close() when the caller clears the flag.
+	//
+	// Not Skip()ped, unlike the frame in WindowWrapper.cpp. wxFrame's default
+	// handler destroys itself; wxDialogBase's only HIDES a modeless dialog,
+	// which would leave the engine session and every native control under it
+	// alive for the rest of the run and a stale hidden window behind any later
+	// re-show. A closed Dialog is gone, exactly as it is on Qt and exactly as a
+	// Window is here.
+	dialog->Bind(wxEVT_CLOSE_WINDOW, [session, dialog](wxCloseEvent&) {
+		session->notifyClosed();
+		dialog->Destroy(); // deferred to idle by wx; the session dies with it
+	});
 	dialog->Bind(wxEVT_DESTROY, [session, dialog](wxWindowDestroyEvent& event) {
 		if (event.GetWindow() == dialog)
+		{
+			// the app shutting down destroys top-level windows without always
+			// routing through a close event
+			session->notifyClosed();
 			delete session;
+		}
 		event.Skip();
 	});
 
@@ -102,6 +124,13 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// caller asked rather than where the platform put the default-positioned one
 	if (position)
 		dialog->Move(position->x, position->y);
+
+	// Constructed last, and only now that the dialog exists to be skipped: the
+	// disabler takes the application's windows as it finds them. It lives in the
+	// session, so the lock lasts exactly as long as the dialog does -- and Show()
+	// still returns immediately, which is what makes Modal() non-blocking.
+	if (modal)
+		session->modalGuard = std::make_unique<wxWindowDisabler>(dialog);
 
 	dialog->Show();
 }

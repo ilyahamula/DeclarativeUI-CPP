@@ -202,6 +202,9 @@ void QtLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	}
 	const Rect local = toLocal(frame);
 	window->setGeometry(local.x, local.y, local.width, local.height);
+	// After the move, so a wrapper that composes its content against the frame
+	// is composing against the frame it actually got.
+	leaf.widget->placed(local);
 }
 
 QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)

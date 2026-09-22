@@ -5,6 +5,7 @@
 #include "frameworks_core/CoreTypes/StatusField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
+#include "frameworks_core/CoreTypes/FileFilter.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
 
 #include <algorithm>
@@ -66,15 +67,22 @@ private:
 };
 
 // TextCtrlWrapper -----------------------------------------------------------
+// The placeholder is a plain string, not a BoundValue: it is a fixed label for
+// the empty field rather than a value anything writes, so there is nothing for
+// a ref sync to poll. It is deliberately NOT measured on any backend -- a hint
+// is usually longer than the text it stands in for, and measuring it would let
+// wording resize an auto-fit dialog, which is the trap the editable fields'
+// content-independent floors already avoid.
 class TextCtrlWrapper : public ControlWrapper
 {
 public:
-	TextCtrlWrapper(BoundValue<std::string> value,
+	TextCtrlWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -84,6 +92,7 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -92,12 +101,13 @@ private:
 class PasswordInputWrapper : public ControlWrapper
 {
 public:
-	PasswordInputWrapper(BoundValue<std::string> value,
+	PasswordInputWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
 		std::function<void(const std::string&)> onChange = {},
 		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
@@ -107,6 +117,7 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -198,13 +209,17 @@ private:
 };
 
 // StaticTextWrapper -----------------------------------------------------------
+// The alignment is a plain TextAlign, not a BoundValue, for the same reason a
+// placeholder is a plain string: it is decided when the tree is described and
+// nothing writes it afterwards, so there is nothing for a ref sync to poll.
 class StaticTextWrapper : public ControlWrapper
 {
 public:
-	StaticTextWrapper(const std::string& text,
+	StaticTextWrapper(const std::string& text, TextAlign align,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
+		, m_align(align)
 	{
 	}
 
@@ -212,6 +227,7 @@ public:
 
 private:
 	std::string m_text;
+	TextAlign m_align = TextAlign::Left;
 };
 
 // DatePickerWrapper -----------------------------------------------------------
@@ -425,7 +441,7 @@ private:
 class ImageWrapper : public ControlWrapper
 {
 public:
-	ImageWrapper(const std::string& filePath,
+	ImageWrapper(const std::string& filePath, ScaleMode scaleMode,
 		const Position& pos, const Size& size, long style,
 		std::function<void()> onClick = {},
 		std::function<void(void*)> onClickWithWidget = {},
@@ -433,6 +449,7 @@ public:
 		std::function<void(void*)> onHoverWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_filePath(filePath)
+		, m_scaleMode(scaleMode)
 		, m_displayWidth(size.width)
 		, m_displayHeight(size.height)
 		, m_onClick(std::move(onClick))
@@ -443,9 +460,19 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+#if defined(USE_WX) || defined(USE_QT)
+	// The one wrapper that needs the frame AFTER the engine has computed it:
+	// every mode but Stretch decides what the pixels do from the frame's shape,
+	// and neither a wxStaticBitmap nor a QLabel can work that out for itself.
+	void placed(const Rect& frame) override;
+#endif
 
 private:
 	std::string m_filePath;
+	// What the pixels do inside the engine's frame. The frame itself is not
+	// known until the control is placed, which is why every backend applies
+	// this later than realize()/measure -- see the wrappers.
+	ScaleMode m_scaleMode = ScaleMode::Stretch;
 	void* m_textureId = nullptr; // ImTextureID (void*) holding the GL texture handle
 	int m_imgWidth = 0;
 	int m_imgHeight = 0;
@@ -527,6 +554,46 @@ private:
 	BoundValue<Color> m_value;
 	std::function<void(const Color&)> m_onChange;
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+};
+
+// FilePickerWrapper -----------------------------------------------------------
+// A path field with a Browse button. ONE leaf to the engine on all three
+// backends, though none of them builds it the same way: wx has a native picker
+// control, Qt gets a composite QWidget laid out by hand, and ImGui draws a
+// field, a button and -- since there is no OS dialog to open -- a browser popup
+// of its own (imgui/FileBrowserPopup.hpp).
+//
+// Both ways of setting the path write through and fire onChange: picking one in
+// the dialog, and typing one into the field (R11.4). That is why the wx picker
+// asks for its text control and why Qt's composite carries a real QLineEdit
+// rather than a read-only display.
+class FilePickerWrapper : public ControlWrapper
+{
+public:
+	FilePickerWrapper(BoundValue<std::string> value,
+		FileMode mode, std::vector<FileFilter> filters, std::string dialogTitle,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const std::string&)> onChange = {},
+		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_value(std::move(value))
+		, m_mode(mode)
+		, m_filters(std::move(filters))
+		, m_dialogTitle(std::move(dialogTitle))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	BoundValue<std::string> m_value;
+	FileMode m_mode = FileMode::Open;
+	std::vector<FileFilter> m_filters;
+	std::string m_dialogTitle;
+	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
 
 // SpacerWrapper -----------------------------------------------------------
@@ -655,10 +722,11 @@ private:
 class ProgressBarWrapper : public ControlWrapper
 {
 public:
-	ProgressBarWrapper(BoundValue<float> value,
+	ProgressBarWrapper(BoundValue<float> value, bool indeterminate,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
+		, m_indeterminate(indeterminate)
 	{
 	}
 
@@ -666,6 +734,9 @@ public:
 
 private:
 	BoundValue<float> m_value;
+	// Busy mode: the value is ignored and the bar animates instead. Nothing polls
+	// it, so it is a plain bool -- see ProgressBar::Indeterminate().
+	bool m_indeterminate = false;
 };
 
 // ComboBoxWrapper -----------------------------------------------------------
@@ -727,11 +798,85 @@ private:
 extern template class ComboBoxWrapper<std::string>;
 extern template class ComboBoxWrapper<int>;
 
+// Item-set decode/encode -----------------------------------------------------
+// Indices are how every list-shaped wrapper carries a set of items internally,
+// and these two functions are the only places the bound type is decoded, so
+// every backend -- and both ListBox and CheckListBox -- share one reading of
+// it. Free functions rather than members of either wrapper for the reason B6
+// gives: the retained backends call them from event handlers and idle syncs,
+// which must not capture a wrapper (wrapper and window teardown order is not
+// fixed, see wx/RefSync.hpp), only the item list they copy.
+
+// Item indices the control should show for `value`. Out-of-range entries are
+// dropped rather than clamped: a stale index means "not in this list", and
+// silently selecting a neighbour would be worse than selecting nothing.
+template <ListBoxValue T>
+std::vector<int> listIndicesFor(const std::vector<std::string>& items, const T& value)
+{
+	std::vector<int> indices;
+	const int count = static_cast<int>(items.size());
+	const auto addIndexOf = [&](const ListBoxItem<T>& item) {
+		if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+		{
+			if (item >= 0 && item < count)
+				indices.push_back(item);
+		}
+		else
+		{
+			for (int i = 0; i < count; ++i)
+			{
+				if (items[i] == item)
+				{
+					indices.push_back(i);
+					break;
+				}
+			}
+		}
+	};
+
+	if constexpr (MultiSelectListBoxValue<T>)
+	{
+		for (const auto& item : value)
+			addIndexOf(item);
+	}
+	else
+	{
+		addIndexOf(value);
+	}
+	return indices;
+}
+
+// The inverse: the bound value for a set of indices. A single-value binding
+// with nothing selected reports -1 / "" -- the same "no selection"
+// wxNOT_FOUND spelling the retained backends use.
+template <ListBoxValue T>
+T listValueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
+{
+	const auto itemAt = [&](int i) -> ListBoxItem<T> {
+		if constexpr (std::is_same_v<ListBoxItem<T>, int>)
+			return i;
+		else
+			return (i >= 0 && i < static_cast<int>(items.size())) ? items[i] : std::string{};
+	};
+
+	if constexpr (MultiSelectListBoxValue<T>)
+	{
+		T value;
+		value.reserve(indices.size());
+		for (int i : indices)
+			value.push_back(itemAt(i));
+		return value;
+	}
+	else
+	{
+		return indices.empty() ? itemAt(-1) : itemAt(indices.front());
+	}
+}
+
 // ListBoxWrapper -----------------------------------------------------------
 // Single- or multi-select depending on T (see ListBoxValue). The selection is
-// carried as item indices everywhere inside the wrapper -- indicesFor() and
-// valueFor() are the only two places the bound type is decoded, so all three
-// backends share one interpretation of it.
+// carried as item indices everywhere inside the wrapper, decoded through the
+// shared pair above.
 template <ListBoxValue T>
 class ListBoxWrapper : public ControlWrapper
 {
@@ -753,73 +898,15 @@ public:
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
-	// Item indices the control should show for `value`. Out-of-range entries
-	// are dropped rather than clamped: a stale index means "not in this list",
-	// and silently selecting a neighbour would be worse than selecting nothing.
-	//
-	// Static, and taking the items explicitly, because the retained backends call
-	// it from event handlers and idle syncs: those must not capture the wrapper
-	// (see the note in wx/RefSync.hpp -- wrapper and window teardown order is not
-	// fixed), only the item list they copy.
+	// The backends reach the shared decode/encode pair through these names.
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
 	{
-		std::vector<int> indices;
-		const int count = static_cast<int>(items.size());
-		const auto addIndexOf = [&](const ListBoxItem<T>& item) {
-			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
-			{
-				if (item >= 0 && item < count)
-					indices.push_back(item);
-			}
-			else
-			{
-				for (int i = 0; i < count; ++i)
-				{
-					if (items[i] == item)
-					{
-						indices.push_back(i);
-						break;
-					}
-				}
-			}
-		};
-
-		if constexpr (kMultiSelect)
-		{
-			for (const auto& item : value)
-				addIndexOf(item);
-		}
-		else
-		{
-			addIndexOf(value);
-		}
-		return indices;
+		return listIndicesFor<T>(items, value);
 	}
 
-	// The inverse: the bound value for a set of selected indices. A single-select
-	// binding with nothing selected reports -1 / "" -- the same "no selection"
-	// wxNOT_FOUND spelling the retained backends use.
 	static T valueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
 	{
-		const auto itemAt = [&](int i) -> ListBoxItem<T> {
-			if constexpr (std::is_same_v<ListBoxItem<T>, int>)
-				return i;
-			else
-				return (i >= 0 && i < static_cast<int>(items.size())) ? items[i] : std::string{};
-		};
-
-		if constexpr (kMultiSelect)
-		{
-			T value;
-			value.reserve(indices.size());
-			for (int i : indices)
-				value.push_back(itemAt(i));
-			return value;
-		}
-		else
-		{
-			return indices.empty() ? itemAt(-1) : itemAt(indices.front());
-		}
+		return listValueFor<T>(items, indices);
 	}
 
 	// Commit a new selection: the value first, then the user callback, so a
@@ -847,6 +934,66 @@ extern template class ListBoxWrapper<int>;
 extern template class ListBoxWrapper<std::string>;
 extern template class ListBoxWrapper<std::vector<int>>;
 extern template class ListBoxWrapper<std::vector<std::string>>;
+
+// CheckListBoxWrapper -----------------------------------------------------------
+// A list with a checkbox per row. The CHECKED SET is the value -- always a
+// vector (see CheckListValue) -- and it is carried as indices inside the
+// wrapper, decoded through the same listIndicesFor()/listValueFor() pair
+// ListBoxWrapper uses. Highlight selection is whatever the native list does
+// with a click and is deliberately not part of the value: a row can be
+// highlighted without being ticked, and the caller only ever asked about ticks.
+template <CheckListValue T>
+class CheckListBoxWrapper : public ControlWrapper
+{
+public:
+	CheckListBoxWrapper(std::vector<std::string> items,
+		BoundValue<T> checked, int visibleRows, const Position& pos, const Size& size, long style,
+		std::function<void(const T&)> onChange = {},
+		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_visibleRows(visibleRows)
+		, m_value(std::move(checked))
+		, m_onChange(std::move(onChange))
+		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
+	{
+		return listIndicesFor<T>(items, value);
+	}
+
+	static T valueFor(const std::vector<std::string>& items, const std::vector<int>& indices)
+	{
+		return listValueFor<T>(items, indices);
+	}
+
+	// Commit a new checked set: the value first, then the user callback, so a
+	// handler reading the bound value sees the new one.
+	void commit(const std::vector<int>& indices)
+	{
+		m_value.set(valueFor(m_items, indices));
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+
+	const T& boundValue() const { return m_value.get(); }
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = 1;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+extern template class CheckListBoxWrapper<std::vector<int>>;
+extern template class CheckListBoxWrapper<std::vector<std::string>>;
 
 // TreeViewWrapper -----------------------------------------------------------
 // Hierarchical, collapsible item list. The selection is carried as item PATHS

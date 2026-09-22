@@ -44,6 +44,7 @@ return Dialog {
 - **Sensible defaults, no flags required** — widgets size to their content (text fields never collapse below their text), sibling group boxes in a column equalize to the widest one (tallest in a row), and dialogs auto-fit their content
 - **Flexible layout flags** — `LayoutFlags` with `Expand()`, `Proportion()`, `Border()`, `CenterVertical()`, `Center()`, `MinSize()`/`MaxSize()`, `SizeGroup()` (equalize across parents), and `AutoGrow()` (field re-measures as you type)
 - **Dialog sizing policy** — dialogs are not user-resizable by default; opt in with `Dialog::Resizable()`, where the auto-fit size becomes the initial *and minimum* size so content can never be clipped
+- **Dialog lifecycle** — `show(bool& open)` makes a caller-owned bool the single truth about whether a dialog is up, `onClose()` fires exactly once however it closed, and `Modal()` locks the other windows out **without blocking** on any backend
 - **CRTP widget hierarchy** — `Widget<T>` base with fluent `.withFlags()`, `.withSize()`, `.withPosition()`, `.withStyle()` modifiers
 - **Two-way data binding** — how you pass the value decides: `Slider{range, 50}` takes a snapshot, `Slider{range, myValue}` *binds* to your variable and writes edits straight back to it. Two controls sharing one variable stay in step with no callback wiring, and a value changed from anywhere else is picked up live
 - **Selection mode from the bound type** — `ListBox<std::string>` selects one item, `ListBox<std::vector<int>>` selects many; `Table` binds either a row index or a key column. There is no mode flag to keep in step with the value
@@ -56,24 +57,43 @@ return Dialog {
 
 | Category          | Widgets |
 |-------------------|---------|
-| Text              | `StaticText`, `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
-| Text input        | `TextCtrl`, `PasswordInput`, `MultiLineTextCtrl` |
+| Text              | `StaticText` (`.withAlign()`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
+| Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
-| Lists & tables    | `ListBox<T>`, `TreeView<T>`, `Table<T>` |
+| Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
-| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker` |
-| Display           | `ProgressBar`, `Separator` (horizontal or vertical), `Image` |
+| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
+| Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
-| Top-level         | `Dialog`, `Window`, `MessageBox` |
+| Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
-`ListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which drives their
-intrinsic height identically on every backend — the native hints disagree far too much
-for the same tree to lay out the same way otherwise. `TreeView` addresses items by path
-(`"src/engine"`) rather than index; `Table` columns are individually sortable and
-editable, and rows keep their original index so a binding survives sorting.
+`ListBox`, `CheckListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which
+drives their intrinsic height identically on every backend — the native hints disagree
+far too much for the same tree to lay out the same way otherwise. `TreeView` addresses
+items by path (`"src/engine"`) rather than index; `Table` columns are individually
+sortable and editable, and rows keep their original index so a binding survives sorting.
+
+`CheckListBox` is a list with a checkbox on every row, and its bound value **is** the
+checked set — so it is always a vector, and there is no single-value spelling because
+"one box ticked" is not a different control. Highlight selection is deliberately not
+part of it: a row can be highlighted without being ticked.
+
+```cpp
+CheckListBox{ {"Formatter", "Linter", "Debugger"}, enabledPlugins }  // vector<string>: by text
+    .withVisibleRows(4)
+    .onChange([&](const std::vector<std::string>& on) { reload(on); })
+
+CheckListBox{ items, checkedRows }                                   // vector<int>: by position
+```
+
+Which vector you bind decides how the ticks are named: `std::vector<std::string>` names
+them by item *text*, so two lists holding the same items in a different order tick the
+same rows; `std::vector<int>` names them by *position*, which is the right choice when
+the labels are not unique. Both decode through the same helpers `ListBox`'s multi-select
+bindings use, so what one control calls "ticked" the other calls "selected".
 
 `HSplitter` / `VSplitter` are arranged by the engine rather than by a native
 splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, which
@@ -90,6 +110,38 @@ and `Fixed()` is what opts out. A `Window` is also the only thing a menu bar can
 attach to on wx. `show(bool& open)` makes a caller-owned bool the single truth
 about whether the window is up: clearing it closes the window, closing the window
 clears it, and `onClose()` fires exactly once either way.
+
+A `Dialog` adds `Modal()`, which is what makes an OK/Cancel form possible.
+**Modality never blocks**: `show()` returns immediately on every backend, so a
+modal dialog has no result to return and reports what the user chose by writing a
+bound value instead — which means the parent can show the answer while the box is
+still on screen.
+
+```cpp
+bool confirmOpen = false;
+std::string answer;
+
+// ... from a button: confirmOpen = true, then show it
+Dialog { "Delete file?",
+    VStack {
+        StaticText{"This cannot be undone."},
+        HStack {
+            Spacer{},
+            Button{"Cancel"}.onClick([&] { answer = "cancelled"; confirmOpen = false; }),
+            Button{"Delete"}.onClick([&] { answer = "deleted";   confirmOpen = false; }),
+        }
+    }
+}
+.Modal()                                     // locks the other windows out, does not block
+.onClose([&] { /* fires exactly once, whichever side closed it */ })
+.show(confirmOpen);                          // clear the flag -> the dialog closes
+```
+
+Closing works the same on all three backends; **re-opening does not, and the
+difference is one call.** On ImGui `show()` is the frame, so setting the flag back
+is enough. wx and Qt destroy the native dialog when it closes, so there a second
+`show(open)` call is what brings one back — one `show()` per open on a retained
+backend, one per frame on an immediate one.
 
 `Window::withMenuBar()` attaches nested menus with separators, submenus, checkable
 items and per-item disabling — native chrome outside the content area on wx and Qt,
@@ -129,6 +181,98 @@ StatusBar {{
 }}
 StatusBar{ status }                     // or one stretched field, the common case
 ```
+
+`.withPlaceholder("Search files…")` puts greyed hint text in a **single-line** field,
+shown only while it is empty (`SetHint` / `setPlaceholderText` / `InputTextWithHint`).
+It is a label, not a value: nothing reads it back, and **no backend measures it**, so the
+wording can be as long as it likes without moving an auto-fit dialog.
+
+```cpp
+TextCtrl{ searchTerm }.withPlaceholder("Search files…")
+PasswordInput{ apiKey }.withPlaceholder("Paste your key")
+MultiLineTextCtrl{ notes }.withPlaceholder("…")   // compile error, by design
+```
+
+`MultiLineTextCtrl` does not have the modifier at all: `wxTextCtrl::SetHint` does nothing
+on a multi-line control on every wx port, so promising it would be a promise one backend
+could not keep. The `PlaceholderHost` concept is what states that.
+
+`ProgressBar{}.Indeterminate()` is the **busy** bar: work of unknown length, animating on
+its own with no value at all. It is a mode rather than a number, so it is a capitalised
+no-arg call and nothing polls it — and it needs the valueless constructor, since there is
+nothing to bind.
+
+```cpp
+ProgressBar{ percentDone }          // 0..100, bound or a snapshot
+ProgressBar{}.Indeterminate()       // busy: no value, animates by itself
+```
+
+Each backend answers with its own drawing mode — `wxGauge::Pulse()`, an empty
+`QProgressBar` range, a negative ImGui fraction — and **wx is the only one that needs a
+clock**: wxGTK advances the marquee one step per `Pulse()`, so the wrapper runs a 100 ms
+timer rather than riding the idle sync, which stops when the event queue drains.
+
+`Image{...}.withScaleMode(...)` says what happens to the **pixels** inside the frame the
+engine gave the picture. The frame itself never moves — `withSize()` and the flags decide
+that, as they do for every other leaf — so the four modes differ only in what is drawn in
+it, and all three backends compute the rectangle from the same helper.
+
+```cpp
+Image{ "images/Cat03.jpg" }.withSize({ 180, 100 }).withScaleMode(ScaleMode::Fit)
+```
+
+| Mode | What fills the frame |
+|------|----------------------|
+| `Stretch` | the whole picture, aspect ratio ignored — the default |
+| `Fit` | the largest uniform scale that fits **inside** the frame; letterboxed |
+| `Fill` | the smallest uniform scale that **covers** the frame; cropped |
+| `Center` | no scaling at all; centred, and cropped where it overflows |
+
+Anything the mode does not cover is left transparent, so a letterbox shows whatever is
+behind the picture. **No native control does this by itself** — a `wxStaticBitmap` draws
+its bitmap at the top-left and clips, a `QLabel` scales only by `setScaledContents()`
+(which is `Stretch` and nothing else) — so the retained backends compose the picture
+against the frame when the engine places it.
+
+`StaticText{...}.withAlign(...)` puts a label's text at the `Left`, `Center` or `Right` of
+its frame. It only shows once the frame is **wider** than the text, and a leaf sits at its
+desired width by default, so it is written alongside `Expand()`, a `SizeGroup` or a `Grid`
+band — whichever is giving the label its slack.
+
+```cpp
+StaticText{ "Password:" }
+    .withAlign(TextAlign::Right)
+    .withFlags(LayoutFlags().Expand().CenterVertical())   // fill the Grid's label column
+```
+
+`FilePicker` is a path field with a Browse button, in one of three modes. **Both** ways
+of setting the path commit identically — picking one in the dialog and typing one into
+the field — so nothing downstream can tell them apart, and **cancelling leaves the path
+alone** rather than clearing it.
+
+```cpp
+FilePicker{ projectPath }                       // bound: edits write through
+    .withMode(FileMode::Open)                   // or Save, or Directory
+    .withFilter("Images (*.png;*.jpg)|*.png;*.jpg|All files|*")
+    .withDialogTitle("Open a project")
+
+FileDialog{"Export"}                            // one-shot, like MessageBox
+    .withMode(FileMode::Save)
+    .onResult([&](const std::string& path) {    // "" on cancel
+        if (!path.empty()) exportTo(path);
+    })
+    .show();
+```
+
+The filter is written once in the wx wildcard spelling and parsed once into a
+`FileFilter`; each backend then rebuilds its *own* wildcard string from the fields,
+because the three disagree on every separator. Browse opens the platform dialog on wx
+and Qt. **On ImGui it opens a browser the framework draws itself** — there is no OS
+dialog and this project takes no new dependency for one — so it is deliberately simpler
+than the native ones: a breadcrumb, a listing, a filter combo, a name field for Save,
+Open/Cancel, and no favourites or previews. `FileDialog` blocks on wx and Qt and does
+not on ImGui, where nothing may stop the frame loop, which is why the answer belongs in
+`onResult` on all three rather than in code after `show()`.
 
 The same `MenuItem` model is a right-click menu on any leaf:
 

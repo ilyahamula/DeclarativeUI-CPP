@@ -21,6 +21,7 @@
 
 #include "declarative_ui.hpp"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -668,8 +669,10 @@ inline auto drawExpanderBinding(bool& open, bool& disabled)
 // Backend divergence worth knowing: TICKING THE BOX BACK ON DOES NOT REOPEN the
 // shell on wx or Qt. Closing destroys the frame and frees its engine session
 // (R6.4), and nothing re-runs show() for a retained backend. On ImGui the main
-// calls show() every frame, so there the shell comes straight back. Re-showing a
-// closed window is a lifecycle question T3.6 settles, not part of T2.1.
+// calls show() every frame, so there the shell comes straight back. The dialog
+// panel further down shows what a caller does about that: re-showing works on
+// every backend, but on a retained one it is a second show() call rather than a
+// write to the flag.
 //
 // `showGrid` is the context-menu binding: a check item inside the toggle's own
 // right-click menu and the `ToggleButton` itself, on one bool. Unlike the menu
@@ -787,4 +790,369 @@ inline auto drawWindowBinding(bool& shellOpen, std::string& shellStatus, bool& d
     }
     // The inverse of a Dialog: a Window resizes unless it is told not to.
     .Fixed();
+}
+
+// FilePicker + TextCtrl over one path string, plus a second picker on the same
+// value. Three controls, one std::string: pick a file in either picker, or type
+// into the plain field, and the other two follow.
+//
+// This is the binding demo T3.1 owes (rules.md G2), and it shows the one thing
+// a FilePicker does that a plain field cannot: both ways of setting the path --
+// the dialog and the keyboard -- commit through the same value, so nothing
+// downstream can tell them apart.
+//
+// The disabled pair is bound too: tick the box and both pickers grey out,
+// leaving the plain field as the only way to change the value. That is the
+// clearest way to see the three controls really are one value.
+inline auto drawFilePickerBinding(std::string& path, bool& pickersDisabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 96;
+    constexpr Size kFieldSize { 360, 28 };
+
+    return Dialog {
+        "FilePicker + TextCtrl (shared path)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One std::string behind all three controls:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Picker:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                FilePicker{path}
+                    .withMode(FileMode::Open)
+                    .withFilter("Sources (*.cpp;*.hpp)|*.cpp;*.hpp|All files|*")
+                    .withDialogTitle("Pick the shared path")
+                    .withSize(kFieldSize)
+                    .isDisabled(pickersDisabled)
+            },
+
+            // A second picker on the SAME value, in Save mode. Pick in one and
+            // the other's field follows -- no callback wiring, no copy-back.
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"Save as:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                FilePicker{path}
+                    .withMode(FileMode::Save)
+                    .withDialogTitle("Save the shared path as")
+                    .withSize(kFieldSize)
+                    .isDisabled(pickersDisabled)
+            },
+
+            // The plain field: the same string again, and the one control that
+            // stays live when the box below is ticked.
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"As text:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                TextCtrl{path}
+                    .withSize(kFieldSize)
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            CheckBox{pickersDisabled, "Disable both pickers (the text field stays live)"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}
+
+// Two CheckListBoxes over ONE std::vector<std::string>: tick a box in either and
+// the other follows, because both are bound to the same caller-owned value and
+// the checked set IS that value. A third control, a plain ListBox on the same
+// vector, shows the set read as a multi-selection -- the two widgets decode the
+// bound type through the same helpers, so "ticked" and "selected" are the same
+// list of items spelled two ways.
+//
+// The lists deliberately carry the SAME items in a different order: the checked
+// set names items by text, not by position, so the second list ticks the right
+// rows anyway. A std::vector<int> binding would name them by position and the
+// two lists would disagree -- which is the whole reason both spellings exist.
+inline auto drawCheckListBinding(std::vector<std::string>& modules, bool& listsDisabled)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kListW = 190;
+
+    return Dialog {
+        "CheckListBox x2 (shared checked set)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One std::vector<std::string> behind all three lists:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"Declared order:"}.withSize({-1, kLabelH}),
+                    CheckListBox{
+                        {"Core", "Network", "Storage", "Rendering", "Audio"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                        .isDisabled(listsDisabled)
+                },
+                Spacer{Size{12, 0}},
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"Reversed:"}.withSize({-1, kLabelH}),
+                    CheckListBox{
+                        {"Audio", "Rendering", "Storage", "Network", "Core"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                        .isDisabled(listsDisabled)
+                },
+                Spacer{Size{12, 0}},
+                // The same vector as a multi-select ListBox: what the check
+                // lists call "ticked" this one calls "selected".
+                VStack {
+                    LayoutFlags().Expand(),
+                    StaticText{"As a ListBox:"}.withSize({-1, kLabelH}),
+                    ListBox{
+                        {"Core", "Network", "Storage", "Rendering", "Audio"},
+                        modules}
+                        .withVisibleRows(5)
+                        .withSize({kListW, -1})
+                        .withFlags(LayoutFlags().Border(Side::Top, 4))
+                }
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            CheckBox{listsDisabled, "Disable both check lists (the ListBox stays live)"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}
+
+// T3.4: the two ProgressBar spellings over one caller-owned float and one
+// caller-owned bool.
+//
+// `progress` is shared by the Slider and the determinate bar, so dragging the
+// slider fills the bar with no wiring at all. The indeterminate bar beside it
+// is bound to nothing: there is no number, and that is the point.
+//
+// `busy` is what picks which of the two is live. isDisabled() binds a bool, not
+// an expression, so the complement is a second caller-owned bool the checkbox
+// keeps in step -- writing `!busy` into the call would snapshot the value at
+// build time and never change again.
+//
+// macOS caveat, the same one this file opens with: a disabled wxGauge or
+// QProgressBar is drawn exactly like an enabled one, so watch the SLIDER to see
+// the toggle land. The animation itself is visible everywhere.
+inline auto drawIndeterminateProgressBinding(float& progress, bool& busy, bool& idle)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 96;
+    constexpr Size kBarSize { 320, 20 };
+
+    return Dialog {
+        "ProgressBar: value vs Indeterminate()",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"One float behind the slider below and the top bar:"}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Progress:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                ProgressBar{progress}
+                    .withSize(kBarSize)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(busy)
+            },
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 6),
+                StaticText{"Indexing…"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                // No value, so nothing to share: the mode replaces the number.
+                ProgressBar{}
+                    .Indeterminate()
+                    .withSize(kBarSize)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(idle)
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                StaticText{"Drag:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                Slider { Range<float>{ .min = 0.0f, .max = 100.0f }, progress }
+                    .withFlags(LayoutFlags().Expand().CenterVertical())
+                    .isDisabled(busy)
+            },
+
+            // The one write that keeps the complement honest. `busy` is bound,
+            // so the checkbox has already stored the new state by the time this
+            // runs -- value first, then the callback, as everywhere else.
+            CheckBox{busy, "Busy (work of unknown length) -- disables the determinate half"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+                .onChange([&idle](bool nowBusy) { idle = !nowBusy; })
+        }
+    };
+}
+
+// T3.6: a Dialog's OPEN FLAG as an ordinary bound value.
+//
+// `detailsOpen` has three holders here -- the check box, the toggle button, and
+// the dialog's own lifecycle -- and they are one bool. Untick either control and
+// the dialog closes; close the dialog from its title bar and both controls come
+// back up, because the flag is cleared from the same place onClose() fires from.
+// Nothing in this file wires the two together.
+//
+// The one asymmetry is OPENING, and it is why both controls carry an onChange
+// that calls `openDetails`. Clearing the flag is enough to close a dialog on
+// every backend, but setting it back is only enough to REOPEN one on ImGui,
+// where the main calls show() every frame. wx and Qt destroyed the native dialog
+// and freed its engine session with it, so there a second show() call is what
+// brings one back -- which is exactly what the main's version of `openDetails`
+// does. That settles the question T2.1's shell left open: re-showing works
+// everywhere, but on a retained backend it is a call, not a flag.
+//
+// Ticking can only happen while the dialog is down, so the two controls cannot
+// stack up two dialogs between them: RefSync mirrors the other control's state
+// with wx's non-notifying setters and Qt's QSignalBlocker, so a mirrored write
+// never re-enters onChange.
+//
+// `detailsReport` is written by the dialog's onClose() and mirrored here through
+// a bound TextCtrl -- the only shape that updates live on the retained backends.
+// The count beside it is what makes "exactly once" readable.
+inline auto drawDialogBinding(bool& detailsOpen, std::string& note,
+    std::string& detailsReport, bool& disabled, std::function<void()> openDetails)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+
+    return Dialog {
+        "Dialog controls (shared bool)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({440, -1}),
+            StaticText{"A dialog's open flag, a check box and a toggle: one bool."}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                CheckBox{detailsOpen, "Details dialog is open"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    .isDisabled(disabled)
+                    .onChange([openDetails](bool nowOpen) {
+                        if (nowOpen)
+                            openDetails();
+                    }),
+                ToggleButton{detailsOpen, "Details"}
+                    .withSize({110, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .isDisabled(disabled)
+                    .withTooltip("Untick to close the dialog; tick to open it again")
+                    .onChange([openDetails](bool nowOpen) {
+                        if (nowOpen)
+                            openDetails();
+                    })
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            StaticText{"What the dialog's onClose() last reported:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            TextCtrl{detailsReport}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+
+            StaticText{"A note the dialog and this panel share:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            // The ordinary two-control binding, across a window boundary: type
+            // here and the field inside the dialog follows, and the other way
+            // round. It survives a close and a reopen because the value belongs
+            // to the caller, not to either dialog.
+            TextCtrl{note}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+
+            CheckBox{disabled, "Lock both controls"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// The dialog the panel above opens and closes. Deliberately NOT Modal(): a
+// modal one could not be closed from the panel, because the panel would not be
+// accepting input. Resizable(), so the other Dialog default is on show too.
+inline auto drawDetailsUI(bool& open, std::string& note, std::string& detailsReport,
+    int& closeCount)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr Size kButtonSize { 110, 28 };
+
+    return Dialog {
+        "Details",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({340, -1}),
+            StaticText{"Shown against the panel's bool. Close me from my title"}
+                .withSize({-1, kLabelH}),
+            StaticText{"bar, from the button below, or from the panel."}
+                .withSize({-1, kLabelH}),
+
+            StaticText{"The shared note:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            TextCtrl{note}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 12)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 12),
+                Spacer{},
+                // Closing from inside is the same act as closing from the title
+                // bar: clear the bool and the dialog follows.
+                Button{"Close"}
+                    .withSize(kButtonSize)
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .onClick([&open]() { open = false; })
+            }
+        }
+    }
+    .Resizable()
+    .onClose([&detailsReport, &closeCount]() {
+        detailsReport = "onClose() fired " + std::to_string(++closeCount)
+            + "x -- once per close, never twice.";
+    });
 }

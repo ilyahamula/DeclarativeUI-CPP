@@ -14,6 +14,7 @@
 #include "frameworks_core/imgui/SnapshotStore.hpp"
 
 #include "frameworks_core/imgui/TextureCache.hpp"
+#include "frameworks_core/imgui/FileBrowserPopup.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // pos, size, style: not directly applicable in ImGui immediate mode.
@@ -150,7 +151,13 @@ void TextCtrlWrapper::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
-	if (ImGui::InputText("##textctrl", buf, sizeof(buf)))
+	// InputTextWithHint draws the hint only while the buffer is empty, exactly
+	// as SetHint and setPlaceholderText do, and measures nothing -- the item is
+	// the width SetNextItemWidth gave it either way.
+	const bool edited = m_placeholder.empty()
+		? ImGui::InputText("##textctrl", buf, sizeof(buf))
+		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), buf, sizeof(buf));
+	if (edited)
 	{
 		m_value.set(buf);
 		if (m_onChange)
@@ -176,7 +183,11 @@ void PasswordInputWrapper::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
-	if (ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password))
+	const bool edited = m_placeholder.empty()
+		? ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password)
+		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), buf, sizeof(buf),
+			ImGuiInputTextFlags_Password);
+	if (edited)
 	{
 		m_value.set(buf);
 		if (m_onChange)
@@ -299,8 +310,20 @@ Size StaticTextWrapper::measureIntrinsic(const Constraints& c)
 
 void StaticTextWrapper::render(const Rect& frame)
 {
-	const bool wrap = sized(frame)
-		&& ImGui::CalcTextSize(m_text.c_str()).x > (float)frame.width;
+	const float textWidth = ImGui::CalcTextSize(m_text.c_str()).x;
+	const bool wrap = sized(frame) && textWidth > (float)frame.width;
+
+	// Alignment IS the leftover width, so a block that wraps has none to give
+	// -- it already fills the frame. Nothing is pushed for Left, which keeps
+	// the common case byte-identical to what it drew before.
+	if (!wrap && sized(frame) && m_align != TextAlign::Left)
+	{
+		const float slack = (float)frame.width - textWidth;
+		if (slack > 0.0f)
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX()
+				+ (m_align == TextAlign::Center ? slack * 0.5f : slack));
+	}
+
 	if (wrap)
 		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + (float)frame.width);
 	ImGui::TextUnformatted(m_text.c_str());
@@ -624,18 +647,38 @@ void ImageWrapper::render(const Rect& frame)
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	if (m_textureId != nullptr)
 	{
-		float w, h;
-		if (sized(frame))
-		{
-			w = (float)frame.width;
-			h = (float)frame.height;
-		}
-		else
-		{
-			w = (m_displayWidth  > 0) ? static_cast<float>(m_displayWidth)  : static_cast<float>(m_imgWidth);
-			h = (m_displayHeight > 0) ? static_cast<float>(m_displayHeight) : static_cast<float>(m_imgHeight);
-		}
-		ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)), ImVec2(w, h));
+		const Size box = sized(frame)
+			? Size { frame.width, frame.height }
+			: Size {
+				(m_displayWidth  > 0) ? m_displayWidth  : m_imgWidth,
+				(m_displayHeight > 0) ? m_displayHeight : m_imgHeight
+			};
+		const Rect target = scaledImageRect(m_scaleMode, Size { m_imgWidth, m_imgHeight }, box);
+
+		// ImGui::Image() draws its whole texture at the size it is given, which
+		// is exactly Stretch and nothing else -- it cannot letterbox and has no
+		// way to crop. The picture is therefore drawn on the window draw list
+		// at the computed rect, clipped to the frame, with a Dummy of the frame
+		// supplying the item rect that hover, the tooltip, the context menu and
+		// the drift guard all read. Same move SeparatorWrapper makes, and for
+		// the same reason. place() has already put the cursor at the frame's
+		// top-left, so the cursor's screen position is the frame origin.
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+		const ImVec2 clipMin(origin.x, origin.y);
+		const ImVec2 clipMax(origin.x + (float)box.width, origin.y + (float)box.height);
+		const ImVec2 drawMin(origin.x + (float)target.x, origin.y + (float)target.y);
+		const ImVec2 drawMax(drawMin.x + (float)target.width, drawMin.y + (float)target.height);
+
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		// intersect_with_current_clip_rect: inside a ScrollPanel's child the
+		// window's own clip must still win.
+		drawList->PushClipRect(clipMin, clipMax, true);
+		drawList->AddImage(
+			static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(m_textureId)),
+			drawMin, drawMax);
+		drawList->PopClipRect();
+
+		ImGui::Dummy(ImVec2((float)box.width, (float)box.height));
 		if (ImGui::IsItemHovered())
 		{
 			if (m_onHover)
@@ -785,6 +828,70 @@ template class ListBoxWrapper<int>;
 template class ListBoxWrapper<std::string>;
 template class ListBoxWrapper<std::vector<int>>;
 template class ListBoxWrapper<std::vector<std::string>>;
+
+// CheckListBoxWrapper -----------------------------------------------------------
+
+template <CheckListValue T>
+Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	// ListBoxWrapper's shape plus what the boxes cost: ImGui draws a checkbox
+	// square of one frame height followed by ItemInnerSpacing before the label.
+	const ImGuiStyle& style = ImGui::GetStyle();
+	float widest = 0.0f;
+	for (const auto& item : m_items)
+		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
+	const float boxWidth = ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
+	const float w = widest + boxWidth + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
+		+ style.FramePadding.y * 2.0f;
+	return Size { ceilInt(w), ceilInt(h) };
+}
+
+template <CheckListValue T>
+void CheckListBoxWrapper<T>::render(const Rect& frame)
+{
+	WidgetSnapshot<T> snapshot(m_value);
+	// Read the checked set back from the binding every frame: the tree is
+	// rebuilt per frame anyway, so a value written from anywhere else is picked
+	// up for free -- no ref sync needed here, unlike the retained backends.
+	std::vector<int> checked = indicesFor(m_items, boundValue());
+
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2(0.0f, 0.0f); // 0 = ImGui's default list-box size
+	ImGui::PushID(snapshot.id());
+	if (ImGui::BeginListBox("##checklistbox", box))
+	{
+		for (int i = 0; i < (int)m_items.size(); ++i)
+		{
+			const auto at = std::find(checked.begin(), checked.end(), i);
+			bool ticked = at != checked.end();
+			// Per-row id: two items may legitimately carry the same label, and
+			// the label is all Checkbox has to key itself by.
+			ImGui::PushID(i);
+			const bool toggled = ImGui::Checkbox(m_items[i].c_str(), &ticked);
+			ImGui::PopID();
+			if (!toggled)
+				continue;
+
+			// Kept sorted, so the bound vector reads in list order whichever
+			// way the user ticked it -- the retained backends report it that
+			// way because they walk the rows.
+			std::vector<int> next = checked;
+			if (const auto it = std::find(next.begin(), next.end(), i); it != next.end())
+				next.erase(it);
+			else
+				next.insert(std::upper_bound(next.begin(), next.end(), i), i);
+			commit(next);
+			checked = std::move(next);
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopID();
+}
+
+template class CheckListBoxWrapper<std::vector<int>>;
+template class CheckListBoxWrapper<std::vector<std::string>>;
 
 // TreeViewWrapper -----------------------------------------------------------
 
@@ -1424,6 +1531,86 @@ void ColorPickerWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
+// FilePickerWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// The Browse button's width, shared by measure and render so the two agree to
+// the pixel -- the same reason ToolBarWrapper has a toolWidth() helper, and the
+// thing the drift guard catches when they stop agreeing.
+float browseButtonWidth()
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	return ImGui::CalcTextSize("...").x + style.FramePadding.x * 2.0f;
+}
+
+} // unnamed namespace
+
+Size FilePickerWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	// The field measures a content-independent floor like every other editable
+	// one: the tree is rebuilt every frame, so measuring the live path would
+	// grow the picker as the user typed into it.
+	const float width = (float)editableFloorWidth() + style.ItemInnerSpacing.x + browseButtonWidth();
+	return Size { ceilInt(width), frameHeight() };
+}
+
+void FilePickerWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<std::string> snapshot(m_value);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float buttonWidth = browseButtonWidth();
+
+	char buf[512] = {};
+	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+
+	ImGui::PushID(snapshot.id());
+	if (sized(frame))
+		ImGui::SetNextItemWidth(std::max(1.0f,
+			(float)frame.width - buttonWidth - style.ItemInnerSpacing.x));
+	if (ImGui::InputText("##path", buf, sizeof(buf)))
+	{
+		// A typed path is as much a selection as a picked one (R11.4).
+		m_value.set(buf);
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+	}
+	ImGui::SameLine(0, style.ItemInnerSpacing.x);
+	const bool browse = ImGui::Button("...", ImVec2(buttonWidth, 0));
+	ImGui::PopID();
+
+	if (!browse)
+		return;
+
+	// The browser answers on a LATER frame, by which time this wrapper is gone
+	// -- the tree is rebuilt every frame. So the result has to be written
+	// somewhere that outlives it, and that is exactly the split BoundValue
+	// already makes: a bound path is the caller's variable, and an unbound one
+	// lives in the SnapshotStore under the key this render() is using.
+	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
+	const std::uint64_t snapshotKey = snapshot.slotKey(0);
+	FileBrowser::request(m_dialogTitle, m_mode, m_filters, m_value.get(),
+		[bound, snapshotKey, cb = m_onChange, cbw = m_onChangeWithWidget](const std::string& chosen) {
+			if (chosen.empty())
+				return; // cancel leaves the path alone -- it is not a selection of ""
+			if (bound != nullptr)
+				*bound = chosen;
+			else
+			{
+				BoundValue<std::string> committed(chosen);
+				SnapshotStore<std::string>::commit(snapshotKey, committed);
+			}
+			// Value first, then the callback, as everywhere else: a handler
+			// reading the bound value sees the new one.
+			if (cb) cb(chosen);
+			else if (cbw) cbw(chosen, nullptr);
+		});
+}
+
 // SpacerWrapper -----------------------------------------------------------
 
 void SpacerWrapper::render(const Rect& frame)
@@ -1662,7 +1849,13 @@ void ProgressBarWrapper::render(const Rect& frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	auto clampedValue = std::clamp(value / 100.0f, 0.0f, 1.0f);
-	ImGui::ProgressBar(clampedValue, size);
+	// A NEGATIVE fraction is ImGui's busy mode, and the band's position is read
+	// straight out of it -- ImGui keeps no animation state of its own here, so
+	// the clock has to be fed in. The tree is rebuilt every frame, which is
+	// exactly what makes that free on this backend.
+	const float fraction = m_indeterminate
+		? -1.0f * (float)ImGui::GetTime()
+		: std::clamp(value / 100.0f, 0.0f, 1.0f);
+	ImGui::ProgressBar(fraction, size);
 	ImGui::PopID();
 }

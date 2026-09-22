@@ -172,17 +172,29 @@ struct StaticText : Widget<StaticText>
 	{
 	}
 
+	// Where the text sits in the frame the engine assigned this label.
+	//
+	// It only shows once the frame is WIDER than the text, and a leaf sits at
+	// its desired width by default -- so this is written alongside Expand(), a
+	// SizeGroup or a Grid band, which is what gives it the slack to align in.
+	StaticText& withAlign(TextAlign align)
+	{
+		m_align = align;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<StaticTextWrapper>(m_text, pos, size, style);
+		return std::make_unique<StaticTextWrapper>(m_text, m_align, pos, size, style);
 	}
 
 private:
 	std::string m_text;
+	TextAlign m_align = TextAlign::Left;
 };
 
 // TextCtrl -----------------------------------------------------------
@@ -212,6 +224,16 @@ struct TextCtrl : Widget<TextCtrl>
 	{
 	}
 
+	// Greyed text shown only while the field is EMPTY -- a label for what to
+	// type, not a value. Single-line only: wxTextCtrl::SetHint does nothing on
+	// a multi-line control on every wx port, so MultiLineTextCtrl does not
+	// declare this and asking it for one is a compile error (PlaceholderHost).
+	TextCtrl& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
 	TextCtrl& onChange(std::function<void(const std::string&)> callback)
 	{
 		m_onChange = std::move(callback);
@@ -230,11 +252,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -261,6 +284,15 @@ struct PasswordInput : Widget<PasswordInput>
 	{
 	}
 
+	// As TextCtrl's: shown only while the field is empty. A password field is
+	// the one that most wants it -- there is no value to read back for a hint
+	// of what is expected, because the echo hides it.
+	PasswordInput& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
 	PasswordInput& onChange(std::function<void(const std::string&)> callback)
 	{
 		m_onChange = std::move(callback);
@@ -279,11 +311,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<PasswordInputWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	BoundValue<std::string> m_value;
+	std::string m_placeholder;
 	std::function<void(const std::string&)> m_onChange;
 	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
 };
@@ -738,6 +771,88 @@ ListBox(std::vector<std::string>, T&) -> ListBox<T>;
 
 template <ListBoxValue T>
 ListBox(std::vector<std::string>, const T&) -> ListBox<T>;
+
+// CheckListBox -----------------------------------------------------------
+// A list with a checkbox on every row. The bound value is the CHECKED SET, so
+// it is always a vector: std::vector<int> names the ticked items by position,
+// std::vector<std::string> by their text -- the same two readings a
+// multi-select ListBox binding has, decoded by the same helpers. There is no
+// single-value spelling because "one box ticked" is not a different control.
+//
+// Highlight selection is not part of the value: clicking a row highlights it on
+// every backend, but only the box says checked.
+template <CheckListValue T>
+struct CheckListBox : Widget<CheckListBox<T>>
+{
+	using super = Widget<CheckListBox<T>>;
+
+	// Rows shown before the list scrolls, driving the intrinsic height on all
+	// three backends for the reason ListBox needs the same knob: their native
+	// hints disagree far too much for the same tree to lay out identically.
+	static constexpr int kDefaultVisibleRows = ListBox<T>::kDefaultVisibleRows;
+
+	explicit CheckListBox(std::vector<std::string> items)
+		: super()
+		, m_items(std::move(items))
+	{
+		// Nothing ticked is the honest default: a checked set the caller never
+		// asked for would be a decision made on their behalf.
+	}
+
+	CheckListBox(std::vector<std::string> items, const T& checked)
+		: super()
+		, m_items(std::move(items))
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox(std::vector<std::string> items, T& checked)
+		: super()
+		, m_items(std::move(items))
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	CheckListBox& onChange(std::function<void(const T&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	CheckListBox& onChange(std::function<void(const T&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<CheckListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	std::vector<std::string> m_items;
+	int m_visibleRows = kDefaultVisibleRows;
+	BoundValue<T> m_value;
+	std::function<void(const T&)> m_onChange;
+	std::function<void(const T&, void*)> m_onChangeWithWidget;
+};
+
+template <CheckListValue T>
+CheckListBox(std::vector<std::string>, T&) -> CheckListBox<T>;
+
+template <CheckListValue T>
+CheckListBox(std::vector<std::string>, const T&) -> CheckListBox<T>;
 
 // TreeView -----------------------------------------------------------
 // Hierarchical, collapsible list. Items are a nested TreeItem literal and the
@@ -1463,6 +1578,92 @@ private:
 	std::function<void(const Color&, void*)> m_onChangeWithWidget;
 };
 
+// FilePicker -----------------------------------------------------------
+// A path field with a Browse button, in one of three modes. Browse opens the
+// native dialog on wx and Qt and a framework-drawn browser on ImGui, which has
+// no OS dialog to open (docs/specs/widget_catalogue_completion/design.md §12).
+//
+// BOTH ways of setting the path write through to the bound string and fire
+// onChange: picking one in the dialog, and typing one into the field. That is
+// the whole point of the text half -- a picker whose field were read-only would
+// be a button with a label.
+//
+//     FilePicker{projectPath}
+//         .withMode(FileMode::Open)
+//         .withFilter("Projects (*.dui)|*.dui|All files|*")
+//
+// The filter is parsed once here and each backend maps the FIELDS through its
+// own wildcard spelling; it is ignored in Directory mode, where there are no
+// files to filter.
+struct FilePicker : Widget<FilePicker>
+{
+	using super = Widget<FilePicker>;
+
+	explicit FilePicker(const std::string& path)
+		: super()
+		, m_value(path)
+	{
+	}
+
+	explicit FilePicker(std::string& path)
+		: super()
+		, m_value(path)
+	{
+	}
+
+	FilePicker& withMode(FileMode mode)
+	{
+		m_mode = mode;
+		return *this;
+	}
+
+	// "Images (*.png;*.jpg)|*.png;*.jpg|All files|*" -- the wx wildcard
+	// spelling, parsed by CoreTypes/FileFilter.hpp.
+	FilePicker& withFilter(const std::string& spec)
+	{
+		m_filters = FileFilter::parse(spec);
+		return *this;
+	}
+
+	// The Browse dialog's title. Empty lets each backend use its own default,
+	// which is the localised one on wx and Qt.
+	FilePicker& withDialogTitle(const std::string& title)
+	{
+		m_dialogTitle = title;
+		return *this;
+	}
+
+	FilePicker& onChange(std::function<void(const std::string&)> callback)
+	{
+		m_onChange = std::move(callback);
+		return *this;
+	}
+
+	FilePicker& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChangeWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<FilePickerWrapper>(m_value, m_mode, m_filters, m_dialogTitle,
+			pos, size, style, m_onChange, m_onChangeWithWidget);
+	}
+
+private:
+	BoundValue<std::string> m_value;
+	FileMode m_mode = FileMode::Open;
+	std::vector<FileFilter> m_filters;
+	std::string m_dialogTitle;
+	std::function<void(const std::string&)> m_onChange;
+	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+};
+
 // Spacer -----------------------------------------------------------
 // Pure geometry: no native window on any backend and nothing drawn, only a
 // rectangle the engine hands out. Default-constructed it is flexible -- it
@@ -1547,6 +1748,14 @@ struct ProgressBar : Widget<ProgressBar>
 {
 	using super = Widget<ProgressBar>;
 
+	// No value at all -- the spelling Indeterminate() is written against. A
+	// determinate bar with nothing bound would sit empty forever, so this
+	// constructor is only useful with the mode below.
+	ProgressBar()
+		: super()
+	{
+	}
+
 	explicit ProgressBar(const float& value)
 		: super()
 		, m_value(value)
@@ -1559,17 +1768,30 @@ struct ProgressBar : Widget<ProgressBar>
 	{
 	}
 
+	// Busy mode: the bar animates on its own and the value is ignored.
+	//
+	// A plain bool rather than a BoundValue, unlike isDisabled(): every backend
+	// switches the native control into a different DRAWING MODE for this
+	// (wxGauge::Pulse, an empty QProgressBar range, ImGui's negative fraction),
+	// which is a decision about what the control is, not a number it displays.
+	ProgressBar& Indeterminate()
+	{
+		m_indeterminate = true;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ProgressBarWrapper>(m_value, pos, size, style);
+		return std::make_unique<ProgressBarWrapper>(m_value, m_indeterminate, pos, size, style);
 	}
 
 private:
 	BoundValue<float> m_value;
+	bool m_indeterminate = false;
 };
 
 // Image -----------------------------------------------------------
@@ -1607,17 +1829,28 @@ struct Image : Widget<Image>
 		return *this;
 	}
 
+	// What happens to the picture inside the frame withSize() and the flags
+	// gave it. The frame is unchanged by every mode -- the engine owns that --
+	// so this is about pixels only. Stretch is the default, which is what the
+	// framework did before there was a choice.
+	Image& withScaleMode(ScaleMode mode)
+	{
+		m_scaleMode = mode;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ImageWrapper>(m_filePath, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
+		return std::make_unique<ImageWrapper>(m_filePath, m_scaleMode, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
 	}
 
 private:
 	std::string m_filePath;
+	ScaleMode m_scaleMode = ScaleMode::Stretch;
 	std::function<void()> m_onClick;
 	std::function<void()> m_onHover;
 	std::function<void(void*)> m_onClickWithWidget;
