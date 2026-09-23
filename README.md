@@ -182,6 +182,11 @@ StatusBar {
 StatusBar{ status }                     // or one stretched field, the common case
 ```
 
+Both also take a collection built elsewhere — `ToolBar{ std::vector<ToolItem> }` and
+`StatusBar{ StatusFields }` — for tools or fields assembled in a loop or returned from a
+helper. Bindings survive the trip: a `ToolItem` or `StatusField` holds the caller's
+variable, not the vector.
+
 `.withPlaceholder("Search files…")` puts greyed hint text in a **single-line** field,
 shown only while it is empty (`SetHint` / `setPlaceholderText` / `InputTextWithHint`).
 It is a label, not a value: nothing reads it back, and **no backend measures it**, so the

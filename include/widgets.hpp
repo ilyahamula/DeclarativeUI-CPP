@@ -1410,6 +1410,15 @@ struct StatusBar : Widget<StatusBar>
 	{
 	}
 
+	// A collection the caller built elsewhere -- assembled in a loop, returned
+	// from a helper, shared between windows. Taken by value, so an rvalue moves
+	// in and an lvalue is copied: the widget never keeps a reference to it.
+	explicit StatusBar(StatusFields fields)
+		: super()
+		, m_fields(std::move(fields))
+	{
+	}
+
 	// One stretched field, the common case. The pair is the usual one: a
 	// literal snapshots, a non-const lvalue binds.
 	explicit StatusBar(const std::string& text)
@@ -1453,6 +1462,13 @@ struct ToolBar : Widget<ToolBar>
 	explicit ToolBar(std::initializer_list<ToolItem> tools)
 		: super()
 		, m_tools(tools)
+	{
+	}
+
+	// A collection the caller built elsewhere; same contract as StatusBar's.
+	explicit ToolBar(std::vector<ToolItem> tools)
+		: super()
+		, m_tools(std::move(tools))
 	{
 	}
 
