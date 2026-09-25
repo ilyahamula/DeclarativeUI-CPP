@@ -26,13 +26,14 @@
 //     "once" is something you can read rather than take on trust. Open and
 //     close the box three times and it says three, never six -- both close
 //     paths run through one place in the session.
-//   * OPENING is a show() from the Delete button's own handler, written once
-//     for all three backends. wx and Qt destroy the native dialog when it
-//     closes, so each open is a fresh show(); ImGui, where a window only exists
-//     while it is submitted every frame, ADOPTS a show() issued from a handler
-//     and keeps drawing the dialog until its flag clears -- nested inside this
-//     window, which is what lets a modal open on top of another window's
-//     frame. No main supplies anything, and none calls the box itself.
+//   * OPENING is declared on the button: onClickShow(confirmOpen, Dialog{...})
+//     is the whole of it, written once for all three backends. It is a show()
+//     from the click handler -- wx and Qt destroy the native dialog when it
+//     closes, so each open is a fresh one; ImGui ADOPTS a handler's show() and
+//     keeps drawing the dialog until its flag clears, nested inside this
+//     window, which is what lets a modal open on top of another window's frame.
+//     The flag also keeps it to ONE: click Delete again while the box is up
+//     and nothing happens. No main supplies anything, and none calls the box.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so this
 // lands as its own dialog alongside a few already-implemented controls for
@@ -115,8 +116,8 @@ inline auto drawConfirmDeleteUI(bool& open, std::string& file, std::string& answ
     });
 }
 
-// The parent. It opens the modal itself, from a click handler: see the fourth
-// note at the top of this file.
+// The parent. It declares the modal on its own button: see the fourth note at
+// the top of this file.
 inline auto drawDeleteFormUI(std::string& file, std::string& answer,
     std::string& closeReport, bool& formDisabled, bool& confirmOpen, int& closeCount)
 {
@@ -148,23 +149,21 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
                         .withSize(kButtonSize)
                         .withTooltip("Opens an application-modal confirmation")
                         .isDisabled(formDisabled)
-                        // One show() per open, on every backend -- ImGui keeps
-                        // the box drawn after this handler returns. The flag is
-                        // set first: it is what the box's lifetime follows.
-                        .onClick([&confirmOpen, &file, &answer, &closeReport, &closeCount]() {
-                            confirmOpen = true;
-                            drawConfirmDeleteUI(confirmOpen, file, answer, closeReport,
-                                closeCount).show(confirmOpen);
-                        }),
-                    // The other top-level spelling from a handler, unbound: no
-                    // flag, so the framework owns whether it is up and its
-                    // close button is the only way down. The fields are bound,
-                    // so the log follows the form while both are open.
+                        // The box, declared where it is asked for. One open at
+                        // a time on every backend: the flag is set while it is
+                        // up, and a click then does nothing.
+                        .onClickShow(confirmOpen,
+                            drawConfirmDeleteUI(confirmOpen, file, answer, closeReport, closeCount)),
+                    // The other top-level spelling, and the other overload: no
+                    // flag, because nothing here needs to read or clear it. The
+                    // framework keeps one per title, so it is still at most one
+                    // log window. Its fields are bound, so the log follows the
+                    // form while both are open.
                     Button{"Show log window..."}
                         .withSize(kButtonSize)
-                        .withTooltip("A Window shown from this click handler")
+                        .withTooltip("Opens a Window -- at most one")
                         .withFlags(LayoutFlags().Border(Side::Top, 8))
-                        .onClick([&answer, &closeReport]() {
+                        .onClickShow(
                             Window {
                                 "Deletion log",
                                 VStack {
@@ -180,8 +179,7 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
                                         .withSize({-1, kRowH})
                                         .withFlags(LayoutFlags().Expand().Border(Side::Top, 4))
                                 }
-                            }.show();
-                        }),
+                            }),
                     Spacer{}
                 }
             },

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 // A top-level show() -- Dialog's or Window's -- issued from INSIDE another
 // top-level's frame: a click handler, a menu action, a file dialog's result,
@@ -22,6 +23,19 @@
 namespace TopLevelShow
 {
 	using Present = std::function<void(bool* open)>;
+
+	// An open flag the framework owns for a caller that bound none, one per
+	// window title, living as long as the process. It has to outlive everything
+	// that can reach it: on wx and Qt the window polls it after the Button that
+	// opened it may be gone, and on ImGui that Button is rebuilt every frame and
+	// has to find the SAME flag again -- the title is what it finds it by, as
+	// ImGui finds the window itself. Node-based map: a reference stays valid
+	// however many titles are added after it.
+	inline bool& ownedOpenFlag(const std::string& title)
+	{
+		static std::unordered_map<std::string, bool> flags;
+		return flags[title];
+	}
 
 #ifdef USE_IMGUI
 	// True while a top-level is mid-frame, i.e. when a show() now comes from a

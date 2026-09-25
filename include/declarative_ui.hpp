@@ -73,6 +73,15 @@ static_assert(!ModalWindow<Window<VStack<Button>>>);
 // which is the reason Window exists next to Dialog.
 static_assert(MenuBarHost<Window<VStack<Button>>>);
 static_assert(!MenuBarHost<Dialog<VStack<Button>>>);
+// A Button opens either top-level spelling on click -- and nothing that is not
+// one: a node is shown IN a window, never AS one. The flag-less spelling keys a
+// framework-owned flag by title, which is why both spellings can name one.
+static_assert(TitledTopLevel<Dialog<VStack<Button>>>);
+static_assert(TitledTopLevel<Window<VStack<Button>>>);
+static_assert(ClickShowHost<Button, Dialog<VStack<Button>>>);
+static_assert(ClickShowHost<Button, Window<VStack<Button>>>);
+static_assert(!ClickShowHost<Button, VStack<Button>>);
+static_assert(!ClickShowHost<CheckBox, Dialog<VStack<Button>>>);
 // withContextMenu() is leaf-only, like withTooltip: a container has no native
 // window to deliver a right-click, so asking for one must not compile.
 static_assert(ContextMenuHost<Button>);

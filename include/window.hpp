@@ -77,6 +77,11 @@ struct Window
 		showFrom(nullptr);
 	}
 
+	const std::string& title() const
+	{
+		return m_title;
+	}
+
 	// Show against a caller-owned flag. The flag is the single truth about
 	// whether the window is up: clearing it closes the window, and closing the
 	// window clears it. Either way onClose() fires once.

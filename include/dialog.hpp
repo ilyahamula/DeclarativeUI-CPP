@@ -82,6 +82,11 @@ struct Dialog
 		showFrom(nullptr);
 	}
 
+	const std::string& title() const
+	{
+		return m_title;
+	}
+
 	// Show against a caller-owned flag. The flag is the single truth about
 	// whether the dialog is up: clearing it closes the dialog, and closing the
 	// dialog clears it. Either way onClose() fires once.
