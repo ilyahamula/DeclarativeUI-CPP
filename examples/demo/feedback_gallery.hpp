@@ -26,14 +26,13 @@
 //     "once" is something you can read rather than take on trust. Open and
 //     close the box three times and it says three, never six -- both close
 //     paths run through one place in the session.
-//   * OPENING is the one half of the lifecycle that is not symmetric across
-//     the backends, which is why the parent takes `openConfirm` as a callback
-//     instead of just setting the flag. On ImGui show() IS the frame, so the
-//     flag alone is enough and the main's frame loop does the rest. wx and Qt
-//     destroy the native dialog when it closes, so there a second show() call
-//     is what brings one back -- one show() per open on a retained backend,
-//     one show() per frame on an immediate one. Each main supplies the version
-//     its backend needs; everything below is written once.
+//   * OPENING is a show() from the Delete button's own handler, written once
+//     for all three backends. wx and Qt destroy the native dialog when it
+//     closes, so each open is a fresh show(); ImGui, where a window only exists
+//     while it is submitted every frame, ADOPTS a show() issued from a handler
+//     and keeps drawing the dialog until its flag clears -- nested inside this
+//     window, which is what lets a modal open on top of another window's
+//     frame. No main supplies anything, and none calls the box itself.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so this
 // lands as its own dialog alongside a few already-implemented controls for
@@ -41,7 +40,6 @@
 
 #include "declarative_ui.hpp"
 
-#include <functional>
 #include <string>
 #include <utility>
 
@@ -117,10 +115,10 @@ inline auto drawConfirmDeleteUI(bool& open, std::string& file, std::string& answ
     });
 }
 
-// The parent. `openConfirm` is the one thing each main has to supply: see the
-// fourth note at the top of this file.
+// The parent. It opens the modal itself, from a click handler: see the fourth
+// note at the top of this file.
 inline auto drawDeleteFormUI(std::string& file, std::string& answer,
-    std::string& closeReport, bool& formDisabled, std::function<void()> openConfirm)
+    std::string& closeReport, bool& formDisabled, bool& confirmOpen, int& closeCount)
 {
     constexpr int kRowH = 28;
     constexpr int kLabelH = 20;
@@ -150,9 +148,40 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
                         .withSize(kButtonSize)
                         .withTooltip("Opens an application-modal confirmation")
                         .isDisabled(formDisabled)
-                        // Just asks. Setting the flag is enough on ImGui; on wx
-                        // and Qt the main's version of this also calls show().
-                        .onClick([openConfirm]() { openConfirm(); }),
+                        // One show() per open, on every backend -- ImGui keeps
+                        // the box drawn after this handler returns. The flag is
+                        // set first: it is what the box's lifetime follows.
+                        .onClick([&confirmOpen, &file, &answer, &closeReport, &closeCount]() {
+                            confirmOpen = true;
+                            drawConfirmDeleteUI(confirmOpen, file, answer, closeReport,
+                                closeCount).show(confirmOpen);
+                        }),
+                    // The other top-level spelling from a handler, unbound: no
+                    // flag, so the framework owns whether it is up and its
+                    // close button is the only way down. The fields are bound,
+                    // so the log follows the form while both are open.
+                    Button{"Show log window..."}
+                        .withSize(kButtonSize)
+                        .withTooltip("A Window shown from this click handler")
+                        .withFlags(LayoutFlags().Border(Side::Top, 8))
+                        .onClick([&answer, &closeReport]() {
+                            Window {
+                                "Deletion log",
+                                VStack {
+                                    LayoutFlags().Expand().Border(Side::All, 14).MinSize({360, -1}),
+                                    StaticText{"Last answer:"}.withSize({-1, kLabelH}),
+                                    TextCtrl{answer}
+                                        .withSize({-1, kRowH})
+                                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+                                    StaticText{"Last onClose() report:"}
+                                        .withSize({-1, kLabelH})
+                                        .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                                    TextCtrl{closeReport}
+                                        .withSize({-1, kRowH})
+                                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 4))
+                                }
+                            }.show();
+                        }),
                     Spacer{}
                 }
             },

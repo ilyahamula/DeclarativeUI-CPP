@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "frameworks_core/TopLevelShow.hpp"
 #include "frameworks_core/WindowWrapper.hpp"
 #include "buildable.hpp"
 #include "menus.hpp"
@@ -69,10 +70,11 @@ struct Window
 		return *this;
 	}
 
+	// Callable from a handler on every backend, meaning one show() per open --
+	// see Dialog::show(), which this shares its mechanism with.
 	void show()
 	{
-		WindowWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			menuBarModel(), std::move(m_onClose), nullptr);
+		showFrom(nullptr);
 	}
 
 	// Show against a caller-owned flag. The flag is the single truth about
@@ -84,11 +86,30 @@ struct Window
 	// lives as long as the event loop (wx/Qt), never to the calling scope.
 	void show(bool& open)
 	{
-		WindowWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			menuBarModel(), std::move(m_onClose), &open);
+		showFrom(&open);
 	}
 
 private:
+	void showFrom(bool* open)
+	{
+		if (TopLevelShow::issuedFromFrame())
+		{
+			// A handler's show() on ImGui: kept and redrawn every frame until it
+			// closes. See Dialog::showFrom().
+			auto self = std::make_shared<Window>(std::move(*this));
+			TopLevelShow::adopt(self->m_title, open,
+				[self](bool* flag) { self->present(flag, self->m_onClose); });
+			return;
+		}
+		present(open, std::move(m_onClose));
+	}
+
+	void present(bool* open, std::function<void()> onClose)
+	{
+		WindowWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
+			menuBarModel(), std::move(onClose), open);
+	}
+
 	// Null when no bar was attached, which is what tells a backend to leave the
 	// chrome (and, on ImGui, the row's height) out altogether.
 	const MenuBarModel* menuBarModel() const

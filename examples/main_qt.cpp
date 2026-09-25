@@ -37,18 +37,12 @@ int main(int argc, char** argv)
     bool tabLogging = false;
     Color themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // The one piece of per-backend wiring T3.6 needs, and the whole of it.
-    // A QDialog is destroyed when it closes and its engine session goes with it,
-    // so on a retained backend OPENING one is a show() call, not merely a flag:
-    // these run from a button click and from the binding panel's check box,
-    // which is long after the engine's measure pass and as safe as any other
-    // event handler. (The ImGui main sets the flag and nothing else -- there
-    // show() is the frame.)
-    std::function<void()> openConfirm = [&] {
-        confirmOpen = true;
-        drawConfirmDeleteUI(confirmOpen, deleteFile, deleteAnswer, confirmReport,
-            confirmCloseCount).show(confirmOpen);
-    };
+    // The binding panel's per-backend wiring. A QDialog is destroyed when it
+    // closes and its engine session goes with it, so re-opening it from the
+    // check box is a show() call, not merely a flag. (The ImGui main sets the
+    // flag and nothing else -- there that dialog is shown every frame. The
+    // confirm box needs none of this: it is shown from its button's handler,
+    // which works as-is on every backend.)
     std::function<void()> openDetails = [&] {
         detailsOpen = true;
         drawDetailsUI(detailsOpen, detailsNote, detailsReport, detailsCloseCount)
@@ -60,7 +54,7 @@ int main(int argc, char** argv)
     // exec() -- so Modal() locks the rest of the application out while the call
     // still returns immediately.
     drawDeleteFormUI(deleteFile, deleteAnswer, confirmReport, deleteFormDisabled,
-        openConfirm).show();
+        confirmOpen, confirmCloseCount).show();
     // The binding demo: a dialog's open flag as an ordinary bound bool, shared
     // with a check box and a toggle in this panel. Unticking either one closes
     // the dialog; ticking it opens a fresh one.

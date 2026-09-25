@@ -33,20 +33,12 @@ class DeclarativeApp : public wxApp
     bool m_tabLogging = false;
     Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // The one piece of per-backend wiring T3.6 needs, and the whole of it.
-    // A wxDialog is destroyed when it closes and its engine session goes with
-    // it, so on a retained backend OPENING one is a show() call, not merely a
-    // flag: these run from a button click and from the binding panel's check
-    // box, which is long after the engine's measure pass and as safe as any
-    // other event handler. (The ImGui main sets the flag and nothing else --
-    // there show() is the frame.)
-    void openConfirm()
-    {
-        m_confirmOpen = true;
-        drawConfirmDeleteUI(m_confirmOpen, m_deleteFile, m_deleteAnswer,
-            m_confirmReport, m_confirmCloseCount).show(m_confirmOpen);
-    }
-
+    // The binding panel's per-backend wiring. A wxDialog is destroyed when it
+    // closes and its engine session goes with it, so re-opening it from the
+    // check box is a show() call, not merely a flag. (The ImGui main sets the
+    // flag and nothing else -- there that dialog is shown every frame. The
+    // confirm box needs none of this: it is shown from its button's handler,
+    // which works as-is on every backend.)
     void openDetails()
     {
         m_detailsOpen = true;
@@ -62,7 +54,7 @@ public:
         // Modal() locks the rest of the application out while show() still
         // returns immediately.
         drawDeleteFormUI(m_deleteFile, m_deleteAnswer, m_confirmReport,
-            m_deleteFormDisabled, [this] { openConfirm(); }).show();
+            m_deleteFormDisabled, m_confirmOpen, m_confirmCloseCount).show();
         // The binding demo: a dialog's open flag as an ordinary bound bool,
         // shared with a check box and a toggle in this panel. Unticking either
         // one closes the dialog; ticking it opens a fresh one.

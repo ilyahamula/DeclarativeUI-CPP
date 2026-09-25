@@ -43,12 +43,11 @@ int main(int argc, char** argv)
     bool tabLogging = false;
     Color themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
 
-    // The one piece of per-backend wiring T3.6 needs, and the whole of it.
-    // On an immediate backend show() IS the frame: the loop below calls it every
-    // frame, so asking for a dialog is nothing more than setting its flag. (The
-    // retained mains hand these lambdas a show() call as well, because wx and Qt
-    // destroyed the native dialog when it closed.)
-    auto openConfirm = [&confirmOpen] { confirmOpen = true; };
+    // The binding panel's per-backend wiring. On an immediate backend show() IS
+    // the frame: the loop below calls the details dialog every frame, so asking
+    // for it is nothing more than setting its flag. (The retained mains hand this
+    // lambda a show() call as well, because wx and Qt destroyed the native
+    // dialog when it closed.)
     auto openDetails = [&detailsOpen] { detailsOpen = true; };
 
     runImGuiApp([&]
@@ -57,23 +56,20 @@ int main(int argc, char** argv)
         // answers. On ImGui the box is a BeginPopupModal rather than a plain
         // window -- nothing else dims the windows behind it and refuses them
         // input -- and it is still non-blocking, because a popup is drawn, not
-        // run.
+        // run. The form opens the box from its Delete button's handler, and
+        // the framework keeps drawing it -- so this loop never calls it.
         drawDeleteFormUI(deleteFile, deleteAnswer, confirmReport, deleteFormDisabled,
-            openConfirm).show();
+            confirmOpen, confirmCloseCount).show();
         // The binding demo: a dialog's open flag as an ordinary bound bool,
-        // shared with a check box and a toggle in this panel.
+        // shared with a check box and a toggle in this panel. Its dialog is the
+        // other spelling -- shown from this loop, every frame, against the flag.
         drawDialogBinding(detailsOpen, detailsNote, detailsReport, panelDisabled,
             openDetails).show();
-        // Both flag-shown dialogs are called EVERY FRAME, open or not: the
-        // wrapper draws nothing while the flag is clear and reports the close
-        // once. This is what makes re-opening free here and a show() call on wx
-        // and Qt.
+        // Called EVERY FRAME, open or not: the wrapper draws nothing while the
+        // flag is clear and reports the close once. This is what makes
+        // re-opening free here and a show() call on wx and Qt.
         drawDetailsUI(detailsOpen, detailsNote, detailsReport, detailsCloseCount)
             .show(detailsOpen);
-        // Drawn last, and from OUTSIDE every window: OpenPopup and
-        // BeginPopupModal have to meet in one ID scope, and this is it.
-        drawConfirmDeleteUI(confirmOpen, deleteFile, deleteAnswer, confirmReport,
-            confirmCloseCount).show(confirmOpen);
         // The controls gallery, for context beside the new dialogs.
         drawControlsUI(multilineText, galleryPassword, spinInt, spinFloat, date, time,
             toggle, galleryProgress, tabNote, tabLogging, themeColor).show();
