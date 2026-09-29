@@ -1,4 +1,5 @@
 #include "test_framework.hpp"
+#include "fake_widget.hpp"
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "mock_layout_backend.hpp"
@@ -79,7 +80,7 @@ struct Golden
 	LayoutNode* shutBody = nullptr;
 	Size window { 0, 0 };
 
-	ControlWrapper* fake(int& tag) { return reinterpret_cast<ControlWrapper*>(&tag); }
+	ControlWrapper* fake(int& tag) { return testfw::fakeWidget(&tag); }
 
 	void build(const Profile& p)
 	{

@@ -1,4 +1,5 @@
 #include "test_framework.hpp"
+#include "fake_widget.hpp"
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "mock_layout_backend.hpp"
@@ -13,7 +14,7 @@ namespace
 
 ControlWrapper* fake(int& tag)
 {
-	return reinterpret_cast<ControlWrapper*>(&tag);
+	return testfw::fakeWidget(&tag);
 }
 
 const Constraints kLoose { 10000, 10000 };

@@ -1,4 +1,5 @@
 #include "test_framework.hpp"
+#include "fake_widget.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 
@@ -6,7 +7,7 @@
 // dereferences it, so distinct fake addresses are enough for structure tests.
 static ControlWrapper* fakeWidget(int& tag)
 {
-	return reinterpret_cast<ControlWrapper*>(&tag);
+	return testfw::fakeWidget(&tag);
 }
 
 // Mirrors the worked example from architecture.md:

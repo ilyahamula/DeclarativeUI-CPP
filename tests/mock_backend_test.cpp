@@ -1,10 +1,11 @@
 #include "test_framework.hpp"
+#include "fake_widget.hpp"
 
 #include "mock_layout_backend.hpp"
 
 static ControlWrapper* fake(int& tag)
 {
-	return reinterpret_cast<ControlWrapper*>(&tag);
+	return testfw::fakeWidget(&tag);
 }
 
 TEST(mock_backend_scripted_sizes)
