@@ -5,73 +5,48 @@
 
 class DeclarativeApp : public wxApp
 {
-    // T3.6 demo state: members, so the bound refs outlive the modeless dialogs
-    // that read them. The two `open` bools are the single truth about whether
-    // their dialog is up; the two counters are what make onClose()'s "exactly
-    // once" readable.
+    // Demo state: members, so the bound refs outlive the modeless windows that
+    // read them.
+    //
+    // The application shell: its menu, tool bar and context menu open their
+    // dialogs through ShowAction(), and `m_renameOpen` is the one flag of theirs
+    // the caller owns (About's is keyed by title inside the framework).
+    std::string m_selectedFile = "main.cpp";
+    TableRows m_files {
+        { "main.cpp",   "2 KB",  "entry point" },
+        { "layout.cpp", "31 KB", "measure/arrange" },
+        { "widgets.hpp", "18 KB", "public API" },
+        { "engine.hpp", "9 KB",  "" },
+    };
+    int m_selectedRow = 0;
+    std::string m_notes = "Try Help > About, the About tool, or right-click a file > Rename...";
+    bool m_shellDisabled = false;
+    bool m_shellOpen = true;
+    std::string m_shellStatus = "(the shell is still open)";
+    bool m_wordWrap = true;
+    bool m_renameOpen = false;
+    // The feedback form: Button::onClickShow(), the Button spelling of the
+    // same thing. The `open` bool is the single truth about whether the modal
+    // is up; the counter is what makes onClose()'s "exactly once" readable.
     std::string m_deleteFile = "main.cpp";
     std::string m_deleteAnswer = "(no answer yet)";
     std::string m_confirmReport = "(the modal has not been closed yet)";
     int m_confirmCloseCount = 0;
     bool m_confirmOpen = false;
     bool m_deleteFormDisabled = false;
-    bool m_detailsOpen = false;
-    std::string m_detailsNote = "Shared by the panel and the dialog.";
-    std::string m_detailsReport = "(the dialog has not been closed yet)";
-    int m_detailsCloseCount = 0;
-    bool m_panelDisabled = false;
-    // Controls-gallery state, for context beside the new dialogs.
-    std::string m_multilineText = "Type something here...";
-    std::string m_galleryPassword;
-    int m_spinInt = 42;
-    float m_spinFloat = 1.5f;
-    Date m_date { .year = 2026, .month = 9, .day = 22 };
-    Time m_time { .hour = 9, .minute = 30, .second = 0 };
-    bool m_toggle = false;
-    float m_galleryProgress = 0.35f;
-    std::string m_tabNote = "Add notes here...";
-    bool m_tabLogging = false;
-    Color m_themeColor { .r = 0.26f, .g = 0.59f, .b = 0.98f, .a = 1.0f };
-
-    // The one piece of per-backend wiring T3.6 needs, and the whole of it.
-    // A wxDialog is destroyed when it closes and its engine session goes with
-    // it, so on a retained backend OPENING one is a show() call, not merely a
-    // flag: these run from a button click and from the binding panel's check
-    // box, which is long after the engine's measure pass and as safe as any
-    // other event handler. (The ImGui main sets the flag and nothing else --
-    // there show() is the frame.)
-    void openConfirm()
-    {
-        m_confirmOpen = true;
-        drawConfirmDeleteUI(m_confirmOpen, m_deleteFile, m_deleteAnswer,
-            m_confirmReport, m_confirmCloseCount).show(m_confirmOpen);
-    }
-
-    void openDetails()
-    {
-        m_detailsOpen = true;
-        drawDetailsUI(m_detailsOpen, m_detailsNote, m_detailsReport,
-            m_detailsCloseCount).show(m_detailsOpen);
-    }
 
 public:
     bool OnInit() override
     {
-        // T3.6's gallery: a form that asks, and an application-modal box that
-        // answers. wx holds a wxWindowDisabler for as long as the box is up, so
-        // Modal() locks the rest of the application out while show() still
-        // returns immediately.
+        // One show() per open on a retained backend. The dialogs the shell
+        // opens are shown from its menu, tool and context-menu callbacks.
+        drawAppShellUI(m_selectedFile, m_files, m_selectedRow, m_notes, m_shellDisabled,
+            m_shellOpen, m_shellStatus, m_wordWrap, m_renameOpen).show(m_shellOpen);
+        // A form that asks and an application-modal box that answers, opened
+        // by onClickShow(). wx holds a wxWindowDisabler for as long as the box
+        // is up, while show() still returns immediately.
         drawDeleteFormUI(m_deleteFile, m_deleteAnswer, m_confirmReport,
-            m_deleteFormDisabled, [this] { openConfirm(); }).show();
-        // The binding demo: a dialog's open flag as an ordinary bound bool,
-        // shared with a check box and a toggle in this panel. Unticking either
-        // one closes the dialog; ticking it opens a fresh one.
-        drawDialogBinding(m_detailsOpen, m_detailsNote, m_detailsReport,
-            m_panelDisabled, [this] { openDetails(); }).show();
-        // The controls gallery, for context beside the new dialogs.
-        drawControlsUI(m_multilineText, m_galleryPassword, m_spinInt, m_spinFloat,
-            m_date, m_time, m_toggle, m_galleryProgress, m_tabNote, m_tabLogging,
-            m_themeColor).show();
+            m_deleteFormDisabled, m_confirmOpen, m_confirmCloseCount).show();
         return true;
     }
 };

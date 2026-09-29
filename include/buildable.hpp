@@ -41,6 +41,26 @@ concept CloseObservable = TopLevel<T> && requires(T element, std::function<void(
 	{ element.onClose(std::move(callback)) } -> std::same_as<T&>;
 };
 
+// A top-level window that can name itself. The title is what identifies a
+// window where the framework has to find it again without holding it -- ImGui
+// keys every window's state by it -- so it is also what a flag the FRAMEWORK
+// owns on the caller's behalf is keyed by (Button::onClickShow(W)).
+template <typename T>
+concept TitledTopLevel = FlagShowable<T> && requires(const T element) {
+	{ element.title() } -> std::convertible_to<std::string>;
+};
+
+// A widget that opens top-level window W when clicked, declared in place --
+// against a caller-owned flag, or against one the framework keys by W's title.
+// Button alone: a click is the one gesture every backend delivers as a single
+// event, which is what "one show() per open" needs. A node is shown IN a
+// window, never AS one, so W must be a top-level and not merely buildable.
+template <typename T, typename W>
+concept ClickShowHost = requires(T element, bool& open, W window) {
+	{ element.onClickShow(open, window) } -> std::same_as<T&>;
+	{ element.onClickShow(window) } -> std::same_as<T&>;
+};
+
 // A top-level window that can lock the rest of the application out while it is
 // up, without blocking the caller. Dialog alone: a Window is the application
 // frame, and a frame that refuses input to every other window is a dialog by

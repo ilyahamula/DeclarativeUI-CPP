@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "frameworks_core/DialogWrapper.hpp"
+#include "frameworks_core/TopLevelShow.hpp"
 #include "buildable.hpp"
 
 template<NodeBuildable Content>
@@ -71,12 +72,19 @@ struct Dialog
 		return *this;
 	}
 
+	// Callable from a handler -- an onClick, a menu action, another dialog's
+	// onClose() -- on every backend, with the retained backends' meaning: one
+	// show() per open. On ImGui that takes the framework keeping this Dialog
+	// and drawing it every frame until it closes (TopLevelShow.hpp); called
+	// from the caller's own frame loop it is that frame, as before.
 	void show()
 	{
-		// build the node tree first (no rendering), then the backend sizes
-		// the window from the engine result and draws
-		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			m_position, m_modal, std::move(m_onClose), nullptr);
+		showFrom(nullptr);
+	}
+
+	const std::string& title() const
+	{
+		return m_title;
 	}
 
 	// Show against a caller-owned flag. The flag is the single truth about
@@ -92,14 +100,39 @@ struct Dialog
 	// setting the flag back is enough on ImGui, where the caller calls show()
 	// every frame, but wx and Qt destroyed the native dialog when it closed, so
 	// there a second show() call is what brings it back. One show() per open on
-	// a retained backend, one show() per frame on an immediate one.
+	// a retained backend, one show() per frame on an immediate one -- unless
+	// the show() comes from a handler, which is one per open everywhere: ImGui
+	// then keeps the dialog, and `open` with it, until the flag is cleared.
 	void show(bool& open)
 	{
-		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
-			m_position, m_modal, std::move(m_onClose), &open);
+		showFrom(&open);
 	}
 
 private:
+	void showFrom(bool* open)
+	{
+		if (TopLevelShow::issuedFromFrame())
+		{
+			// A handler's show() on ImGui. This Dialog is a temporary that dies
+			// with the handler's expression, so it moves into the one copy the
+			// registry keeps and rebuilds from every frame. onClose is COPIED
+			// per frame: every frame's call has to be able to fire it.
+			auto self = std::make_shared<Dialog>(std::move(*this));
+			TopLevelShow::adopt(self->m_title, open,
+				[self](bool* flag) { self->present(flag, self->m_onClose); });
+			return;
+		}
+		present(open, std::move(m_onClose));
+	}
+
+	void present(bool* open, std::function<void()> onClose)
+	{
+		// build the node tree first (no rendering), then the backend sizes
+		// the window from the engine result and draws
+		DialogWrapper::runLayoutEngine(m_title, m_size, m_content.buildNode(), m_resizable,
+			m_position, m_modal, std::move(onClose), open);
+	}
+
 	std::string m_title;
 	Size m_size { -1, -1 };
 	std::optional<Position> m_position;

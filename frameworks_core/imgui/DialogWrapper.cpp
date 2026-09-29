@@ -3,6 +3,7 @@
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/imgui/AdoptedTopLevels.hpp"
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 
@@ -64,6 +65,11 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	std::unique_ptr<LayoutNode> rootPtr, bool resizable, const std::optional<Position>& position,
 	bool modal, std::function<void()> onClose, bool* open)
 {
+	// Everything from here on -- the close callback below included -- is this
+	// window's frame, so a show() issued in it is a handler's and is adopted
+	// (TopLevelShow.hpp) rather than drawn as if it were the caller's frame.
+	AdoptedTopLevels::FrameScope frameScope(title);
+
 	DialogState& state = dialogStates()[title];
 
 	// A dialog has a close button on wx and Qt whether or not the caller bound
@@ -192,6 +198,12 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		// and disabled scope, which is what lets OpenPopup and BeginPopupModal
 		// meet in the same scope as ImGui requires.
 		FileBrowser::drawPending();
+
+		// Dialogs and Windows a handler in this frame (or an earlier one) showed,
+		// drawn at the same point and for the same reason -- and, for a Modal()
+		// child of a modal parent, nested inside the parent's popup as ImGui
+		// requires. See AdoptedTopLevels.hpp.
+		AdoptedTopLevels::drawAdopted();
 	}
 	// EndPopup pairs with a BeginPopupModal that RETURNED TRUE -- it closes
 	// itself on the way out otherwise -- while End pairs with Begin either way.

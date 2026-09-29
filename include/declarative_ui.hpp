@@ -13,6 +13,7 @@
 #include "tabpanel.hpp"
 #include "messagebox.hpp"
 #include "filedialog.hpp"
+#include "show_action.hpp"
 
 #include <type_traits>
 
@@ -73,6 +74,35 @@ static_assert(!ModalWindow<Window<VStack<Button>>>);
 // which is the reason Window exists next to Dialog.
 static_assert(MenuBarHost<Window<VStack<Button>>>);
 static_assert(!MenuBarHost<Dialog<VStack<Button>>>);
+// A Button opens either top-level spelling on click -- and nothing that is not
+// one: a node is shown IN a window, never AS one. The flag-less spelling keys a
+// framework-owned flag by title, which is why both spellings can name one.
+static_assert(TitledTopLevel<Dialog<VStack<Button>>>);
+static_assert(TitledTopLevel<Window<VStack<Button>>>);
+static_assert(ClickShowHost<Button, Dialog<VStack<Button>>>);
+static_assert(ClickShowHost<Button, Window<VStack<Button>>>);
+static_assert(!ClickShowHost<Button, VStack<Button>>);
+static_assert(!ClickShowHost<CheckBox, Dialog<VStack<Button>>>);
+// ShowAction() is a COMMAND: it fits every callback that takes nothing -- a
+// menu item, a tool, a link -- and no callback that reports a value, whose
+// window would depend on that value and so cannot be declared ahead of it.
+static_assert(std::same_as<decltype(ShowAction(std::declval<Dialog<VStack<Button>>>())),
+	std::function<void()>>);
+static_assert(requires(MenuItem item) { item.onSelect(ShowAction(std::declval<Window<VStack<Button>>>())); });
+static_assert(requires(ToolItem tool, bool& open) { tool.onClick(ShowAction(open, std::declval<Dialog<VStack<Button>>>())); });
+static_assert(requires(LinkText link) { link.onClick(ShowAction(std::declval<Dialog<VStack<Button>>>())); });
+template <typename T>
+concept ChangeTakesAction = requires(T element, std::function<void()> action) {
+	element.onChange(action);
+};
+template <typename T>
+concept ResultTakesAction = requires(T element, std::function<void()> action) {
+	element.onResult(action);
+};
+static_assert(!ChangeTakesAction<CheckBox>);
+static_assert(!ChangeTakesAction<ListBox<std::string>>);
+static_assert(!ResultTakesAction<FileDialog>);
+static_assert(!ResultTakesAction<MessageBox>);
 // withContextMenu() is leaf-only, like withTooltip: a container has no native
 // window to deliver a right-click, so asking for one must not compile.
 static_assert(ContextMenuHost<Button>);

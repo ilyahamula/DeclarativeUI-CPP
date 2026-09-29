@@ -3,7 +3,10 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/LayoutNode.hpp"
+#include "buildable.hpp"
+#include "show_action.hpp"
 
+#include <concepts>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -498,18 +501,62 @@ struct Button : Widget<Button>
 		return *this;
 	}
 
+	// Open a Dialog or Window on click, declared in place: ShowAction()
+	// (show_action.hpp) on the one widget whose click is its whole purpose,
+	// and spelled as a modifier because it has to compose with onClick() --
+	// which runs first, so a handler can prepare state the window then shows.
+	// Same contract as ShowAction: `open` is the single truth about whether the
+	// window is up, and a click while it is set does nothing.
+	template<FlagShowable W>
+		requires std::copy_constructible<W>
+	Button& onClickShow(bool& open, W topLevel)
+	{
+		m_onClickShow = ShowAction(open, std::move(topLevel));
+		return *this;
+	}
+
+	// The flag-less spelling: the framework owns the flag, keyed by title.
+	template<TitledTopLevel W>
+		requires std::copy_constructible<W>
+	Button& onClickShow(W topLevel)
+	{
+		m_onClickShow = ShowAction(std::move(topLevel));
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, m_onClick, m_onClickWithWidget);
+		// The wrapper fires one callback per click, so onClickShow() rides in
+		// whichever one the caller set -- after it, so a handler can prepare
+		// state the window then shows.
+		std::function<void()> onClick = m_onClick;
+		std::function<void(void*)> onClickWithWidget = m_onClickWithWidget;
+		if (m_onClickShow)
+		{
+			if (onClickWithWidget)
+				onClickWithWidget = [first = std::move(onClickWithWidget), show = m_onClickShow](void* widget) {
+					first(widget);
+					show();
+				};
+			else
+				onClick = [first = std::move(onClick), show = m_onClickShow]() {
+					if (first)
+						first();
+					show();
+				};
+		}
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style,
+			std::move(onClick), std::move(onClickWithWidget));
 	}
 
 private:
 	std::function<void()> m_onClick;
 	std::function<void(void*)> m_onClickWithWidget;
+	std::function<void()> m_onClickShow;
 	std::string m_btnTitle;
 };
 
