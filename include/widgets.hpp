@@ -3,8 +3,8 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/LayoutNode.hpp"
-#include "frameworks_core/TopLevelShow.hpp"
 #include "buildable.hpp"
+#include "show_action.hpp"
 
 #include <concepts>
 #include <functional>
@@ -501,45 +501,27 @@ struct Button : Widget<Button>
 		return *this;
 	}
 
-	// Open a Dialog or Window on click, declared in place. `open` is the single
-	// truth about whether it is up, exactly as for show(bool&) -- which is what
-	// this calls -- and it is also what keeps it to ONE: a click while the flag
-	// is set does nothing, on every backend. Closing the window clears the flag,
-	// so the next click opens it again, rebuilt from this declaration.
-	//
-	// The flag must outlive both the Button and the window, as for any
-	// show(bool&) from a handler.
-	//
-	// Runs after onClick() when both are set. The window is copied per click:
-	// show() consumes what it shows, and every click needs a fresh one.
+	// Open a Dialog or Window on click, declared in place: ShowAction()
+	// (show_action.hpp) on the one widget whose click is its whole purpose,
+	// and spelled as a modifier because it has to compose with onClick() --
+	// which runs first, so a handler can prepare state the window then shows.
+	// Same contract as ShowAction: `open` is the single truth about whether the
+	// window is up, and a click while it is set does nothing.
 	template<FlagShowable W>
 		requires std::copy_constructible<W>
 	Button& onClickShow(bool& open, W topLevel)
 	{
-		m_onClickShow = [flag = &open, window = std::make_shared<W>(std::move(topLevel))]() {
-			if (*flag)
-				return;
-			// Set before show(), not after: it is what the window's lifetime
-			// follows from here on, and a handler's show() reads it at once.
-			*flag = true;
-			W fresh = *window;
-			fresh.show(*flag);
-		};
+		m_onClickShow = ShowAction(open, std::move(topLevel));
 		return *this;
 	}
 
-	// The same, for a caller who has no use for the flag: the framework owns it,
-	// keyed by the window's title, so it is still ONE at a time on every backend.
-	// Not owned by the Button -- on ImGui the Button is rebuilt every frame and
-	// would forget, and on wx and Qt the window can outlive it and would poll a
-	// dead flag. Two buttons showing the same title therefore share one flag,
-	// which is right: a title is one window on ImGui.
+	// The flag-less spelling: the framework owns the flag, keyed by title.
 	template<TitledTopLevel W>
 		requires std::copy_constructible<W>
 	Button& onClickShow(W topLevel)
 	{
-		bool& open = TopLevelShow::ownedOpenFlag(topLevel.title());
-		return onClickShow(open, std::move(topLevel));
+		m_onClickShow = ShowAction(std::move(topLevel));
+		return *this;
 	}
 
 private:

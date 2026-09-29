@@ -44,6 +44,20 @@
 //   * the modifier is leaf-only, like withTooltip. There is no container
 //     overload to call: a stack has no native window to deliver a right-click.
 //
+// Help > About, the About tool, the table's Rename... and the Rename tool all
+// OPEN A DIALOG, and none of them has a handler: each is ShowAction(...), a
+// dialog declared where it is asked for. Two things to watch:
+//
+//   * it is ONE AT A TIME per flag. The menu item and the tool both show the
+//     same About dialog through the flag-less spelling, which the framework
+//     keys by title -- so whichever you use, there is only ever one About box.
+//     Rename is the bound spelling: `renameOpen` is the caller's, and the
+//     context menu and the tool share it on purpose.
+//   * it is a plain std::function<void()>, so it goes wherever a command goes
+//     -- a menu item, a tool, a context menu -- and the same call works on all
+//     three backends, ImGui included: a show() from a callback is kept up by
+//     the framework until the dialog closes.
+//
 // Two things about a Window are worth watching, both the inverse of a Dialog:
 //
 //   * it is RESIZABLE by default, with the auto-fit size as its floor -- drag
@@ -81,7 +95,8 @@
 // `shellOpen` is the bool the shell is shown against and `shellStatus` the line
 // onClose() writes when it goes away -- both belong to the caller and have to
 // outlive the window, which is modeless on every backend. The control panel in
-// value_binding.hpp shares the same two.
+// value_binding.hpp shares the same two. `renameOpen` is the Rename dialog's
+// flag, owned by the caller for the same reason.
 inline auto drawAppShellUI(
     std::string& selectedFile,
     TableRows& rows,
@@ -90,8 +105,49 @@ inline auto drawAppShellUI(
     bool& shellDisabled,
     bool& shellOpen,
     std::string& shellStatus,
-    bool& wordWrap)
+    bool& wordWrap,
+    bool& renameOpen)
 {
+    constexpr int kDialogLabelH = 20;
+
+    // The two dialogs the shell opens, declared once and handed to every
+    // command that opens them -- ShowAction copies what it is given.
+    //
+    // About has no flag of its own: nothing here needs to read or clear it, so
+    // the flag-less ShowAction lets the framework keep one, keyed by title.
+    const auto aboutDialog = Dialog {
+        "About DeclarativeUI-CPP",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 14).MinSize({320, -1}),
+            StaticText{"DeclarativeUI-CPP"}.withSize({-1, kDialogLabelH}),
+            StaticText{"One tree, three backends."}
+                .withSize({-1, kDialogLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+        }
+    };
+
+    // Rename is modal and bound: its own button clears the caller's flag, which
+    // is what closes it -- the same single truth as the title bar's X.
+    const auto renameDialog = Dialog {
+        "Rename file",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 14).MinSize({340, -1}),
+            StaticText{"New name (the status bar follows as you type):"}
+                .withSize({-1, kDialogLabelH}),
+            TextCtrl{selectedFile}
+                .withSize({-1, 26})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 6)),
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 12),
+                Spacer{},
+                Button{"Done"}
+                    .withSize({90, 28})
+                    .onClick([&renameOpen]() { renameOpen = false; })
+            }
+        }
+    }
+    .Modal();
+
     // Every handler and bound flag below belongs to the caller and outlives the
     // window: the backends COPY the menu model, but a menu is not walked until
     // the user opens one, long after this function has returned.
@@ -140,8 +196,9 @@ inline auto drawAppShellUI(
             MenuItem{"Show line numbers"}.checkable(true),
         } },
         Menu { "Help", {
+            // A dialog, declared where it is asked for -- F1 included.
             MenuItem{"About"}.withShortcut("F1")
-                .onSelect([&notes]() { notes = "DeclarativeUI-CPP -- one tree, three backends."; }),
+                .onSelect(ShowAction(aboutDialog)),
             // A snapshot disabled flag: greyed for good, not bound to anything.
             MenuItem{"Check for updates..."}.isDisabled(true),
         } },
@@ -197,6 +254,15 @@ inline auto drawAppShellUI(
                 ToolItem{"Delete"}.withTooltip("Disabled while the shell is locked")
                     .isDisabled(shellDisabled)
                     .onClick([&notes]() { notes = "Toolbar > Delete"; }),
+                ToolItem::Separator(),
+                // The same two dialogs the menus open, and the same flags:
+                // About is keyed by its title, Rename by `renameOpen` -- so a
+                // tool and a menu item can never stack up a second copy.
+                ToolItem{"Rename"}.withTooltip("Rename the selected file")
+                    .isDisabled(shellDisabled)
+                    .onClick(ShowAction(renameOpen, renameDialog)),
+                ToolItem{"About"}.withTooltip("Same dialog as Help > About")
+                    .onClick(ShowAction(aboutDialog)),
             }
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
             // 240 is the first pane's width in pixels, snapshotted from a
@@ -230,7 +296,7 @@ inline auto drawAppShellUI(
                             // control has no context menu on any backend).
                             .withContextMenu({
                                 MenuItem{"Open"}.onSelect([&notes]() { notes = "Context > Open"; }),
-                                MenuItem{"Rename..."}.onSelect([&notes]() { notes = "Context > Rename..."; }),
+                                MenuItem{"Rename..."}.onSelect(ShowAction(renameOpen, renameDialog)),
                                 MenuItem::Separator(),
                                 MenuItem{"Copy"}.withSubmenu({
                                     MenuItem{"Copy name"}.onSelect([&notes]() { notes = "Context > Copy name"; }),
