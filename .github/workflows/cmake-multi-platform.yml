@@ -108,8 +108,6 @@ jobs:
             macOS)
               ARGS+=( -DCMAKE_PREFIX_PATH="$(brew --prefix)" ) ;;
             Windows)
-              # Sources contain UTF-8 (comments with em dashes etc.)
-              ARGS+=( -DCMAKE_CXX_FLAGS_INIT=/utf-8 )
               if [ "${{ matrix.backend }}" = "WX" ]; then
                 ARGS+=( -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
                         -DVCPKG_TARGET_TRIPLET=x64-windows )
