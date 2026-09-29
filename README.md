@@ -57,7 +57,7 @@ return Dialog {
 
 | Category          | Widgets |
 |-------------------|---------|
-| Text              | `StaticText` (`.withAlign()`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
+| Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
@@ -294,6 +294,20 @@ All three backends draw it themselves at the bottom-right of the application win
 not in the OS notification centre — and several live toasts stack upwards instead of
 overlapping. On ImGui nothing extra is called per frame: the next `Dialog` or `Window`
 the app shows draws the pending ones.
+
+`RichText` is read-only text with inline formatting, written as a small markup:
+
+```cpp
+RichText{"**Bold**, *italic*, {#d08a00}coloured{/} and a [link](https://example.com)."}
+    .withSize({420, -1})                        // it wraps at spaces to the width it gets
+    .onLink([](const std::string& url) { /* the framework never opens it */ });
+```
+
+The constructs nest, a backslash escapes the next character, a newline breaks the line, and
+markup that does not pair up is shown as typed. None of the three backends uses a
+native rich-text control: the markup is parsed once, one shared routine wraps it, and
+each backend only draws the pieces in its own fonts, so line breaks differ only as far as
+glyph widths do. A link fires when the press and the release both land on it.
 
 The same `MenuItem` model is a right-click menu on any leaf:
 

@@ -1258,3 +1258,73 @@ inline auto drawToastBinding(std::string& message, int& style, int& durationMs, 
         }
     };
 }
+
+// T4.2: RichText is read-only, so there is no value of its own to bind. What
+// binds is what surrounds it:
+//
+//   * `locked` is shared by the check box and BOTH RichTexts' isDisabled():
+//     tick it and the text greys out and its links go inert on every backend
+//     (ImGui dims it the way it dims every control in a disabled scope).
+//   * `lastLink` and `linkClicks` are written by the links -- one RichText uses
+//     onLink(url), the other the onLink(url, void*) overload that also hands
+//     over the native handle -- and read back by the two fields below, the
+//     count through a SpinBox that can reset it by hand.
+inline auto drawRichTextBinding(std::string& lastLink, int& linkClicks, bool& locked)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 90;
+    constexpr int kTextW = 400;
+
+    return Dialog {
+        "RichText (shared values)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            RichText{"Pick a colour: [**red**](red), [*green*](green) or "
+                     "[{#3060ff}blue{/}](blue). Each link writes its url into the "
+                     "field below."}
+                .withSize({kTextW, -1})
+                .isDisabled(locked)
+                .onLink([&lastLink, &linkClicks](const std::string& url) {
+                    lastLink = url;
+                    ++linkClicks;
+                }),
+            RichText{"This one uses the *native-handle* overload: "
+                     "[count me](count) -- the handle is non-null on wx and Qt."}
+                .withSize({kTextW, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(locked)
+                .onLink([&lastLink, &linkClicks](const std::string& url, void* native) {
+                    lastLink = url + (native != nullptr ? " (native handle)" : " (no handle)");
+                    ++linkClicks;
+                }),
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                StaticText{"Last link:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{lastLink}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+            },
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Clicks:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                SpinBox { Range<int>{ .min = 0, .max = 1000, .step = 1 }, linkClicks }
+                    .withSize({100, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+            },
+
+            CheckBox{locked, "Disable both texts"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}

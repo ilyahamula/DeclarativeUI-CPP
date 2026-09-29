@@ -101,6 +101,14 @@ concept TextAlignHost = requires(T element) {
 	{ element.withAlign(TextAlign::Right) } -> std::same_as<T&>;
 };
 
+// Text that reports a clicked link by its url. RichText alone: a LinkText is
+// one link that reports a click and has no url to hand over. The callback takes
+// the url, so it is a VALUE callback -- ShowAction() cannot go in it.
+template <typename T>
+concept LinkReporter = requires(T element, std::function<void(const std::string&)> callback) {
+	{ element.onLink(std::move(callback)) } -> std::same_as<T&>;
+};
+
 // A notice that goes away on its own: shown from a handler, drawn OVER the
 // windows rather than in one, with no flag to hold and no close to observe --
 // its whole lifecycle is a duration. Toast alone. It has a show() like any

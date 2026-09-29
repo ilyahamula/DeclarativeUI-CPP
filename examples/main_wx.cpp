@@ -8,34 +8,21 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // The toast panel: every value a Toast is built from, each caller-owned.
-    // The duration has two holders (a slider and a spin box).
-    std::string m_toastMessage = "Settings applied";
-    int m_toastStyle = 0;
-    int m_toastDurationMs = 2500;
-    bool m_toastLocked = false;
-    // The feedback form: Button::onClickShow(), the Button spelling of the
-    // same thing. The `open` bool is the single truth about whether the modal
-    // is up; the counter is what makes onClose()'s "exactly once" readable.
-    std::string m_deleteFile = "main.cpp";
-    std::string m_deleteAnswer = "(no answer yet)";
-    std::string m_confirmReport = "(the modal has not been closed yet)";
-    int m_confirmCloseCount = 0;
-    bool m_confirmOpen = false;
-    bool m_deleteFormDisabled = false;
+    // The RichText panel: the links write these, the fields read them back,
+    // and `m_richLocked` disables both texts at once.
+    std::string m_richLastLink = "(no link clicked yet)";
+    int m_richLinkClicks = 0;
+    bool m_richLocked = false;
+    // The About panel: its links report here (and raise a toast).
+    std::string m_aboutLastLink;
 
 public:
     bool OnInit() override
     {
-        // One show() per open on a retained backend. Each toast is a window of
-        // its own that is shown without being activated.
-        drawToastBinding(m_toastMessage, m_toastStyle, m_toastDurationMs, m_toastLocked).show();
-        // A form that asks and an application-modal box that answers, opened
-        // by onClickShow(), plus a Save button that answers with a toast. wx
-        // holds a wxWindowDisabler for as long as the box is up, while show()
-        // still returns immediately.
-        drawDeleteFormUI(m_deleteFile, m_deleteAnswer, m_confirmReport,
-            m_deleteFormDisabled, m_confirmOpen, m_confirmCloseCount).show();
+        // One show() per open on a retained backend. RichText is an owner-drawn
+        // wxPanel painting the shared layout.
+        drawRichTextBinding(m_richLastLink, m_richLinkClicks, m_richLocked).show();
+        drawAboutUI(m_aboutLastLink).show();
         return true;
     }
 };

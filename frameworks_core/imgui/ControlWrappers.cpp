@@ -331,6 +331,109 @@ void StaticTextWrapper::render(const Rect& frame)
 		ImGui::PopTextWrapPos();
 }
 
+// RichTextWrapper -----------------------------------------------------------
+// ImGui has one font face, so the two styles it lacks are drawn: bold is the
+// glyphs twice, one pixel apart (and measured one pixel wider to match), and
+// italic slants the glyph quads it just emitted about the line's bottom edge.
+// Everything goes on the window draw list inside a clip of the frame, and one
+// InvisibleButton of the frame is the item that hover, the tooltip, the
+// context menu and the drift guard read -- the same move SeparatorWrapper and
+// ImageWrapper make.
+
+namespace
+{
+
+constexpr float kItalicSlant = 0.2f;
+
+int richRunWidth(const TextRun& run, std::string_view text)
+{
+	const float w = ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+	return ceilInt(w) + (run.bold ? 1 : 0);
+}
+
+RichTextLayout imguiRichLayout(const std::vector<TextRun>& runs, int maxWidth)
+{
+	return layoutRichText(runs, maxWidth, ceilInt(ImGui::GetTextLineHeight()), richRunWidth);
+}
+
+} // namespace
+
+Size RichTextWrapper::measureIntrinsic(const Constraints& c)
+{
+	const RichTextLayout layout = imguiRichLayout(m_runs, wrapWidth(c));
+	return Size { layout.width, layout.height };
+}
+
+void RichTextWrapper::render(const Rect& frame)
+{
+	ImGui::PushID(WidgetIdManager::nextWidgetId());
+	const RichTextLayout layout = imguiRichLayout(m_runs, sized(frame) ? frame.width : 0);
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+	const ImVec2 size = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2((float)layout.width, (float)layout.height);
+
+	const bool released = ImGui::InvisibleButton("##richtext",
+		ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)));
+	const ImGuiIO& io = ImGui::GetIO();
+	auto linkUnder = [&](const ImVec2& p) {
+		return linkAt(layout, m_runs, (int)std::floor(p.x - origin.x), (int)std::floor(p.y - origin.y));
+	};
+	const std::string* hovered = ImGui::IsItemHovered() ? linkUnder(io.MousePos) : nullptr;
+	if (hovered != nullptr)
+		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+	ImFont* font = ImGui::GetFont();
+	const float fontSize = ImGui::GetFontSize();
+	const ImVec4 textColour = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+	const ImVec4 linkColour = ImGui::GetStyleColorVec4(ImGuiCol_TextLink);
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	drawList->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y), true);
+	for (const RichTextFragment& f : layout.fragments)
+	{
+		const TextRun& run = m_runs[f.run];
+		// GetColorU32 applies style.Alpha, so a disabled scope dims every run
+		// -- coloured ones included -- the way it dims every other control.
+		const ImVec4 colour = run.colour
+			? ImVec4(run.colour->r, run.colour->g, run.colour->b, run.colour->a)
+			: run.isLink() ? linkColour : textColour;
+		const ImU32 col = ImGui::GetColorU32(colour);
+		const ImVec2 pos(origin.x + (float)f.x, origin.y + (float)f.y);
+		const char* begin = f.text.data();
+		const char* end = begin + f.text.size();
+
+		const int firstVertex = drawList->VtxBuffer.Size;
+		drawList->AddText(font, fontSize, pos, col, begin, end);
+		if (run.bold)
+			drawList->AddText(font, fontSize, ImVec2(pos.x + 1.0f, pos.y), col, begin, end);
+		if (run.italic)
+		{
+			const float baseline = pos.y + fontSize;
+			for (int v = firstVertex; v < drawList->VtxBuffer.Size; ++v)
+				drawList->VtxBuffer[v].pos.x += (baseline - drawList->VtxBuffer[v].pos.y) * kItalicSlant;
+		}
+		if (run.isLink())
+		{
+			const float y = std::floor(pos.y + fontSize) - 0.5f;
+			drawList->AddLine(ImVec2(pos.x, y), ImVec2(pos.x + (float)f.width, y), col);
+		}
+	}
+	drawList->PopClipRect();
+	ImGui::PopID();
+
+	// A link fires when the press and the release both land on it -- the rule
+	// wx and Qt follow too. The release position is the live mouse; the press
+	// is where ImGui recorded it, so nothing has to survive the frame.
+	if (released && hovered != nullptr && linkUnder(io.MouseClickedPos[0]) == hovered)
+	{
+		const std::string url = *hovered;
+		if (m_onLink)
+			m_onLink(url);
+		else if (m_onLinkWithWidget)
+			m_onLinkWithWidget(url, m_nativeWidget);
+	}
+}
+
 // DatePickerWrapper -----------------------------------------------------------
 
 Size DatePickerWrapper::measureIntrinsic(const Constraints&)

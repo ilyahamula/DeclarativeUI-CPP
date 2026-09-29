@@ -56,6 +56,16 @@ public:
 		return Size { 0, 0 };
 	}
 
+	// Retained backends measure a leaf by asking its native window for a best
+	// size, which cannot be told the width on offer. A leaf whose HEIGHT follows
+	// that width -- wrapping text -- answers true, and the backend then measures
+	// it through measureContent() instead, exactly as it does a windowless leaf.
+	// Immediate backends always measure through the wrapper and never ask.
+	virtual bool measuresItself() const
+	{
+		return false;
+	}
+
 	// Draw/realize the widget at the frame the engine assigned (the backend
 	// adapter has already positioned the cursor/window). frame.width < 0
 	// means "natural size" (legacy path).

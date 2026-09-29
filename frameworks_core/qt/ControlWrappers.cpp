@@ -41,6 +41,7 @@
 #include <QHBoxLayout>
 
 #include "frameworks_core/qt/FileDialogSupport.hpp"
+#include "frameworks_core/qt/RichTextView.hpp"
 
 // realize() creates the QWidget under the given parent window and connects
 // its signals (plain lambda connects — no moc). The layout engine measures
@@ -362,6 +363,28 @@ void StaticTextWrapper::realize(void* parentWindow)
 	label->setAlignment(horizontal | Qt::AlignVCenter);
 	m_nativeWidget = label;
 
+}
+
+// RichTextWrapper -----------------------------------------------------------
+
+void RichTextWrapper::realize(void* parentWindow)
+{
+	auto* view = new RichTextView(static_cast<QWidget*>(parentWindow), m_runs);
+	m_nativeWidget = view;
+
+	if (m_onLink)
+		view->setOnLink(std::move(m_onLink));
+	else if (m_onLinkWithWidget)
+		view->setOnLink([cb = std::move(m_onLinkWithWidget), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
+}
+
+Size RichTextWrapper::measureIntrinsic(const Constraints& c)
+{
+	const auto* view = static_cast<const RichTextView*>(m_nativeWidget);
+	if (view == nullptr)
+		return Size { 0, 0 };
+	const RichTextLayout layout = view->layoutFor(wrapWidth(c));
+	return Size { layout.width, layout.height };
 }
 
 // DatePickerWrapper -----------------------------------------------------------

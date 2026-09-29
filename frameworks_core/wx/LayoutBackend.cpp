@@ -180,6 +180,10 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 	// the leaf is pure geometry the engine positions and wx never draws.
 	if (window == nullptr)
 		return widget->measureContent(c);
+	// Width-dependent: the native best size could only report one width's
+	// answer, so the wrapper measures against the constraint itself.
+	if (widget->measuresItself())
+		return widget->measureContent(c);
 
 	const wxSize best = window->GetBestSize();
 	Size size { best.x, best.y };

@@ -46,6 +46,21 @@
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so this
 // lands as its own dialog alongside a few already-implemented controls for
 // context (ListBox, StaticText, TextCtrl, Separator, CheckBox, Button).
+//
+// The About panel at the bottom is the gallery for RICHTEXT: read-only text with
+// **bold**, *italic*, [links](url) and {#rrggbb}colour{/}, written as markup.
+// Three things to watch:
+//
+//   * it WRAPS by one rule on all three backends. No native rich-text control
+//     is involved anywhere: the markup is parsed once into runs, one shared
+//     routine breaks them into lines at spaces, and each backend only draws the
+//     pieces with its own fonts. The paragraphs are pinned at one width, so the
+//     line breaks move only as far as the fonts' glyph widths differ.
+//   * a link is REPORTED, never opened. onLink(url) hands the url to the
+//     caller, which here writes it to the field below the text and raises a
+//     toast. Press on a link, drag off it and let go: nothing fires, on any
+//     backend -- the press and the release must both land on the same link.
+//   * it is an ordinary leaf, so withTooltip() and withContextMenu() come free.
 
 #include "declarative_ui.hpp"
 
@@ -231,6 +246,75 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
             CheckBox{formDisabled, "Lock the list and the buttons"}
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// RichText's gallery: an About panel, with a few already-implemented controls
+// around it for context (StaticText, TextCtrl, Separator, Button).
+inline auto drawAboutUI(std::string& lastLink)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kTextW = 420;
+    constexpr Size kButtonSize { 110, 28 };
+
+    // Writes the url where the panel shows it and says so with a toast: the
+    // framework never opens a url itself, so the "opening" is the caller's.
+    auto follow = [&lastLink](const std::string& url) {
+        lastLink = url;
+        Toast{"Link: " + url}.withDuration(1500).show();
+    };
+
+    return Dialog {
+        "About DeclarativeUI",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 14),
+            RichText{"**DeclarativeUI** {#808080}version 0.9{/}"}
+                .withSize({kTextW, -1}),
+
+            RichText{"One widget tree, compiled against *ImGui*, *wxWidgets* or *Qt* by "
+                     "switching one CMake variable. A single layout engine computes every "
+                     "rectangle, so **the same tree lays out identically** on every backend."}
+                .withSize({kTextW, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+                .withTooltip("RichText wraps at spaces, by one rule on all three backends"),
+
+            RichText{"Status: {#2e9e44}**stable**{/} layout engine, "
+                     "{#d08a00}*preview*{/} self-rendered backend.\n"
+                     "Markup is literal when escaped: \\*not italic\\*, \\[not a link\\]."}
+                .withSize({kTextW, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+
+            RichText{"Read the [README](https://example.com/readme), browse the "
+                     "[**widget catalogue**](https://example.com/widgets) or "
+                     "[report a bug](https://example.com/issues)."}
+                .withSize({kTextW, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+                .onLink(follow)
+                .withContextMenu({
+                    MenuItem{"Open the README"}.onSelect([follow]() { follow("https://example.com/readme"); }),
+                    MenuItem{"Open the issue tracker"}.onSelect([follow]() { follow("https://example.com/issues"); }),
+                }),
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 12)),
+
+            StaticText{"Last link clicked (reported by onLink, not opened):"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            TextCtrl{lastLink}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 12),
+                Spacer{},
+                Button{"Clear"}
+                    .withSize(kButtonSize)
+                    .onClick([&lastLink]() { lastLink.clear(); })
+            }
         }
     };
 }

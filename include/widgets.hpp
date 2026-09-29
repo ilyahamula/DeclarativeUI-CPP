@@ -478,6 +478,55 @@ private:
 	std::string m_text;
 };
 
+// RichText -----------------------------------------------------------
+// Read-only text with inline formatting, written in a small markup:
+//
+//     **bold**   *italic*   [text](url)   {#rrggbb}coloured{/}
+//
+// The constructs nest, a backslash takes the next character literally and a
+// newline breaks the line. Markup that does not pair up is shown as typed.
+//
+// It wraps at word boundaries to the width it is offered, so like a StaticText
+// it is usually given one -- withSize({w, -1}), or a column that has one.
+struct RichText : Widget<RichText>
+{
+	using super = Widget<RichText>;
+
+	explicit RichText(const std::string& markup)
+		: super()
+		, m_markup(markup)
+	{
+	}
+
+	// Reports the url of a clicked link. The framework never opens it: what a
+	// link means -- a browser, a help page, another dialog -- is the caller's.
+	RichText& onLink(std::function<void(const std::string&)> callback)
+	{
+		m_onLink = std::move(callback);
+		return *this;
+	}
+
+	RichText& onLink(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onLinkWithWidget = std::move(callback);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<RichTextWrapper>(m_markup, pos, size, style, m_onLink, m_onLinkWithWidget);
+	}
+
+private:
+	std::string m_markup;
+	std::function<void(const std::string&)> m_onLink;
+	std::function<void(const std::string&, void*)> m_onLinkWithWidget;
+};
+
 // Button -----------------------------------------------------------
 struct Button : Widget<Button>
 {

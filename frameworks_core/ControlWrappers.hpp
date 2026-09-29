@@ -7,6 +7,7 @@
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/FileFilter.hpp"
 #include "frameworks_core/CoreTypes/SplitterState.hpp"
+#include "frameworks_core/CoreTypes/RichTextRuns.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -228,6 +229,48 @@ public:
 private:
 	std::string m_text;
 	TextAlign m_align = TextAlign::Left;
+};
+
+// RichTextWrapper -----------------------------------------------------------
+// The markup is parsed here, once, into the runs every backend draws from. No
+// backend has a native control behind it: each draws the fragments
+// layoutRichText() places, measured with its own fonts, so the wrapping rule is
+// the same everywhere. That also makes the height depend on the width on offer,
+// which a retained backend's native best size cannot express -- hence
+// measuresItself() and a measureIntrinsic() on wx and Qt too.
+//
+// The wrap width is the explicit withSize() width when there is one, else the
+// constraint's: measureContent() replaces the measured width by the explicit
+// one afterwards, and the height has to be the height AT that width.
+class RichTextWrapper : public ControlWrapper
+{
+public:
+	RichTextWrapper(std::string_view markup,
+		const Position& pos, const Size& size, long style,
+		std::function<void(const std::string&)> onLink = {},
+		std::function<void(const std::string&, void*)> onLinkWithWidget = {})
+		: ControlWrapper(pos, size, style)
+		, m_runs(parseMarkup(markup))
+		, m_onLink(std::move(onLink))
+		, m_onLinkWithWidget(std::move(onLinkWithWidget))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+#if defined(USE_WX) || defined(USE_QT)
+	Size measureIntrinsic(const Constraints& c) override;
+	bool measuresItself() const override { return true; }
+#endif
+
+private:
+	int wrapWidth(const Constraints& c) const
+	{
+		return m_size.width > 0 ? m_size.width : c.maxWidth;
+	}
+
+	std::vector<TextRun> m_runs;
+	std::function<void(const std::string&)> m_onLink;
+	std::function<void(const std::string&, void*)> m_onLinkWithWidget;
 };
 
 // DatePickerWrapper -----------------------------------------------------------

@@ -21,6 +21,7 @@
 static_assert(NodeBuildable<Button>);
 static_assert(NodeBuildable<TextCtrl>);
 static_assert(NodeBuildable<StaticText>);
+static_assert(NodeBuildable<RichText>);
 static_assert(NodeBuildable<Spacer>);
 static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
@@ -100,6 +101,13 @@ template <typename T>
 concept ResultTakesAction = requires(T element, std::function<void()> action) {
 	element.onResult(action);
 };
+template <typename T>
+concept LinkTakesAction = requires(T element, std::function<void()> action) {
+	element.onLink(action);
+};
+static_assert(LinkReporter<RichText>);
+static_assert(!LinkReporter<LinkText>);
+static_assert(!LinkTakesAction<RichText>);
 static_assert(!ChangeTakesAction<CheckBox>);
 static_assert(!ChangeTakesAction<ListBox<std::string>>);
 static_assert(!ResultTakesAction<FileDialog>);
@@ -107,6 +115,7 @@ static_assert(!ResultTakesAction<MessageBox>);
 // withContextMenu() is leaf-only, like withTooltip: a container has no native
 // window to deliver a right-click, so asking for one must not compile.
 static_assert(ContextMenuHost<Button>);
+static_assert(ContextMenuHost<RichText>);
 static_assert(ContextMenuHost<ToolBar>);
 static_assert(ContextMenuHost<StatusBar>);
 static_assert(ContextMenuHost<FilePicker>);
@@ -130,6 +139,7 @@ static_assert(!ScaleModeHost<StaticText>);
 static_assert(TextAlignHost<StaticText>);
 static_assert(!TextAlignHost<Image>);
 static_assert(!TextAlignHost<Button>);
+static_assert(!TextAlignHost<RichText>);
 // A Toast is shown over the windows and leaves on its own: not a node and not
 // a flag-showable window, and so neither something a Button can onClickShow()
 // nor something with an open flag. MessageBox is the notice that waits for an answer instead.

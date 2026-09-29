@@ -145,6 +145,10 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 	// the leaf is pure geometry the engine positions and Qt never draws.
 	if (window == nullptr)
 		return widget->measureContent(c);
+	// Width-dependent: the native best size could only report one width's
+	// answer, so the wrapper measures against the constraint itself.
+	if (widget->measuresItself())
+		return widget->measureContent(c);
 
 	const QSize hint = window->sizeHint();
 	Size size { hint.width(), hint.height() };

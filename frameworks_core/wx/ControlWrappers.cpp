@@ -32,6 +32,7 @@
 #include <wx/timer.h>
 
 #include "frameworks_core/wx/FileDialogSupport.hpp"
+#include "frameworks_core/wx/RichTextPanel.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
 // realize() creates the native wxWidget from the collected data (plus the
@@ -241,6 +242,31 @@ void StaticTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | align);
 
+}
+
+// RichTextWrapper -----------------------------------------------------------
+
+void RichTextWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("RichTextWrapper::realize()\t-> new RichTextPanel()\n");
+#endif
+	auto* panel = new RichTextPanel(static_cast<wxWindow*>(parentWindow), m_runs);
+	m_nativeWidget = panel;
+
+	if (m_onLink)
+		panel->setOnLink(std::move(m_onLink));
+	else if (m_onLinkWithWidget)
+		panel->setOnLink([cb = std::move(m_onLinkWithWidget), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
+}
+
+Size RichTextWrapper::measureIntrinsic(const Constraints& c)
+{
+	const auto* panel = static_cast<const RichTextPanel*>(m_nativeWidget);
+	if (panel == nullptr)
+		return Size { 0, 0 };
+	const RichTextLayout layout = panel->layoutFor(wrapWidth(c));
+	return Size { layout.width, layout.height };
 }
 
 // DatePickerWrapper -----------------------------------------------------------
