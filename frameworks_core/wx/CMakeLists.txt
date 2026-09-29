@@ -6,6 +6,7 @@ target_sources(DeclarativeUI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/MenuBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageBoxWrapper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FileDialogWrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ToastWrapper.cpp
 )
 
 if(APPLE)

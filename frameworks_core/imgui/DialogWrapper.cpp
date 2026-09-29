@@ -6,6 +6,7 @@
 #include "frameworks_core/imgui/AdoptedTopLevels.hpp"
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
+#include "frameworks_core/imgui/ToastQueue.hpp"
 
 #include <algorithm>
 #include <string>
@@ -69,6 +70,11 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// window's frame, so a show() issued in it is a handler's and is adopted
 	// (TopLevelShow.hpp) rather than drawn as if it were the caller's frame.
 	AdoptedTopLevels::FrameScope frameScope(title);
+
+	// Toasts ride on whichever framework window the frame draws first, so an
+	// app never has to call anything for them (ToastQueue.hpp). Here, before
+	// anything can return early: a closed window's show() is still a frame.
+	ToastQueue::draw();
 
 	DialogState& state = dialogStates()[title];
 

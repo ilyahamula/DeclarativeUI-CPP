@@ -1156,3 +1156,105 @@ inline auto drawDetailsUI(bool& open, std::string& note, std::string& detailsRep
             + "x -- once per close, never twice.";
     });
 }
+
+// T4.1: a Toast built from caller-owned values.
+//
+// A Toast holds no binding of its own -- it is shown and forgotten, and its
+// message is COPIED at show() -- so what binds here is everything that feeds
+// it. The message field, the style combo and the duration are each a
+// caller-owned value, and the duration has two holders: drag the slider and the
+// spin box follows, type in the spin box and the slider moves. Whatever the
+// three say at the moment of the click is what the toast shows; editing the
+// message afterwards does not rewrite a toast that is already up.
+//
+// "Show three" raises three at once to make the STACKING visible: they sit one
+// above another in the bottom-right corner, oldest lowest, and as each expires
+// the rest slide down. `locked` is bound to both buttons' isDisabled().
+inline auto drawToastBinding(std::string& message, int& style, int& durationMs, bool& locked)
+{
+    constexpr int kRowH = 28;
+    constexpr int kLabelH = 20;
+    constexpr int kLabelW = 80;
+    constexpr Size kButtonSize { 130, 28 };
+
+    // Built fresh in each handler from whatever the caller's values say NOW --
+    // not captured by value at build time, which on wx and Qt would freeze the
+    // settings the dialog opened with.
+    auto showToast = [&message, &style, &durationMs](const std::string& suffix) {
+        Toast{message + suffix}
+            .withStyle(static_cast<MessageBoxStyle>(style))
+            .withDuration(durationMs)
+            .show();
+    };
+
+    return Dialog {
+        "Toast controls (shared values)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12).MinSize({440, -1}),
+            StaticText{"The toast is built from these values at the moment you click."}
+                .withSize({-1, kLabelH}),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                StaticText{"Message:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{message}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+            },
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Style:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                // Indices in MessageBoxStyle's declaration order.
+                ComboBox{ {"Info", "Warning", "Error", "Question"}, style }
+                    .withSize({160, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical())
+            },
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 8),
+                StaticText{"Duration:"}
+                    .withSize({kLabelW, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical()),
+                Slider { Range<int>{ .min = 500, .max = 8000, .step = 100 }, durationMs }
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Proportion(1).CenterVertical()),
+                SpinBox { Range<int>{ .min = 500, .max = 8000, .step = 100 }, durationMs }
+                    .withSize({100, kRowH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 8)),
+                StaticText{"ms"}
+                    .withSize({24, kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 6))
+            },
+
+            Separator{}
+                .withSize({-1, 1})
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+            HStack {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                Spacer{},
+                Button{"Show three"}
+                    .withSize(kButtonSize)
+                    .withFlags(LayoutFlags().Border(Side::Right, 8))
+                    .withTooltip("Three at once, to see them stack")
+                    .isDisabled(locked)
+                    .onClick([showToast]() {
+                        showToast(" (1 of 3)");
+                        showToast(" (2 of 3)");
+                        showToast(" (3 of 3)");
+                    }),
+                Button{"Show toast"}
+                    .withSize(kButtonSize)
+                    .isDisabled(locked)
+                    .onClick([showToast]() { showToast(""); })
+            },
+
+            CheckBox{locked, "Lock both buttons"}
+                .withSize({-1, kRowH})
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}

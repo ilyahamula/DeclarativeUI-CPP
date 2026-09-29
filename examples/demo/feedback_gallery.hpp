@@ -1,7 +1,8 @@
 #pragma once
 
 // Feedback: the gallery for a Dialog's LIFECYCLE -- Modal(), onClose() and
-// show(bool&) -- as an OK/Cancel form, which is the shape those three exist for.
+// show(bool&) -- as an OK/Cancel form, which is the shape those three exist for,
+// and for the Toast: feedback that needs no dialog at all.
 //
 // A confirmation is the smallest thing you cannot build without all three of
 // them. The parent asks; a modal box takes the answer and nothing else in the
@@ -34,6 +35,13 @@
 //     window, which is what lets a modal open on top of another window's frame.
 //     The flag also keeps it to ONE: click Delete again while the box is up
 //     and nothing happens. No main supplies anything, and none calls the box.
+//   * A TOAST is the other half of feedback: "Save" answers with a notice that
+//     asks nothing, takes no focus and leaves on its own after 2 s. Click it a
+//     few times and the notices stack upwards from the bottom-right corner
+//     instead of overlapping. The modal's Delete button raises one too, from a
+//     handler inside a modal: on ImGui it is drawn on the foreground draw list,
+//     so it stays above the modal's dimming; on wx and Qt it is a window of its
+//     own that is never activated, so the modal keeps the keyboard.
 //
 // controls_gallery.hpp is long past the ~20-element mark rule 4 sets, so this
 // lands as its own dialog alongside a few already-implemented controls for
@@ -102,6 +110,9 @@ inline auto drawConfirmDeleteUI(bool& open, std::string& file, std::string& answ
                     .onClick([&open, &answer, &file]() {
                         answer = "Deleted " + file + ".";
                         open = false;
+                        Toast{"Deleted " + file}
+                            .withStyle(MessageBoxStyle::Warning)
+                            .show();
                     })
             }
         }
@@ -154,6 +165,17 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
                         // up, and a click then does nothing.
                         .onClickShow(confirmOpen,
                             drawConfirmDeleteUI(confirmOpen, file, answer, closeReport, closeCount)),
+                    // No dialog, no flag, no answer: the notice is shown and
+                    // forgotten. The message is copied when it is shown, so
+                    // each toast keeps the file name it was raised for.
+                    Button{"Save"}
+                        .withSize(kButtonSize)
+                        .withTooltip("Shows a 2-second toast -- click it a few times")
+                        .withFlags(LayoutFlags().Border(Side::Top, 8))
+                        .isDisabled(formDisabled)
+                        .onClick([&file]() {
+                            Toast{"Saved " + file}.withDuration(2000).show();
+                        }),
                     // The other top-level spelling, and the other overload: no
                     // flag, because nothing here needs to read or clear it. The
                     // framework keeps one per title, so it is still at most one
@@ -206,7 +228,7 @@ inline auto drawDeleteFormUI(std::string& file, std::string& answer,
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Expand().Border(Side::Top, 4)),
 
-            CheckBox{formDisabled, "Lock the list and the button"}
+            CheckBox{formDisabled, "Lock the list and the buttons"}
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
         }

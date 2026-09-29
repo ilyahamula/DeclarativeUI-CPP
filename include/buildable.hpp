@@ -100,3 +100,15 @@ template <typename T>
 concept TextAlignHost = requires(T element) {
 	{ element.withAlign(TextAlign::Right) } -> std::same_as<T&>;
 };
+
+// A notice that goes away on its own: shown from a handler, drawn OVER the
+// windows rather than in one, with no flag to hold and no close to observe --
+// its whole lifecycle is a duration. Toast alone. It has a show() like any
+// one-shot, but it is not a node and has no open flag, which is what keeps it
+// out of a layout, out of onClickShow() and out of the show(bool&) lifecycle a
+// Dialog and a Window share.
+template <typename T>
+concept TimedNotice = !NodeBuildable<T> && !FlagShowable<T> && requires(T element, int ms) {
+	{ element.withDuration(ms) } -> std::same_as<T&>;
+	element.show();
+};

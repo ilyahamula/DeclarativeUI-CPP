@@ -13,6 +13,7 @@
 #include "tabpanel.hpp"
 #include "messagebox.hpp"
 #include "filedialog.hpp"
+#include "toast.hpp"
 #include "show_action.hpp"
 
 #include <type_traits>
@@ -129,6 +130,13 @@ static_assert(!ScaleModeHost<StaticText>);
 static_assert(TextAlignHost<StaticText>);
 static_assert(!TextAlignHost<Image>);
 static_assert(!TextAlignHost<Button>);
+// A Toast is shown over the windows and leaves on its own: not a node and not
+// a flag-showable window, and so neither something a Button can onClickShow()
+// nor something with an open flag. MessageBox is the notice that waits for an answer instead.
+static_assert(TimedNotice<Toast>);
+static_assert(!FlagShowable<Toast>);
+static_assert(!ClickShowHost<Button, Toast>);
+static_assert(!TimedNotice<MessageBox>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

@@ -68,6 +68,7 @@ return Dialog {
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
+| Feedback          | `Toast` (timed, non-blocking, stacks) |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
 
 `ListBox`, `CheckListBox`, `TreeView` and `Table` all take `.withVisibleRows(n)`, which
@@ -278,6 +279,21 @@ than the native ones: a breadcrumb, a listing, a filter combo, a name field for 
 Open/Cancel, and no favourites or previews. `FileDialog` blocks on wx and Qt and does
 not on ImGui, where nothing may stop the frame loop, which is why the answer belongs in
 `onResult` on all three rather than in code after `show()`.
+
+A `Toast` is the feedback that needs no answer. It is another one-shot — no node, no
+flag — shown from a handler, and it leaves on its own:
+
+```cpp
+Toast{"Saved " + file}                          // the message is copied at show()
+    .withStyle(MessageBoxStyle::Info)           // the accent colour; Info is the default
+    .withDuration(2000)                         // ms, the closing fade included
+    .show();                                    // returns at once, takes no focus
+```
+
+All three backends draw it themselves at the bottom-right of the application window —
+not in the OS notification centre — and several live toasts stack upwards instead of
+overlapping. On ImGui nothing extra is called per frame: the next `Dialog` or `Window`
+the app shows draws the pending ones.
 
 The same `MenuItem` model is a right-click menu on any leaf:
 

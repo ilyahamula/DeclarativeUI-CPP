@@ -8,23 +8,12 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // The application shell: its menu, tool bar and context menu open their
-    // dialogs through ShowAction(), and `m_renameOpen` is the one flag of theirs
-    // the caller owns (About's is keyed by title inside the framework).
-    std::string m_selectedFile = "main.cpp";
-    TableRows m_files {
-        { "main.cpp",   "2 KB",  "entry point" },
-        { "layout.cpp", "31 KB", "measure/arrange" },
-        { "widgets.hpp", "18 KB", "public API" },
-        { "engine.hpp", "9 KB",  "" },
-    };
-    int m_selectedRow = 0;
-    std::string m_notes = "Try Help > About, the About tool, or right-click a file > Rename...";
-    bool m_shellDisabled = false;
-    bool m_shellOpen = true;
-    std::string m_shellStatus = "(the shell is still open)";
-    bool m_wordWrap = true;
-    bool m_renameOpen = false;
+    // The toast panel: every value a Toast is built from, each caller-owned.
+    // The duration has two holders (a slider and a spin box).
+    std::string m_toastMessage = "Settings applied";
+    int m_toastStyle = 0;
+    int m_toastDurationMs = 2500;
+    bool m_toastLocked = false;
     // The feedback form: Button::onClickShow(), the Button spelling of the
     // same thing. The `open` bool is the single truth about whether the modal
     // is up; the counter is what makes onClose()'s "exactly once" readable.
@@ -38,13 +27,13 @@ class DeclarativeApp : public wxApp
 public:
     bool OnInit() override
     {
-        // One show() per open on a retained backend. The dialogs the shell
-        // opens are shown from its menu, tool and context-menu callbacks.
-        drawAppShellUI(m_selectedFile, m_files, m_selectedRow, m_notes, m_shellDisabled,
-            m_shellOpen, m_shellStatus, m_wordWrap, m_renameOpen).show(m_shellOpen);
+        // One show() per open on a retained backend. Each toast is a window of
+        // its own that is shown without being activated.
+        drawToastBinding(m_toastMessage, m_toastStyle, m_toastDurationMs, m_toastLocked).show();
         // A form that asks and an application-modal box that answers, opened
-        // by onClickShow(). wx holds a wxWindowDisabler for as long as the box
-        // is up, while show() still returns immediately.
+        // by onClickShow(), plus a Save button that answers with a toast. wx
+        // holds a wxWindowDisabler for as long as the box is up, while show()
+        // still returns immediately.
         drawDeleteFormUI(m_deleteFile, m_deleteAnswer, m_confirmReport,
             m_deleteFormDisabled, m_confirmOpen, m_confirmCloseCount).show();
         return true;
