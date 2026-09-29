@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
 // Per-ImGui-scope sequential ID manager (USE_IMGUI only).
@@ -52,6 +53,20 @@ public:
         const std::uint64_t scope = ImGui::GetID("__dui_scope__");
         return (scope << 32)
             | (static_cast<std::uint32_t>(widgetId) << 4)
+            | static_cast<std::uint32_t>(slot & 0xF);
+    }
+
+    // Key for a control the caller named with withId(): the same scope seed,
+    // but the id's hash in place of the sequential number, so the key survives
+    // any change in the tree's shape. Bit 31 of the low half is always set --
+    // sequential ids never reach it -- so a named and a numbered control can
+    // never share a key.
+    static std::uint64_t stableStateKey(const std::string& id, int slot = 0)
+    {
+        const std::uint64_t scope = ImGui::GetID("__dui_scope__");
+        const std::uint32_t hash = ImGui::GetID(id.c_str());
+        return (scope << 32)
+            | ((hash | 0x80000000u) & ~0xFu)
             | static_cast<std::uint32_t>(slot & 0xF);
     }
 

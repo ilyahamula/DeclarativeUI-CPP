@@ -8,9 +8,12 @@
 #include "declarative_ui.hpp"
 
 #include <wx/combobox.h>
+#include <wx/statline.h>
+#include <wx/statusbr.h>
 #include <wx/wx.h>
 
 #include <functional>
+#include <thread>
 
 #ifdef __WXOSX__
 // A real Cocoa click (performClick), so native radio grouping, if any, happens
@@ -210,6 +213,58 @@ TEST(wx_change_callbacks_write_the_value_first_then_report)
 	pump();
 	CHECK_EQ(shortCalls, 1);
 	CHECK_EQ(unboundSeen, std::string("other"));
+	w->Close();
+	pump();
+}
+
+// Review finding 9: a Separator measured 2 px on wx (3 on Qt, 1 on ImGui) and
+// a StatusBar took its width from the native bar. Both are now the shared
+// rule: a 1 px line, and fixed widths + 120 per stretch field + 8 px gaps.
+TEST(wx_separator_and_status_bar_follow_the_shared_rule)
+{
+	Dialog { "Rules",
+		VStack {
+			Separator{}.withFlags(LayoutFlags().Expand()),
+			StatusBar { StatusField{"fixed", 100}, StatusField{"stretch"} }
+				.withFlags(LayoutFlags())
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Rules");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* line = find<wxStaticLine>(w, [](wxStaticLine*) { return true; });
+	auto* bar = find<wxStatusBar>(w, [](wxStatusBar*) { return true; });
+	CHECK(line != nullptr && line->GetSize().y == 1);
+	CHECK(bar != nullptr && bar->GetSize().x == statusBarContentWidth({ StatusField{"a", 100}, StatusField{"b"} }));
+	w->Close();
+	pump();
+}
+
+// withId() names the native window; postToUi() runs a worker's task on the UI
+// thread.
+TEST(wx_with_id_names_the_window_and_post_to_ui_crosses_threads)
+{
+	bool flag = false;
+	Dialog { "Named", VStack { CheckBox{flag, "Box"}.withId("named-box") } }.show();
+	pump();
+	wxWindow* w = windowTitled("Named");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* box = find<wxCheckBox>(w, [](wxCheckBox* c) { return c->GetName() == "named-box"; });
+	CHECK(box != nullptr);
+
+	const auto uiThread = std::this_thread::get_id();
+	bool onUiThread = false;
+	std::thread([&] {
+		postToUi([&] { flag = true; onUiThread = std::this_thread::get_id() == uiThread; });
+	}).join();
+	pump();
+	CHECK(flag);
+	CHECK(onUiThread);
+	CHECK(box != nullptr && box->GetValue()); // and RefSync mirrored it
 	w->Close();
 	pump();
 }

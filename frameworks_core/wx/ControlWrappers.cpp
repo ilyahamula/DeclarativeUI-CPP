@@ -803,6 +803,12 @@ void StatusBarWrapper::realize(void* parentWindow)
 	}
 }
 
+Size StatusBarWrapper::measureIntrinsic(const Constraints&)
+{
+	const auto* bar = static_cast<const wxStatusBar*>(m_nativeWidget);
+	return Size { statusBarContentWidth(m_fields), bar != nullptr ? bar->GetBestSize().y : 0 };
+}
+
 // ColorPickerWrapper -----------------------------------------------------------
 
 void ColorPickerWrapper::realize(void* parentWindow)

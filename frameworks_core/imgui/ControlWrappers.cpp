@@ -1,9 +1,11 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include <algorithm>
+#include <array>
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"
@@ -140,14 +142,14 @@ Size TextCtrlWrapper::measureIntrinsic(const Constraints&)
 
 void TextCtrlWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<std::string> snapshot(m_value);
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
 	// Edited in place through imgui_stdlib's std::string overload, so the field
 	// holds text of any length -- a fixed buffer would cut a long bound value
 	// short and write the cut version back on the first keystroke.
 	std::string& text = m_value.get();
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	// InputTextWithHint draws the hint only while the buffer is empty, exactly
 	// as SetHint and setPlaceholderText do, and measures nothing -- the item is
 	// the width SetNextItemWidth gave it either way.
@@ -170,11 +172,11 @@ Size PasswordInputWrapper::measureIntrinsic(const Constraints&)
 
 void PasswordInputWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<std::string> snapshot(m_value);
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
 	std::string& text = m_value.get(); // any length -- see TextCtrlWrapper
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	const bool edited = m_placeholder.empty()
 		? ImGui::InputText("##passwordinput", &text, ImGuiInputTextFlags_Password)
 		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), &text,
@@ -198,12 +200,12 @@ Size MultiLineTextCtrlWrapper::measureIntrinsic(const Constraints&)
 
 void MultiLineTextCtrlWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<std::string> snapshot(m_value);
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
 	std::string& text = m_value.get(); // any length -- see TextCtrlWrapper
 	const ImVec2 size = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0, 0);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::InputTextMultiline("##multilinetextctrl", &text, size))
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
@@ -411,37 +413,77 @@ void RichTextWrapper::render(const Rect& frame)
 
 // DatePickerWrapper -----------------------------------------------------------
 
-Size DatePickerWrapper::measureIntrinsic(const Constraints&)
+namespace
+{
+
+// The gap ImGui::SameLine(0, 4) leaves between a picker's three fields.
+constexpr float kPickerFieldGap = 4.0f;
+
+// Widths for a picker's three InputInt fields. Unsized, each gets its natural
+// width -- what measureIntrinsic() adds up. Sized, the frame is shared out in
+// the same proportions, so the composite fills exactly the rectangle the engine
+// gave it rather than ignoring it and overflowing a narrower one.
+std::array<float, 3> pickerFieldWidths(const std::array<float, 3>& natural, const Rect& frame)
+{
+	if (!sized(frame))
+		return natural;
+	const float total = natural[0] + natural[1] + natural[2];
+	const float available = std::max(3.0f, (float)frame.width - 2.0f * kPickerFieldGap);
+	std::array<float, 3> widths {};
+	float given = 0.0f;
+	for (int i = 0; i < 2; ++i)
+	{
+		widths[i] = std::floor(natural[i] * available / total);
+		given += widths[i];
+	}
+	widths[2] = available - given; // the last absorbs the rounding
+	return widths;
+}
+
+std::array<float, 3> dateFieldNaturalWidths()
 {
 	const ImGuiStyle& style = ImGui::GetStyle();
 	const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
 	const float padW = style.FramePadding.x * 2.0f;
-	const float w = (ImGui::CalcTextSize("9999").x + padW + btnW)
-		+ (ImGui::CalcTextSize("12").x + padW + btnW)
-		+ (ImGui::CalcTextSize("31").x + padW + btnW)
-		+ 2.0f * 4.0f; // SameLine(0, 4) gaps
-	return Size { ceilInt(w), frameHeight() };
+	return { ImGui::CalcTextSize("9999").x + padW + btnW,
+		ImGui::CalcTextSize("12").x + padW + btnW,
+		ImGui::CalcTextSize("31").x + padW + btnW };
 }
 
-void DatePickerWrapper::render(const Rect&)
+std::array<float, 3> timeFieldNaturalWidths()
 {
-	WidgetSnapshot<Date> snapshot(m_value);
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
+	const float padW = style.FramePadding.x * 2.0f;
+	const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
+	return { ImGui::CalcTextSize("23").x + padW + btnW, twoDigitW, twoDigitW };
+}
+
+} // unnamed namespace
+
+Size DatePickerWrapper::measureIntrinsic(const Constraints&)
+{
+	const auto w = dateFieldNaturalWidths();
+	return Size { ceilInt(w[0] + w[1] + w[2] + 2.0f * kPickerFieldGap), frameHeight() };
+}
+
+void DatePickerWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<Date> snapshot(m_value, m_stableId);
 	// Edited in place: bound, this is the caller's Date; unbound, the snapshot
 	// just restored into it -- either way the reference outlives the edit.
 	Date& date = m_value.get();
 	bool changed = false;
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	{
-		const ImGuiStyle& style = ImGui::GetStyle();
-		const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
-		const float padW = style.FramePadding.x * 2.0f;
-		ImGui::SetNextItemWidth(ImGui::CalcTextSize("9999").x + padW + btnW);
+		const auto w = pickerFieldWidths(dateFieldNaturalWidths(), frame);
+		ImGui::SetNextItemWidth(w[0]);
 		changed |= ImGui::InputInt("##dp_year",  &date.year,  1, 10);
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(ImGui::CalcTextSize("12").x + padW + btnW);
+		ImGui::SameLine(0, kPickerFieldGap);
+		ImGui::SetNextItemWidth(w[1]);
 		changed |= ImGui::InputInt("##dp_month", &date.month, 1, 0);
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(ImGui::CalcTextSize("31").x + padW + btnW);
+		ImGui::SameLine(0, kPickerFieldGap);
+		ImGui::SetNextItemWidth(w[2]);
 		changed |= ImGui::InputInt("##dp_day",   &date.day,   1, 0);
 	}
 	ImGui::PopID();
@@ -457,36 +499,27 @@ void DatePickerWrapper::render(const Rect&)
 
 Size TimePickerWrapper::measureIntrinsic(const Constraints&)
 {
-	const ImGuiStyle& style = ImGui::GetStyle();
-	const float btnW = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
-	const float padW = style.FramePadding.x * 2.0f;
-	const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
-	const float w = (ImGui::CalcTextSize("23").x + padW + btnW)
-		+ twoDigitW * 2.0f
-		+ 2.0f * 4.0f; // SameLine(0, 4) gaps
-	return Size { ceilInt(w), frameHeight() };
+	const auto w = timeFieldNaturalWidths();
+	return Size { ceilInt(w[0] + w[1] + w[2] + 2.0f * kPickerFieldGap), frameHeight() };
 }
 
-void TimePickerWrapper::render(const Rect&)
+void TimePickerWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<Time> snapshot(m_value);
+	WidgetSnapshot<Time> snapshot(m_value, m_stableId);
 	// Edited in place: bound, this is the caller's Time; unbound, the snapshot
 	// just restored into it -- either way the reference outlives the edit.
 	Time& time = m_value.get();
 	bool changed = false;
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	{
-		const ImGuiStyle& style = ImGui::GetStyle();
-		const float btnW  = (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) * 2.0f;
-		const float padW  = style.FramePadding.x * 2.0f;
-		const float twoDigitW = ImGui::CalcTextSize("59").x + padW + btnW;
-		ImGui::SetNextItemWidth(ImGui::CalcTextSize("23").x + padW + btnW);
+		const auto w = pickerFieldWidths(timeFieldNaturalWidths(), frame);
+		ImGui::SetNextItemWidth(w[0]);
 		changed |= ImGui::InputInt("##tp_hour",   &time.hour,   1, 0);
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(twoDigitW);
+		ImGui::SameLine(0, kPickerFieldGap);
+		ImGui::SetNextItemWidth(w[1]);
 		changed |= ImGui::InputInt("##tp_minute", &time.minute, 1, 0);
-		ImGui::SameLine(0, 4);
-		ImGui::SetNextItemWidth(twoDigitW);
+		ImGui::SameLine(0, kPickerFieldGap);
+		ImGui::SetNextItemWidth(w[2]);
 		changed |= ImGui::InputInt("##tp_second", &time.second, 1, 0);
 	}
 	ImGui::PopID();
@@ -510,10 +543,10 @@ Size SliderWrapper<T>::measureIntrinsic(const Constraints&)
 template <SliderValue T>
 void SliderWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 		changed = ImGui::SliderInt("##slider", &m_value.get(), m_range.min, m_range.max);
@@ -556,10 +589,10 @@ Size SpinBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <SpinBoxValue T>
 void SpinBoxWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	bool changed = false;
 	if constexpr (std::is_same_v<T, int>)
 	{
@@ -595,9 +628,9 @@ Size RadioButtonWrapper<T>::measureIntrinsic(const Constraints&)
 template <RadioButtonValue T>
 void RadioButtonWrapper<T>::render(const Rect&)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	const char* label = m_label.empty() ? "##radio" : m_label.c_str();
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	// Picking writes the radio's own value, the same rule as wx and Qt: a bool
 	// radio sets true (it never clears itself), an int radio writes its option.
 	if (ImGui::RadioButton(label, isChecked(m_value.get(), m_option)))
@@ -620,9 +653,9 @@ Size CheckBoxWrapper::measureIntrinsic(const Constraints&)
 
 void CheckBoxWrapper::render(const Rect&)
 {
-	WidgetSnapshot<bool> snapshot(m_value);
+	WidgetSnapshot<bool> snapshot(m_value, m_stableId);
 	const char* label = m_label.empty() ? "##checkbox" : m_label.c_str();
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::Checkbox(label, &m_value.get()))
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
@@ -639,9 +672,9 @@ Size ToggleButtonWrapper::measureIntrinsic(const Constraints&)
 
 void ToggleButtonWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<bool> snapshot(m_value);
+	WidgetSnapshot<bool> snapshot(m_value, m_stableId);
 	const char* label = m_label.empty() ? "##toggle" : m_label.c_str();
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	const bool wasToggled = m_value.get();
 	if (wasToggled)
 	{
@@ -758,7 +791,7 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <ComboBoxValue T>
 void ComboBoxWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	// The value is authoritative, bound or not: unbound it is the snapshot the
 	// store just restored, so the index buildItems() resolved from the declared
 	// literal has to be re-resolved against it.
@@ -780,7 +813,7 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
 	{
 		if constexpr (std::is_same_v<T, int>)
@@ -817,7 +850,7 @@ Size ListBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <ListBoxValue T>
 void ListBoxWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	// Read the selection back from the binding every frame: the tree is rebuilt
 	// per frame anyway, so a value written from anywhere else is picked up for
 	// free -- no ref sync needed here, unlike the retained backends.
@@ -829,7 +862,7 @@ void ListBoxWrapper<T>::render(const Rect& frame)
 	const ImVec2 box = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f); // 0 = ImGui's default list-box size
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::BeginListBox("##listbox", box))
 	{
 		for (int i = 0; i < (int)m_items.size(); ++i)
@@ -887,7 +920,7 @@ Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template <CheckListValue T>
 void CheckListBoxWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	// Read the checked set back from the binding every frame: the tree is
 	// rebuilt per frame anyway, so a value written from anywhere else is picked
 	// up for free -- no ref sync needed here, unlike the retained backends.
@@ -896,7 +929,7 @@ void CheckListBoxWrapper<T>::render(const Rect& frame)
 	const ImVec2 box = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, 0.0f); // 0 = ImGui's default list-box size
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::BeginListBox("##checklistbox", box))
 	{
 		for (int i = 0; i < (int)m_items.size(); ++i)
@@ -954,7 +987,7 @@ Size TreeViewWrapper<T>::measureIntrinsic(const Constraints&)
 template <TreeViewValue T>
 void TreeViewWrapper<T>::render(const Rect& frame)
 {
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	// Read the selection back from the binding every frame: the tree is rebuilt
 	// per frame anyway, so a value written from anywhere else is picked up for
 	// free -- no ref sync needed here, unlike the retained backends.
@@ -970,7 +1003,7 @@ void TreeViewWrapper<T>::render(const Rect& frame)
 	std::vector<std::string> next;
 	bool changed = false;
 
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	// ImGui has no tree container the way it has BeginListBox, so a framed child
 	// window is what gives the tree its scrollable box. BeginChild must be paired
 	// with EndChild whatever it returns (ImGui >= 1.90).
@@ -1052,6 +1085,37 @@ template class TreeViewWrapper<std::vector<std::string>>;
 namespace
 {
 
+// The display order of one table, kept between frames. Re-sorting every frame
+// is n log n string compares for a table that almost never changes order, so
+// the order is recomputed only when the sort spec, the row count or the TEXT
+// OF THE SORTED COLUMN changes -- the last checked by a hash, which is one pass
+// over that column instead of a sort.
+struct TableOrderCache
+{
+	int column = -2;
+	bool ascending = true;
+	std::size_t rowCount = 0;
+	std::size_t columnHash = 0;
+	std::vector<int> order;
+};
+
+std::unordered_map<std::uint64_t, TableOrderCache>& tableOrderCaches()
+{
+	static std::unordered_map<std::uint64_t, TableOrderCache> caches;
+	return caches;
+}
+
+std::size_t hashColumn(const TableRows& rows, int column)
+{
+	std::size_t hash = rows.size();
+	for (const TableRow& row : rows)
+	{
+		const std::size_t cell = column < (int)row.size() ? std::hash<std::string>{}(row[column]) : 0;
+		hash ^= cell + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+	}
+	return hash;
+}
+
 } // unnamed namespace
 
 template <TableValue T>
@@ -1067,10 +1131,11 @@ Size TableWrapper<T>::measureIntrinsic(const Constraints&)
 	// measure does.
 	const TableRows& rows = m_rows.get();
 	int width = ceilInt(style.ScrollbarSize);
+	m_columnWidths.clear();
 	for (int column = 0; column < (int)m_columns.size(); ++column)
 	{
-		width += columnWidth(m_columns, rows, column, measureText)
-			+ ceilInt(style.CellPadding.x * 2.0f);
+		m_columnWidths.push_back(columnWidth(m_columns, rows, column, measureText));
+		width += m_columnWidths.back() + ceilInt(style.CellPadding.x * 2.0f);
 	}
 
 	// visibleRows + 1: the header row is always drawn, so it is always measured.
@@ -1090,7 +1155,7 @@ void TableWrapper<T>::render(const Rect& frame)
 	// Two values on one control, so the rows take a slot of their own. Both are
 	// restored before the reads below: `rows` binds a reference straight into
 	// the storage a cell edit writes through.
-	WidgetSnapshot<T> snapshot(m_value);
+	WidgetSnapshot<T> snapshot(m_value, m_stableId);
 	SnapshotScope<TableRows> rowsSnapshot(snapshot.slotKey(1), m_rows);
 
 	// Read rows and selection back from their bindings every frame: the tree is
@@ -1098,9 +1163,11 @@ void TableWrapper<T>::render(const Rect& frame)
 	// up for free -- no ref sync needed here, unlike the retained backends.
 	const TableRows& rows = m_rows.get();
 	const std::vector<int> selection = rowIndicesFor(rows, boundValue());
-	const auto isSelected = [&selection](int row) {
-		return std::find(selection.begin(), selection.end(), row) != selection.end();
-	};
+	// Looked up once per visible row, so a flag per row rather than a search.
+	std::vector<char> selectedFlags(rows.size(), 0);
+	for (int row : selection)
+		selectedFlags[(std::size_t)row] = 1;
+	const auto isSelected = [&selectedFlags](int row) { return selectedFlags[(std::size_t)row] != 0; };
 
 	const bool anySortable = std::any_of(m_columns.begin(), m_columns.end(),
 		[](const TableColumn& column) { return column.sortable; });
@@ -1125,7 +1192,7 @@ void TableWrapper<T>::render(const Rect& frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * (float)(m_visibleRows + 1));
 
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 
 	// Which cell is open for editing has to outlive the frame, and this wrapper
 	// does not -- the declarative tree is rebuilt every time. ImGui's own
@@ -1153,9 +1220,16 @@ void TableWrapper<T>::render(const Rect& frame)
 	{
 		// The header stays put while the body scrolls.
 		ImGui::TableSetupScrollFreeze(0, 1);
-		const auto measureText = [](const std::string& text) {
-			return ceilInt(ImGui::CalcTextSize(text.c_str()).x);
-		};
+		if ((int)m_columnWidths.size() != columnCount)
+		{
+			// Not measured through this wrapper this frame (an unsized render).
+			const auto measureText = [](const std::string& text) {
+				return ceilInt(ImGui::CalcTextSize(text.c_str()).x);
+			};
+			m_columnWidths.clear();
+			for (int column = 0; column < columnCount; ++column)
+				m_columnWidths.push_back(columnWidth(m_columns, rows, column, measureText));
+		}
 		for (int column = 0; column < columnCount; ++column)
 		{
 			const TableColumn& spec = m_columns[column];
@@ -1166,7 +1240,7 @@ void TableWrapper<T>::render(const Rect& frame)
 			// its own cell padding on top, which is exactly what
 			// measureIntrinsic() budgeted for above.
 			ImGui::TableSetupColumn(spec.label.c_str(), columnFlags,
-				(float)columnWidth(m_columns, rows, column, measureText));
+				(float)m_columnWidths[(std::size_t)column]);
 		}
 		ImGui::TableHeadersRow();
 
@@ -1181,10 +1255,34 @@ void TableWrapper<T>::render(const Rect& frame)
 			sortColumn = specs->Specs[0].ColumnIndex;
 			ascending = specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending;
 		}
-		const std::vector<int> order = sortedOrder(rows, sortColumn, ascending);
-
-		for (int row : order)
+		TableOrderCache& cache = tableOrderCaches()[snapshot.slotKey(2)];
+		const std::size_t columnHash = sortColumn >= 0 ? hashColumn(rows, sortColumn) : 0;
+		if (cache.column != sortColumn || cache.ascending != ascending
+			|| cache.rowCount != rows.size() || cache.columnHash != columnHash)
 		{
+			cache.column = sortColumn;
+			cache.ascending = ascending;
+			cache.rowCount = rows.size();
+			cache.columnHash = columnHash;
+			cache.order = sortedOrder(rows, sortColumn, ascending);
+		}
+		const std::vector<int>& order = cache.order;
+
+		// Only the rows in view are submitted: a table of thousands draws a
+		// screenful. The row being edited is kept in even when scrolled away,
+		// or ImGui would drop its active InputText and lose the edit.
+		ImGuiListClipper clipper;
+		clipper.Begin((int)order.size());
+		if (editRow >= 0)
+		{
+			const auto at = std::find(order.begin(), order.end(), editRow);
+			if (at != order.end())
+				clipper.IncludeItemByIndex((int)(at - order.begin()));
+		}
+		while (clipper.Step())
+		for (int display = clipper.DisplayStart; display < clipper.DisplayEnd; ++display)
+		{
+			const int row = order[(std::size_t)display];
 			ImGui::TableNextRow();
 			// Keyed by the ORIGINAL index, not the display position, so a cell's
 			// edit state follows its row across a re-sort.
@@ -1467,21 +1565,11 @@ void ToolBarWrapper::render(const Rect& frame)
 
 Size StatusBarWrapper::measureIntrinsic(const Constraints&)
 {
-	const ImGuiStyle& style = ImGui::GetStyle();
-
 	// Deliberately NOT measured from the live text: a status bar displays a
 	// string written from elsewhere, so measuring it would let an arriving
-	// message widen an auto-fit window. Fixed fields contribute their width,
-	// stretch fields a constant, and Expand() gets the bar the rest of the row.
-	float width = 0.0f;
-	for (std::size_t index = 0; index < m_fields.size(); ++index)
-	{
-		if (index > 0)
-			width += style.ItemSpacing.x;
-		const StatusField& field = m_fields[index];
-		width += (float)(field.width > 0 ? field.width : kDefaultStatusFieldWidth);
-	}
-	return Size { (int)std::ceil(width), (int)std::ceil(ImGui::GetFrameHeight()) };
+	// message widen an auto-fit window. The width is the rule every backend
+	// shares (StatusField.hpp); Expand() gets the bar the rest of the row.
+	return Size { statusBarContentWidth(m_fields), (int)std::ceil(ImGui::GetFrameHeight()) };
 }
 
 void StatusBarWrapper::render(const Rect& frame)
@@ -1500,7 +1588,7 @@ void StatusBarWrapper::render(const Rect& frame)
 		else
 			++stretchCount;
 	}
-	const float gaps = m_fields.empty() ? 0.0f : style.ItemSpacing.x * (float)(m_fields.size() - 1);
+	const float gaps = m_fields.empty() ? 0.0f : (float)kStatusFieldGap * (float)(m_fields.size() - 1);
 	const float leftover = std::max(0.0f, (float)frame.width - fixedTotal - gaps);
 	const float stretchWidth = stretchCount > 0 ? leftover / (float)stretchCount : 0.0f;
 
@@ -1515,7 +1603,7 @@ void StatusBarWrapper::render(const Rect& frame)
 		{
 			// A thin divider between panes, drawn by hand -- ImGui::Separator()
 			// would span the window instead of this row.
-			const float lineX = x - style.ItemSpacing.x * 0.5f;
+			const float lineX = x - (float)kStatusFieldGap * 0.5f;
 			draw->AddLine(ImVec2(lineX, origin.y + style.FramePadding.y),
 				ImVec2(lineX, origin.y + height - style.FramePadding.y),
 				ImGui::GetColorU32(ImGuiCol_Separator));
@@ -1531,7 +1619,7 @@ void StatusBarWrapper::render(const Rect& frame)
 			ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
 		draw->PopClipRect();
 
-		x += fieldWidth + style.ItemSpacing.x;
+		x += fieldWidth + (float)kStatusFieldGap;
 	}
 
 	// One item for the whole row, so the engine's frame is what it occupies.
@@ -1547,12 +1635,12 @@ Size ColorPickerWrapper::measureIntrinsic(const Constraints&)
 
 void ColorPickerWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<Color> snapshot(m_value);
+	WidgetSnapshot<Color> snapshot(m_value, m_stableId);
 	const Color& cur = m_value.get();
 	float col[4] = { cur.r, cur.g, cur.b, cur.a };
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (ImGui::ColorEdit4("##colorpicker", col))
 	{
 		m_value.set(Color{ col[0], col[1], col[2], col[3] });
@@ -1589,13 +1677,13 @@ Size FilePickerWrapper::measureIntrinsic(const Constraints&)
 
 void FilePickerWrapper::render(const Rect& frame)
 {
-	WidgetSnapshot<std::string> snapshot(m_value);
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
 	const ImGuiStyle& style = ImGui::GetStyle();
 	const float buttonWidth = browseButtonWidth();
 
 	std::string& path = m_value.get(); // any length -- see TextCtrlWrapper
 
-	ImGui::PushID(snapshot.id());
+	snapshot.pushId();
 	if (sized(frame))
 		ImGui::SetNextItemWidth(std::max(1.0f,
 			(float)frame.width - buttonWidth - style.ItemInnerSpacing.x));
@@ -1646,13 +1734,6 @@ void SpacerWrapper::render(const Rect& frame)
 }
 
 // SeparatorWrapper -----------------------------------------------------------
-
-Size SeparatorWrapper::measureIntrinsic(const Constraints&)
-{
-	// a hairline on its own axis and nothing on the other; spans when the caller
-	// adds Expand(), exactly as it does on wx and Qt
-	return m_orient == Orientation::Vertical ? Size { 1, 0 } : Size { 0, 1 };
-}
 
 void SeparatorWrapper::render(const Rect& frame)
 {

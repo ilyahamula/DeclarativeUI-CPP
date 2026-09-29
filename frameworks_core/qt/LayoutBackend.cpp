@@ -11,6 +11,8 @@
 #include <QPlainTextEdit>
 #include <QScrollArea>
 #include <QStyle>
+#include <QStyleOption>
+#include <QTabBar>
 #include <QTabWidget>
 
 #include <algorithm>
@@ -129,6 +131,8 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
 			applyContextMenu(created, *widget);
+			if (!widget->stableId().empty())
+				created->setObjectName(QString::fromStdString(widget->stableId()));
 		}
 	}
 
@@ -242,18 +246,47 @@ EdgeInsets QtLayoutBackend::containerInsets(const LayoutNode& node)
 {
 	if (node.kind == NodeKind::GroupBox)
 	{
-		auto* box = ensureContainer(node);
-		// title row on top, thin frame around; QGroupBox has no exact
-		// metrics API without a layout, so derive from the font
-		const int side = 8;
-		return { side, side, box->fontMetrics().height() + 6, side };
+		// The style's own answer: the contents rectangle QGroupBox gives a
+		// layout (SC_GroupBoxContents), probed on a fixed rect so the insets
+		// are the four differences. Guessing from the font drifted from the
+		// frame and title the style actually draws.
+		auto* box = static_cast<QGroupBox*>(ensureContainer(node));
+		QStyleOptionGroupBox option;
+		option.initFrom(box);
+		option.text = box->title();
+		option.lineWidth = 1;
+		option.midLineWidth = 0;
+		option.textAlignment = Qt::AlignLeft;
+		option.subControls = QStyle::SC_GroupBoxFrame;
+		if (!box->title().isEmpty())
+			option.subControls |= QStyle::SC_GroupBoxLabel;
+		const QRect probe(0, 0, 400, 400);
+		option.rect = probe;
+		const QRect contents = box->style()->subControlRect(QStyle::CC_GroupBox, &option,
+			QStyle::SC_GroupBoxContents, box);
+		return { contents.left() - probe.left(), probe.right() - contents.right(),
+			contents.top() - probe.top(), probe.bottom() - contents.bottom() };
 	}
 	if (node.kind == NodeKind::TabPanel)
 	{
-		auto* tabs = ensureContainer(node);
-		// tab bar on top; deterministic estimate (the real bar reports a
-		// useful height only after pages exist)
-		return { 2, 2, tabs->fontMetrics().height() + 14, 2 };
+		// The rectangle QTabWidget itself puts its pages in
+		// (SE_TabWidgetTabContents), for a tab bar as tall as one of its own
+		// tabs. The real bar is empty when this runs -- pages are added later,
+		// in beginContainer -- so a throwaway QTabBar supplies the height.
+		auto* tabs = static_cast<QTabWidget*>(ensureContainer(node));
+		QTabBar sample;
+		sample.setFont(tabs->font());
+		sample.addTab(QStringLiteral("Xg"));
+		QStyleOptionTabWidgetFrame option;
+		option.initFrom(tabs);
+		option.shape = QTabBar::RoundedNorth;
+		option.tabBarSize = sample.sizeHint();
+		option.lineWidth = tabs->style()->pixelMetric(QStyle::PM_DefaultFrameWidth, nullptr, tabs);
+		const QRect probe(0, 0, 400, 400);
+		option.rect = probe;
+		const QRect contents = tabs->style()->subElementRect(QStyle::SE_TabWidgetTabContents, &option, tabs);
+		return { contents.left() - probe.left(), probe.right() - contents.right(),
+			contents.top() - probe.top(), probe.bottom() - contents.bottom() };
 	}
 	if (node.kind == NodeKind::ScrollPanel)
 	{

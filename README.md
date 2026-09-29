@@ -50,6 +50,8 @@ return Dialog {
 - **Selection mode from the bound type** — `ListBox<std::string>` selects one item, `ListBox<std::vector<int>>` selects many; `Table` binds either a row index or a key column. There is no mode flag to keep in step with the value
 - **Disable anything** — `.isDisabled(flag)` on any widget, or on a `VStack`/`GroupBox`/`TabPanel`/`Tab` to grey out its whole subtree. Bind it to a `bool&` and it flips live, without rebuilding the tree
 - **Tooltips** — `.withTooltip("…")` on any leaf widget, either fixed text or bound to a `std::string&` that can change at runtime
+- **Background threads** — bound values belong to the UI thread; a worker hands its results over with `postToUi([&] { progress = 50; })`, which runs the task on the UI thread on every backend
+- **Stable ids** — `.withId("volume")` names a control: on ImGui its state is keyed by the name rather than its position in the tree (so an unbound value survives an `Expander` folding above it), and on wx/Qt it becomes the native window / object name
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
 

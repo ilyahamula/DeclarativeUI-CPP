@@ -15,6 +15,7 @@
 #include "filedialog.hpp"
 #include "toast.hpp"
 #include "show_action.hpp"
+#include "ui_thread.hpp"
 
 #include <type_traits>
 
@@ -157,6 +158,10 @@ static_assert(TimedNotice<Toast>);
 static_assert(!FlagShowable<Toast>);
 static_assert(!ClickShowHost<Button, Toast>);
 static_assert(!TimedNotice<MessageBox>);
+
+// postToUi() takes a plain command, like ShowAction(): anything a click handler
+// could be, including a ShowAction itself.
+static_assert(std::is_invocable_v<decltype(&postToUi), std::function<void()>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

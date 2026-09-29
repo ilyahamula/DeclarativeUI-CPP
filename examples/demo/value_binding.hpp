@@ -21,8 +21,10 @@
 
 #include "declarative_ui.hpp"
 
+#include <chrono>
 #include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 inline auto drawProgressBarBindedToSlider(float& value, bool& checked)
@@ -1327,6 +1329,74 @@ inline auto drawRichTextBinding(std::string& lastLink, int& linkClicks, bool& lo
             CheckBox{locked, "Disable both texts"}
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// Two ways a value can outlive the code that set it.
+//
+// postToUi(): "Start work" runs a worker thread that must not touch the bound
+// progress or status itself -- the UI thread reads them. Each step is posted
+// to the UI thread instead, and the last one clears `busy`, which re-enables
+// the button and raises a toast. The same code runs on all three backends.
+//
+// withId(): two UNBOUND check boxes below a foldable section. On ImGui an
+// unbound value is kept by the control's position in the tree, and opening the
+// section above shifts that position -- so the unnamed box loses its tick when
+// the section folds or unfolds, while the one named with withId() keeps it. On
+// wx and Qt both keep their state natively; there the id is the native window
+// or object name, which is what tests find the control by.
+inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& busy, bool& detailsOpen)
+{
+    return Dialog {
+        "Background work & stable ids",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            VGroupBox { "postToUi -- a worker thread updates bound values",
+                LayoutFlags().Expand(),
+                ProgressBar{progress}
+                    .withSize({300, 18})
+                    .withFlags(LayoutFlags().Expand()),
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    Button{"Start work"}
+                        .isDisabled(busy)
+                        .onClick([&progress, &status, &busy] {
+                            busy = true;
+                            progress = 0.0f;
+                            status = "Working...";
+                            std::thread([&progress, &status, &busy] {
+                                for (int step = 1; step <= 20; ++step)
+                                {
+                                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                    postToUi([&progress, step] { progress = step * 5.0f; });
+                                }
+                                postToUi([&status, &busy] {
+                                    status = "Done";
+                                    busy = false;
+                                    Toast{"Background work finished"}.show();
+                                });
+                            }).detach();
+                        })
+                        .withId("worker-start"),
+                    Spacer{}
+                },
+                StatusBar{status}
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+            },
+            VGroupBox { "withId -- unbound values that survive a fold",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                Expander { "Details above the boxes", detailsOpen,
+                    VStack {
+                        StaticText{"Opening or folding this section shifts every control below it."},
+                        TextCtrl{std::string("filler")}
+                    }
+                },
+                CheckBox{false, "Named with withId(): keeps its tick"}
+                    .withId("worker-demo-named")
+                    .withFlags(LayoutFlags().Border(Side::Top, 8)),
+                CheckBox{false, "Unnamed: may lose it on ImGui"}
+            }
         }
     };
 }

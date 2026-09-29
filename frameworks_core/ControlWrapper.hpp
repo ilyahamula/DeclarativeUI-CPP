@@ -157,6 +157,19 @@ public:
 		return m_contextMenu;
 	}
 
+	// The caller's stable identity for this control (Widget<W>::withId), or
+	// empty. ImGui keys the control's own state by it instead of by position;
+	// wx and Qt give it to the native window as its name.
+	void setStableId(std::string id)
+	{
+		m_stableId = std::move(id);
+	}
+
+	const std::string& stableId() const
+	{
+		return m_stableId;
+	}
+
 protected:
 	void* m_nativeWidget = nullptr;
 	Position m_pos { -1, -1 };
@@ -165,4 +178,5 @@ protected:
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
 	ContextMenu m_contextMenu;
+	std::string m_stableId;
 };

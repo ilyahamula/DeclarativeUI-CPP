@@ -771,6 +771,12 @@ void StatusBarWrapper::realize(void* parentWindow)
 	}
 }
 
+Size StatusBarWrapper::measureIntrinsic(const Constraints&)
+{
+	const auto* bar = static_cast<const QStatusBar*>(m_nativeWidget);
+	return Size { statusBarContentWidth(m_fields), bar != nullptr ? bar->sizeHint().height() : 0 };
+}
+
 // ColorPickerWrapper -----------------------------------------------------------
 
 void ColorPickerWrapper::realize(void* parentWindow)

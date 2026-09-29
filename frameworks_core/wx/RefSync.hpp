@@ -7,8 +7,11 @@
 
 // Mirrors an externally-owned value back into a native control.
 //
-// A bound ref can be written from anywhere -- another widget's handler, a worker, a
-// timer -- and wx has no notification for that, so we poll on idle.
+// A bound ref can be written by anything on the UI thread -- another widget's
+// handler, a timer, a task a worker posted with postToUi() -- and wx has no
+// notification for that, so we poll on idle. Never by the worker itself: this
+// poll reads the ref on the UI thread, so a direct write from another thread
+// is a data race (frameworks_core/UiThread.hpp).
 //
 // The sync is driven by CHANGES TO THE REF, never by the control merely disagreeing
 // with it. That distinction is load-bearing. A control can legitimately display

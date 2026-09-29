@@ -7,6 +7,7 @@
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 #include "frameworks_core/imgui/ToastQueue.hpp"
+#include "frameworks_core/UiThread.hpp"
 
 #include <algorithm>
 #include <string>
@@ -53,6 +54,10 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// app never has to call anything for them (ToastQueue.hpp). Here, before
 	// anything can return early: a closed window's show() is still a frame.
 	ToastQueue::draw();
+
+	// Work a background thread posted (postToUi) runs here, inside this
+	// window's frame, so a show() it issues is a handler's and is kept up.
+	UiThreadQueue::drain();
 
 	DialogState& state = dialogStates()[title];
 

@@ -37,6 +37,7 @@ struct Widget
 		wrapper->setDisabled(m_disabled);
 		wrapper->setTooltip(m_tooltip);
 		wrapper->setContextMenu(m_contextMenu);
+		wrapper->setStableId(m_id);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(defaultFlags()));
 
 		if (m_postCreateCallback)
@@ -130,6 +131,22 @@ struct Widget
 		return static_cast<W&>(*this);
 	}
 
+	// A stable identity for this control, unique within its window.
+	//
+	// On ImGui it is what the control's state is keyed by -- an unbound value,
+	// the text cursor, an open combo -- instead of the control's position in
+	// the tree. Position shifts whenever the tree's shape does (an Expander
+	// folding above it, a tab switch), and an unbound value keyed by position
+	// then lands on a different control; one keyed by id stays put. On wx and
+	// Qt the native control keeps its own state anyway, and the id becomes its
+	// window / object name (wxWindow::SetName, QObject::setObjectName), which
+	// is what tests and accessibility tools find it by.
+	W& withId(std::string id)
+	{
+		m_id = std::move(id);
+		return static_cast<W&>(*this);
+	}
+
 	W& withStyle(long style)
 	{
 		m_style = style;
@@ -159,6 +176,7 @@ private:
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
 	ContextMenu m_contextMenu;
+	std::string m_id;
 	std::optional<LayoutFlags> m_flags;
 	Position m_position { -1, -1 };
 	Size m_size { -1, -1 };

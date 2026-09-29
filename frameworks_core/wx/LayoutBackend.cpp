@@ -164,6 +164,8 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
 			applyContextMenu(created, *widget);
+			if (!widget->stableId().empty())
+				created->SetName(wxString::FromUTF8(widget->stableId()));
 		}
 	}
 

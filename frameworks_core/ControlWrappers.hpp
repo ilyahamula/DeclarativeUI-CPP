@@ -535,6 +535,12 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+#if defined(USE_WX) || defined(USE_QT)
+	// Width from statusBarContentWidth() on all three, height from the native
+	// bar -- never the native best width, which differs per toolkit.
+	Size measureIntrinsic(const Constraints& c) override;
+	bool measuresItself() const override { return true; }
+#endif
 
 private:
 	StatusFields m_fields;
@@ -631,6 +637,11 @@ private:
 };
 
 // SeparatorWrapper -----------------------------------------------------------
+// A hairline, and the SAME hairline on every backend: one pixel on its own axis
+// and nothing on the other, measured here rather than asked of the native line
+// -- wxStaticLine reports 2 px and a sunken QFrame 3, so a native measure would
+// give one tree three different frames. The native line is simply drawn into
+// the 1 px frame. It spans its parent once the caller adds Expand().
 class SeparatorWrapper : public ControlWrapper
 {
 public:
@@ -641,7 +652,17 @@ public:
 	{
 	}
 
-	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+#if defined(USE_WX) || defined(USE_QT)
+	void realize(void* parentWindow) override;
+	bool measuresItself() const override { return true; }
+#elif defined(USE_IMGUI)
+	void render(const Rect& frame) override;
+#endif
+
+	Size measureIntrinsic(const Constraints&) override
+	{
+		return m_orient == Orientation::Vertical ? Size { 1, 0 } : Size { 0, 1 };
+	}
 
 private:
 	Orientation m_orient;
@@ -1330,6 +1351,13 @@ private:
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
 	std::function<void(int, int, const std::string&)> m_onCellChange;
+
+#ifdef USE_IMGUI
+	// Column widths measureIntrinsic() computed this frame, reused by render()
+	// on the same wrapper so every cell's text is measured once per frame, not
+	// twice. Empty until measured.
+	std::vector<int> m_columnWidths;
+#endif
 };
 
 extern template class TableWrapper<int>;

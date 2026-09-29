@@ -7,9 +7,17 @@
 #include "declarative_ui.hpp"
 
 #include <QApplication>
+
+#include <thread>
 #include <QElapsedTimer>
 #include <QCheckBox>
+#include <QFrame>
+#include <QGroupBox>
+#include <QStatusBar>
 #include <QLabel>
+#include <QPlainTextEdit>
+#include <QStyleOption>
+#include <QTabWidget>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
@@ -216,6 +224,130 @@ TEST(qt_ref_sync_runs_one_timer_per_window)
 	for (auto* edit : w->findChildren<QLineEdit*>())
 		sawText |= edit->text() == QStringLiteral("two");
 	CHECK(sawText);
+	w->close();
+	pump();
+}
+
+// Review finding 9: Qt group-box and tab insets were guessed from the font, so
+// content drifted against the frame Qt draws. They now come from the style's
+// own contents rectangles: an expanding child fills its tab page exactly and
+// sits exactly inside the group box's contents rect.
+TEST(qt_container_insets_match_the_style)
+{
+	std::string text = "x";
+	std::string other = "y";
+	Dialog { "Insets",
+		VStack {
+			TabPanel {
+				LayoutFlags().MinSize({300, 150}),
+				Tab { "Page",
+					VStack {
+						LayoutFlags().Expand().Proportion(1),
+						MultiLineTextCtrl{text}.withFlags(LayoutFlags().Expand().Proportion(1))
+					}
+				}
+			},
+			VGroupBox { "Box",
+				LayoutFlags().MinSize({300, 120}),
+				MultiLineTextCtrl{other}.withFlags(LayoutFlags().Expand().Proportion(1))
+			}
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Insets");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+
+	auto* tabs = w->findChild<QTabWidget*>();
+	CHECK(tabs != nullptr);
+	QPlainTextEdit* inPage = nullptr;
+	QPlainTextEdit* inBox = nullptr;
+	for (auto* e : w->findChildren<QPlainTextEdit*>())
+		(e->toPlainText() == "x" ? inPage : inBox) = e;
+	CHECK(inPage != nullptr && inBox != nullptr);
+	if (tabs == nullptr || inPage == nullptr || inBox == nullptr)
+		return;
+
+	// The page is whatever QTabWidget made it; the child must fill it.
+	QWidget* page = tabs->currentWidget();
+	CHECK(inPage->parentWidget() == page);
+	CHECK_EQ(inPage->geometry().bottom(), page->rect().bottom());
+	CHECK_EQ(inPage->geometry().right(), page->rect().right());
+
+	// The box's child is a sibling placed over it: it must fill the contents
+	// rect the style gives the box, in the box's own coordinates.
+	auto* box = w->findChild<QGroupBox*>();
+	CHECK(box != nullptr);
+	if (box != nullptr)
+	{
+		QStyleOptionGroupBox option;
+		option.initFrom(box);
+		option.text = box->title();
+		option.lineWidth = 1;
+		option.subControls = QStyle::SC_GroupBoxFrame | QStyle::SC_GroupBoxLabel;
+		option.rect = box->rect();
+		const QRect contents = box->style()->subControlRect(QStyle::CC_GroupBox, &option,
+			QStyle::SC_GroupBoxContents, box);
+		// Siblings, so both are mapped through the dialog rather than one onto
+		// the other (mapTo() requires an ancestor).
+		const QRect child(inBox->mapTo(w, QPoint(0, 0)) - box->mapTo(w, QPoint(0, 0)), inBox->size());
+		CHECK(contents.contains(child));
+		CHECK_EQ(child.bottom(), contents.bottom());
+	}
+	w->close();
+	pump();
+}
+
+// Review finding 9: see the wx twin -- a 1 px Separator and the shared
+// StatusBar width rule, where Qt used to measure 3 px and its native bar.
+TEST(qt_separator_and_status_bar_follow_the_shared_rule)
+{
+	Dialog { "Rules",
+		VStack {
+			Separator{}.withFlags(LayoutFlags().Expand()),
+			StatusBar { StatusField{"fixed", 100}, StatusField{"stretch"} }
+				.withFlags(LayoutFlags())
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Rules");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	QFrame* line = nullptr;
+	for (auto* f : w->findChildren<QFrame*>())
+		if (f->frameShape() == QFrame::HLine)
+			line = f;
+	auto* bar = w->findChild<QStatusBar*>();
+	CHECK(line != nullptr && line->height() == 1);
+	CHECK(bar != nullptr && bar->width() == statusBarContentWidth({ StatusField{"a", 100}, StatusField{"b"} }));
+	w->close();
+	pump();
+}
+
+// withId() names the native object; postToUi() runs a worker's task on the UI
+// thread.
+TEST(qt_with_id_names_the_widget_and_post_to_ui_crosses_threads)
+{
+	bool flag = false;
+	Dialog { "Named", VStack { CheckBox{flag, "Box"}.withId("named-box") } }.show();
+	pump();
+	QWidget* w = windowTitled("Named");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	CHECK(w->findChild<QCheckBox*>(QStringLiteral("named-box")) != nullptr);
+
+	const auto uiThread = std::this_thread::get_id();
+	bool onUiThread = false;
+	std::thread([&] {
+		postToUi([&] { flag = true; onUiThread = std::this_thread::get_id() == uiThread; });
+	}).join();
+	pump();
+	CHECK(flag);
+	CHECK(onUiThread);
+	CHECK(w->findChild<QCheckBox*>(QStringLiteral("named-box"))->isChecked()); // and RefSync mirrored it
 	w->close();
 	pump();
 }
