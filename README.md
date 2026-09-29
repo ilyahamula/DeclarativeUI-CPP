@@ -28,7 +28,7 @@ return Dialog {
             VStack { StaticText{"Time"}, TimePicker{time} }
         },
         HStack {
-            StaticText{""}.withFlags(LayoutFlags().Proportion(1)),
+            Spacer{},
             Button{"Check"}.withFlags(LayoutFlags().CenterVertical()).onClick(onCheck)
         }
     }
@@ -95,6 +95,20 @@ them by item *text*, so two lists holding the same items in a different order ti
 same rows; `std::vector<int>` names them by *position*, which is the right choice when
 the labels are not unique. Both decode through the same helpers `ListBox`'s multi-select
 bindings use, so what one control calls "ticked" the other calls "selected".
+
+A `RadioButton` on an `int` names the value it stands for, and its group is simply
+every radio bound to the same variable — not declaration order, not the parent box —
+so two groups can share one box and a group survives any rebuild:
+
+```cpp
+RadioButton{ colour, 0, "Red" },     // picking it writes 0 into colour
+RadioButton{ colour, 1, "Green" },
+RadioButton{ size,   0, "Small" },   // a second group, same box
+RadioButton{ enabled, "Enabled" }    // bool: a lone radio
+```
+
+An `int` radio must be bound: a snapshot would give each radio a private copy of the
+choice, so they could never uncheck each other, and that spelling does not compile.
 
 `HSplitter` / `VSplitter` are arranged by the engine rather than by a native
 splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, which

@@ -1,5 +1,6 @@
 #include "frameworks_core/wx/MenuBuilder.hpp"
 
+#include "frameworks_core/wx/Labels.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
 
 #ifdef USE_LOGGER
@@ -26,16 +27,6 @@ struct MenuHost
 	MenuBarModel model;
 	wxMenuBar* bar = nullptr;
 };
-
-// wx treats '&' as the mnemonic marker in menu labels exactly as it does in
-// container labels, so caller text has to escape it -- the same rule, and the
-// same two characters, as wx/LayoutBackend.cpp applies.
-wxString escaped(const std::string& text)
-{
-	wxString out = wxString::FromUTF8(text.c_str());
-	out.Replace(wxT("&"), wxT("&&"));
-	return out;
-}
 
 // wx builds the frame's accelerator table by re-parsing the text after '\t', so
 // the key has to be spelled the way wxAcceleratorEntry::ParseAccel spells it --
@@ -86,12 +77,12 @@ void appendItem(wxMenu* menu, MenuItem& item, MenuHost* host, wxFrame* frame)
 		// A submenu's own item is a container: it opens, it never selects.
 		auto* sub = new wxMenu;
 		buildMenu(sub, item.submenu, host, frame);
-		menu->AppendSubMenu(sub, escaped(item.label));
+		menu->AppendSubMenu(sub, wxLabelText(item.label));
 		return;
 	}
 
 	const int id = wxWindow::NewControlId();
-	wxString text = escaped(item.label);
+	wxString text = wxLabelText(item.label);
 	if (item.shortcut)
 		text += wxT("\t") + acceleratorText(*item.shortcut);
 #ifdef USE_LOGGER
@@ -166,7 +157,7 @@ void attachMenuBar(wxFrame* frame, const MenuBarModel& model)
 	{
 		auto* menu = new wxMenu;
 		buildMenu(menu, menuModel.items, host, frame);
-		host->bar->Append(menu, escaped(menuModel.label));
+		host->bar->Append(menu, wxLabelText(menuModel.label));
 	}
 
 	frame->SetMenuBar(host->bar);
@@ -198,12 +189,12 @@ void buildPopup(wxMenu& menu, ContextMenu& items,
 		{
 			auto* sub = new wxMenu; // owned by `menu` once appended
 			buildPopup(*sub, item.submenu, byId);
-			menu.AppendSubMenu(sub, escaped(item.label));
+			menu.AppendSubMenu(sub, wxLabelText(item.label));
 			continue;
 		}
 
 		const int id = wxWindow::NewControlId();
-		wxString text = escaped(item.label);
+		wxString text = wxLabelText(item.label);
 		if (item.shortcut)
 			text += wxT("\t") + acceleratorText(*item.shortcut);
 

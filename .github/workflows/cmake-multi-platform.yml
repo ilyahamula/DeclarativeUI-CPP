@@ -48,7 +48,8 @@ jobs:
               sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
                 libxcursor-dev libxi-dev libgl1-mesa-dev ;;
             WX)
-              sudo apt-get install -y libwxgtk3.2-dev ;;
+              # xvfb: backend_tests creates real GTK windows and needs a display
+              sudo apt-get install -y libwxgtk3.2-dev xvfb ;;
             QT)
               sudo apt-get install -y qt6-base-dev libgl1-mesa-dev ;;
           esac
@@ -120,6 +121,14 @@ jobs:
       - name: Build
         run: cmake --build "$BUILD_DIR" --config ${{ matrix.build_type }} --parallel
 
-      # ── Test (layout_tests is backend-free, no display needed) ────────────
+      # ── Test ──────────────────────────────────────────────────────────────
+      # layout_tests is backend-free. backend_tests drives real widgets: ImGui
+      # runs headless and Qt on the offscreen platform everywhere, while wx
+      # needs a display -- the desktop session on macOS/Windows, xvfb on Linux.
       - name: Test
-        run: ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ] && [ "${{ matrix.backend }}" = "WX" ]; then
+            xvfb-run -a ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
+          else
+            ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
+          fi

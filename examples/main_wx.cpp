@@ -13,8 +13,11 @@ class DeclarativeApp : public wxApp
     std::string m_richLastLink = "(no link clicked yet)";
     int m_richLinkClicks = 0;
     bool m_richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string m_aboutLastLink;
+    // The radio/combo binding: three radios and a combo on one int. Each radio
+    // names its own value, so the group is the shared int -- not declaration
+    // order -- and `choiceLocked` disables the lot.
+    int m_choice = 1;
+    bool m_choiceLocked = false;
 
 public:
     bool OnInit() override
@@ -22,7 +25,7 @@ public:
         // One show() per open on a retained backend. RichText is an owner-drawn
         // wxPanel painting the shared layout.
         drawRichTextBinding(m_richLastLink, m_richLinkClicks, m_richLocked).show();
-        drawAboutUI(m_aboutLastLink).show();
+        drawChoiceMirror(m_choice, m_choiceLocked).show();
         return true;
     }
 };

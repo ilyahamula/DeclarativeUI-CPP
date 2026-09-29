@@ -91,8 +91,10 @@ inline auto drawTextMirror(std::string& text, bool& disabled)
     };
 }
 
-// ComboBox + RadioButtons over one int. Radio indices are assigned in
-// declaration order, so they line up with the combo's item indices.
+// ComboBox + RadioButtons over one int. Each radio names the index it stands
+// for, so it lines up with the combo's item of the same index -- and the three
+// radios are one group because they share `choice`, not because of where they
+// are declared.
 inline auto drawChoiceMirror(int& choice, bool& disabled)
 {
     return Dialog {
@@ -104,11 +106,11 @@ inline auto drawChoiceMirror(int& choice, bool& disabled)
                 .isDisabled(disabled),
             VGroupBox { "Same value as radios",
                 LayoutFlags().Expand().Border(Side::Top, 10),
-                RadioButton{choice, "Red"}
+                RadioButton{choice, 0, "Red"}
                     .isDisabled(disabled),
-                RadioButton{choice, "Green"}
+                RadioButton{choice, 1, "Green"}
                     .isDisabled(disabled),
-                RadioButton{choice, "Blue"}
+                RadioButton{choice, 2, "Blue"}
                     .isDisabled(disabled)
             },
             CheckBox{disabled, "Disable both"}

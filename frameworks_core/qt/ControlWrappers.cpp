@@ -41,6 +41,7 @@
 #include <QHBoxLayout>
 
 #include "frameworks_core/qt/FileDialogSupport.hpp"
+#include "frameworks_core/qt/Labels.hpp"
 #include "frameworks_core/qt/RichTextView.hpp"
 
 // realize() creates the QWidget under the given parent window and connects
@@ -194,7 +195,7 @@ private:
 
 void ButtonWrapper::realize(void* parentWindow)
 {
-	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	auto* button = new QPushButton(qtLabelText(m_label), static_cast<QWidget*>(parentWindow));
 	// QPushButton is autoDefault inside a QDialog, so the first one built would come
 	// up drawn as the dialog's default button (blue on macOS) and keep that highlight
 	// for the life of the dialog. wx and ImGui highlight nothing, so neither do we.
@@ -323,7 +324,8 @@ void ReadonlyTextCtrlWrapper::realize(void* parentWindow)
 
 void ClickableTextWrapper::realize(void* parentWindow)
 {
-	auto* label = new ClickableLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	auto* label = new ClickableLabel(static_cast<QWidget*>(parentWindow));
+	qtSetPlainText(label, m_text);
 	m_nativeWidget = label;
 	if (m_onClick)
 		label->onClick = std::move(m_onClick);
@@ -354,7 +356,8 @@ void LinkTextWrapper::realize(void* parentWindow)
 
 void StaticTextWrapper::realize(void* parentWindow)
 {
-	auto* label = new QLabel(qstr(m_text), static_cast<QWidget*>(parentWindow));
+	auto* label = new QLabel(static_cast<QWidget*>(parentWindow));
+	qtSetPlainText(label, m_text);
 	// AlignVCenter is QLabel's own default and is kept, so a Left label reads
 	// exactly as it always did; only the horizontal half follows withAlign().
 	const Qt::Alignment horizontal = m_align == TextAlign::Center ? Qt::AlignHCenter
@@ -586,79 +589,71 @@ template class SpinBoxWrapper<float>;
 
 namespace
 {
-// Qt auto-groups radio buttons by parent widget; with flat parenting every
-// radio would join one group. Mirror the wxRB_GROUP rule instead: a radio
-// with index 0 starts a new QButtonGroup, later indices join it.
-QButtonGroup* currentRadioGroup(QWidget* owner, bool startNew)
+// A radio that belongs to no native group. Qt makes sibling radios
+// auto-exclusive by parent widget, and every leaf here is parented flat to its
+// dialog or page -- so two groups in one box would merge natively. The bound
+// int is the group instead (see RadioButtonWrapper).
+//
+// Non-exclusive, a QRadioButton would toggle OFF when clicked while checked,
+// which no radio does. nextCheckState() is what a click calls, so overriding
+// it to only ever check is the whole fix -- a virtual override, no Q_OBJECT.
+class OptionRadioButton : public QRadioButton
 {
-	static QButtonGroup* s_group = nullptr;
-	if (startNew || s_group == nullptr)
-		s_group = new QButtonGroup(owner);
-	return s_group;
-}
+public:
+	using QRadioButton::QRadioButton;
+
+protected:
+	void nextCheckState() override
+	{
+		if (!isChecked())
+			setChecked(true);
+	}
+};
 } // unnamed namespace
 
 template <RadioButtonValue T>
 void RadioButtonWrapper<T>::realize(void* parentWindow)
 {
-	const T& initial = m_value.get();
-	auto* radio = new QRadioButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	auto* radio = new OptionRadioButton(qtLabelText(m_label), static_cast<QWidget*>(parentWindow));
+	radio->setAutoExclusive(false);
+	radio->setChecked(isChecked(m_value.get(), m_option));
 	m_nativeWidget = radio;
 
-	QButtonGroup* group = currentRadioGroup(static_cast<QWidget*>(parentWindow), m_index == 0);
-	group->addButton(radio, m_index);
-
-	if constexpr (std::is_same_v<T, bool>)
-		radio->setChecked(initial);
-	else
-		radio->setChecked(static_cast<int>(initial) == m_index);
-
+	// toggled(true) is connected only after the initial setChecked above, so
+	// the starting state is not read as a pick.
+	const T choice = picked(m_option);
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
 		QObject::connect(radio, &QRadioButton::toggled,
-			[&value, index = m_index, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
+			[&value, choice, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
 				if (!checked)
 					return;
-				if constexpr (std::is_same_v<T, bool>)
-					value = true;
-				else
-					value = index;
+				value = choice;
 				if (cb) cb(value);
 				else if (cbw) cbw(value, nw);
 			});
-		// Every radio syncs itself; QButtonGroup clears the siblings when one is set.
+		// Every radio on the int mirrors it: the one just picked is already
+		// checked, and the rest see the int move away from their option and
+		// uncheck themselves. The push runs under RefSync's QSignalBlocker, so
+		// an uncheck never reaches the handler above.
 		bindExternalRefSync(radio,
 			[radio] { return radio->isChecked(); },
-			[&value, index = m_index] {
-				if constexpr (std::is_same_v<T, bool>)
-					return static_cast<bool>(value);
-				else
-					return static_cast<int>(value) == index;
-			},
+			[&value, option = m_option] { return isChecked(value, option); },
 			[radio](bool on) { radio->setChecked(on); });
 	}
 	else if (m_onChange)
 		QObject::connect(radio, &QRadioButton::toggled,
-			[index = m_index, cb = std::move(m_onChange)](bool checked) {
-				if (!checked)
-					return;
-				if constexpr (std::is_same_v<T, bool>)
-					cb(true);
-				else
-					cb(static_cast<T>(index));
+			[choice, cb = std::move(m_onChange)](bool checked) {
+				if (checked)
+					cb(choice);
 			});
 	else if (m_onChangeWithWidget)
 		QObject::connect(radio, &QRadioButton::toggled,
-			[index = m_index, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
-				if (!checked)
-					return;
-				if constexpr (std::is_same_v<T, bool>)
-					cbw(true, nw);
-				else
-					cbw(static_cast<T>(index), nw);
+			[choice, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
+				if (checked)
+					cbw(choice, nw);
 			});
-
 }
 
 template class RadioButtonWrapper<bool>;
@@ -669,7 +664,7 @@ template class RadioButtonWrapper<int>;
 void CheckBoxWrapper::realize(void* parentWindow)
 {
 	const bool checked = m_value.get();
-	auto* box = new QCheckBox(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	auto* box = new QCheckBox(qtLabelText(m_label), static_cast<QWidget*>(parentWindow));
 	box->setChecked(checked);
 	m_nativeWidget = box;
 
@@ -700,7 +695,7 @@ void CheckBoxWrapper::realize(void* parentWindow)
 void ToggleButtonWrapper::realize(void* parentWindow)
 {
 	const bool toggled = m_value.get();
-	auto* button = new QPushButton(qstr(m_label), static_cast<QWidget*>(parentWindow));
+	auto* button = new QPushButton(qtLabelText(m_label), static_cast<QWidget*>(parentWindow));
 	button->setCheckable(true);
 	button->setChecked(toggled);
 	button->setAutoDefault(false);
@@ -815,8 +810,8 @@ void ToolBarWrapper::realize(void* parentWindow)
 		}
 
 		QAction* action = icon.isNull()
-			? bar->addAction(qstr(tool.label))
-			: bar->addAction(icon, qstr(tool.label));
+			? bar->addAction(qtLabelText(tool.label))
+			: bar->addAction(icon, qtLabelText(tool.label));
 		if (!tool.tooltip.empty())
 			action->setToolTip(qstr(tool.tooltip));
 
@@ -870,7 +865,8 @@ void StatusBarWrapper::realize(void* parentWindow)
 
 	for (StatusField& field : m_fields)
 	{
-		auto* label = new QLabel(qstr(field.text.get()), bar);
+		auto* label = new QLabel(bar);
+		qtSetPlainText(label, field.text.get());
 		if (field.width > 0)
 		{
 			label->setFixedWidth(field.width);
@@ -1070,7 +1066,7 @@ void ExpanderHeaderWrapper::realize(void* parentWindow)
 	// headers and every Qt settings dialog use, and the closest thing to
 	// wxCollapsibleHeaderCtrl that needs no painting of our own.
 	auto* header = new QToolButton(static_cast<QWidget*>(parentWindow));
-	header->setText(qstr(m_label));
+	header->setText(qtLabelText(m_label));
 	header->setCheckable(true);
 	header->setChecked(m_state->expanded.get());
 	header->setAutoRaise(true);

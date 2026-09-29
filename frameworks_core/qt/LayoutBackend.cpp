@@ -1,5 +1,6 @@
 #include "frameworks_core/qt/LayoutBackend.hpp"
 #include "frameworks_core/qt/MenuBuilder.hpp"
+#include "frameworks_core/qt/Labels.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
@@ -21,14 +22,6 @@ namespace
 constexpr int kTextFloorChars = 10;
 // Allowance for the text frame's own padding around the text extent.
 constexpr int kTextFramePadding = 16;
-
-// Qt treats '&' as a mnemonic marker in titles; user text must escape it.
-QString labelText(const std::string& label)
-{
-	QString text = QString::fromStdString(label);
-	text.replace(QLatin1String("&"), QLatin1String("&&"));
-	return text;
-}
 
 // Applies a node's effective disabled state to the widget that was just
 // created for it (leaf control, group box, tab widget or page), and keeps
@@ -219,7 +212,7 @@ QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)
 	// created against the host first; beginContainer reparents as needed
 	QWidget* window = nullptr;
 	if (node.kind == NodeKind::GroupBox)
-		window = new QGroupBox(labelText(node.label), m_host);
+		window = new QGroupBox(qtLabelText(node.label), m_host);
 	else if (node.kind == NodeKind::TabPanel)
 		window = new QTabWidget(m_host);
 	else if (isExpanderContent(node))
@@ -358,7 +351,7 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		else
 		{
 			page = new QWidget(tabs);
-			tabs->addTab(page, labelText(node.label));
+			tabs->addTab(page, qtLabelText(node.label));
 			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}

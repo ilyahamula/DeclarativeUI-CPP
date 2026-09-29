@@ -16,13 +16,16 @@ int main(int argc, char** argv)
     std::string richLastLink = "(no link clicked yet)";
     int richLinkClicks = 0;
     bool richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string aboutLastLink;
+    // The radio/combo binding: three radios and a combo on one int. Each radio
+    // names its own value, so the group is the shared int -- not declaration
+    // order -- and `choiceLocked` disables the lot.
+    int choice = 1;
+    bool choiceLocked = false;
 
     // One show() per open on a retained backend. RichText is a plain QWidget
     // that paints the shared layout -- no QLabel, no HTML.
     drawRichTextBinding(richLastLink, richLinkClicks, richLocked).show();
-    drawAboutUI(aboutLastLink).show();
+    drawChoiceMirror(choice, choiceLocked).show();
 
     return app.exec();
 }

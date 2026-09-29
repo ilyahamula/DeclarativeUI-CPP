@@ -1,5 +1,6 @@
 #include "frameworks_core/qt/MenuBuilder.hpp"
 
+#include "frameworks_core/qt/Labels.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 
 #ifdef USE_LOGGER
@@ -31,14 +32,6 @@ struct MenuHost
 {
 	MenuBarModel model;
 };
-
-// Qt treats '&' as the mnemonic marker in menu text exactly as wx does, so
-// caller text escapes it the same way qt/LayoutBackend.cpp escapes container
-// labels.
-QString escaped(const std::string& text)
-{
-	return QString::fromStdString(text).replace(QLatin1String("&"), QLatin1String("&&"));
-}
 
 // Qt's own key table. Built from the parsed fields rather than from
 // QKeySequence::fromString, whose accepted spellings are Qt's translated key
@@ -136,12 +129,12 @@ void appendItem(QMenu* menu, MenuItem& item, QMainWindow* window)
 	if (!item.submenu.empty())
 	{
 		// A submenu's own item is a container: it opens, it never selects.
-		QMenu* sub = menu->addMenu(escaped(item.label));
+		QMenu* sub = menu->addMenu(qtLabelText(item.label));
 		buildMenu(sub, item.submenu, window);
 		return;
 	}
 
-	QAction* action = menu->addAction(escaped(item.label));
+	QAction* action = menu->addAction(qtLabelText(item.label));
 	applyShortcut(action, item);
 
 	MenuItem* model = &item;
@@ -205,7 +198,7 @@ int attachMenuBar(QMainWindow* window, const MenuBarModel& model)
 	auto* bar = new QMenuBar(window);
 	for (auto& menuModel : host->model.menus)
 	{
-		QMenu* menu = bar->addMenu(escaped(menuModel.label));
+		QMenu* menu = bar->addMenu(qtLabelText(menuModel.label));
 		buildMenu(menu, menuModel.items, window);
 	}
 	window->setMenuBar(bar);
@@ -237,12 +230,12 @@ void buildPopup(QMenu& menu, ContextMenu& items,
 
 		if (!item.submenu.empty())
 		{
-			QMenu* sub = menu.addMenu(escaped(item.label));
+			QMenu* sub = menu.addMenu(qtLabelText(item.label));
 			buildPopup(*sub, item.submenu, byAction);
 			continue;
 		}
 
-		QAction* action = menu.addAction(escaped(item.label));
+		QAction* action = menu.addAction(qtLabelText(item.label));
 		applyShortcut(action, item);
 		if (item.checkedFlag)
 		{

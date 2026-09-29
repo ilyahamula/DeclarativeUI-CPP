@@ -378,52 +378,63 @@ extern template class SpinBoxWrapper<int>;
 extern template class SpinBoxWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
+// One radio. An int radio is checked while the bound int equals `option`, and
+// picking it writes `option`; the radios sharing that int ARE the group. That
+// is the whole grouping rule, on every backend, and it holds no state of its
+// own -- a group survives any rebuild because there is nothing to rebuild.
+//
+// No native radio group is used. Native grouping keys on creation order and on
+// the parent window (a wxRB_GROUP run, Qt's auto-exclusive siblings or a
+// QButtonGroup), neither of which is a property of the declarative tree: every
+// leaf is parented flat to its dialog or page, so two groups in one box would
+// merge natively. The retained backends therefore create each radio on its own
+// (wxRB_SINGLE / setAutoExclusive(false)) and let the bound int, mirrored by
+// the ordinary RefSync poll, uncheck the others. A bool radio ignores `option`.
 template <RadioButtonValue T>
 class RadioButtonWrapper : public ControlWrapper
 {
 public:
 	RadioButtonWrapper(const std::string& label,
-		BoundValue<T> value, const Position& pos, const Size& size, long style,
+		BoundValue<T> value, int option, const Position& pos, const Size& size, long style,
 		std::function<void(T)> onChange = {},
 		std::function<void(T, void*)> onChangeWithWidget = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(value))
+		, m_option(option)
 		, m_onChange(std::move(onChange))
 		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
-		assignGroupIndex(&m_value.get());
 	}
 
-	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
-private:
-	// Assigns the radio's index within its group. Consecutive radios sharing
-	// the same backing value form one group; a distinct address starts a new
-	// group (so standalone radios, each backed by their own owned value, end
-	// up as independent single-element groups).
-	void assignGroupIndex(const T* groupKey)
+	// Whether a radio standing for `option` shows checked while the bound value
+	// is `value`. Static and data-only, so an event handler can call it holding
+	// nothing but the caller's variable -- never the wrapper.
+	static bool isChecked(const T& value, int option)
 	{
-		if constexpr (std::is_same_v<T, int>)
-		{
-			if (const_cast<int*>(groupKey) != s_lastGroup)
-			{
-				s_radioButtonId = 0;
-				s_lastGroup = const_cast<int*>(groupKey);
-			}
-			m_index = s_radioButtonId++;
-		}
+		if constexpr (std::is_same_v<T, bool>)
+			return value;
+		else
+			return value == option;
 	}
 
+	// What picking a radio standing for `option` writes.
+	static T picked(int option)
+	{
+		if constexpr (std::is_same_v<T, bool>)
+			return true;
+		else
+			return option;
+	}
+
+private:
 	std::string m_label;
 	BoundValue<T> m_value;
+	int m_option = 0;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
-	int m_index = 0;
-
-	static inline int s_radioButtonId = 0;
-	static inline int* s_lastGroup = nullptr;
 };
 
 extern template class RadioButtonWrapper<bool>;

@@ -23,15 +23,18 @@ int main(int argc, char** argv)
     std::string richLastLink = "(no link clicked yet)";
     int richLinkClicks = 0;
     bool richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string aboutLastLink;
+    // The radio/combo binding: three radios and a combo on one int. Each radio
+    // names its own value, so the group is the shared int -- not declaration
+    // order -- and `choiceLocked` disables the lot.
+    int choice = 1;
+    bool choiceLocked = false;
 
     runImGuiApp([&]
     {
         // RichText drawn on the window draw list: bold is drawn twice 1 px
         // apart, italic slants the glyph quads, links are hit-tested on release.
         drawRichTextBinding(richLastLink, richLinkClicks, richLocked).show();
-        drawAboutUI(aboutLastLink).show();
+        drawChoiceMirror(choice, choiceLocked).show();
     });
 
     return 0;

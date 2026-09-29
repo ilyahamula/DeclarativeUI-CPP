@@ -109,10 +109,15 @@ elseif(UI_FRAMEWORK STREQUAL "IMGUI")
         ${imgui_SOURCE_DIR}/imgui_widgets.cpp
         ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
         ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+        # std::string overloads of InputText -- part of the ImGui repository,
+        # so no new dependency. Without them every editable field needs a
+        # fixed char buffer that silently truncates the caller's text.
+        ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
     )
     target_include_directories(imgui_lib PUBLIC
         ${imgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}/backends
+        ${imgui_SOURCE_DIR}/misc/cpp
     )
     target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
 

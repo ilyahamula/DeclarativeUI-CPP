@@ -1,5 +1,6 @@
 #include "frameworks_core/wx/LayoutBackend.hpp"
 #include "frameworks_core/wx/MenuBuilder.hpp"
+#include "frameworks_core/wx/Labels.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
@@ -22,14 +23,6 @@ namespace
 constexpr int kTextFloorChars = 10;
 // Allowance for the text frame's own padding around the text extent.
 constexpr int kTextFramePadding = 16;
-
-// wx treats '&' as a mnemonic marker in labels; user text must escape it.
-wxString labelText(const std::string& label)
-{
-	wxString text = wxString::FromUTF8(label);
-	text.Replace(wxT("&"), wxT("&&"));
-	return text;
-}
 
 // Applies a node's effective disabled state to the window that was just
 // created for it (leaf control, group-box chrome, notebook or page), and keeps
@@ -247,7 +240,7 @@ wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)
 	// created against the host first; beginContainer reparents as needed
 	wxWindow* window = nullptr;
 	if (node.kind == NodeKind::GroupBox)
-		window = new wxStaticBox(m_host, wxID_ANY, labelText(node.label));
+		window = new wxStaticBox(m_host, wxID_ANY, wxLabelText(node.label));
 	else if (node.kind == NodeKind::TabPanel)
 		window = new wxNotebook(m_host, wxID_ANY);
 	else if (node.kind == NodeKind::ScrollPanel)
@@ -382,7 +375,7 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		else
 		{
 			page = new wxPanel(notebook);
-			notebook->AddPage(page, labelText(node.label));
+			notebook->AddPage(page, wxLabelText(node.label));
 			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}

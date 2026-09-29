@@ -10,6 +10,7 @@
 #endif
 
 #include "imgui.h"
+#include "imgui_stdlib.h"
 #include "frameworks_core/imgui/ImGuiWidgetIdManager.hpp"
 #include "frameworks_core/imgui/SnapshotStore.hpp"
 
@@ -146,8 +147,10 @@ Size TextCtrlWrapper::measureIntrinsic(const Constraints&)
 void TextCtrlWrapper::render(const Rect& frame)
 {
 	WidgetSnapshot<std::string> snapshot(m_value);
-	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+	// Edited in place through imgui_stdlib's std::string overload, so the field
+	// holds text of any length -- a fixed buffer would cut a long bound value
+	// short and write the cut version back on the first keystroke.
+	std::string& text = m_value.get();
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
@@ -155,11 +158,10 @@ void TextCtrlWrapper::render(const Rect& frame)
 	// as SetHint and setPlaceholderText do, and measures nothing -- the item is
 	// the width SetNextItemWidth gave it either way.
 	const bool edited = m_placeholder.empty()
-		? ImGui::InputText("##textctrl", buf, sizeof(buf))
-		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), buf, sizeof(buf));
+		? ImGui::InputText("##textctrl", &text)
+		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), &text);
 	if (edited)
 	{
-		m_value.set(buf);
 		if (m_onChange)
 			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
@@ -178,18 +180,16 @@ Size PasswordInputWrapper::measureIntrinsic(const Constraints&)
 void PasswordInputWrapper::render(const Rect& frame)
 {
 	WidgetSnapshot<std::string> snapshot(m_value);
-	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+	std::string& text = m_value.get(); // any length -- see TextCtrlWrapper
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(snapshot.id());
 	const bool edited = m_placeholder.empty()
-		? ImGui::InputText("##passwordinput", buf, sizeof(buf), ImGuiInputTextFlags_Password)
-		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), buf, sizeof(buf),
+		? ImGui::InputText("##passwordinput", &text, ImGuiInputTextFlags_Password)
+		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), &text,
 			ImGuiInputTextFlags_Password);
 	if (edited)
 	{
-		m_value.set(buf);
 		if (m_onChange)
 			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
@@ -211,15 +211,13 @@ Size MultiLineTextCtrlWrapper::measureIntrinsic(const Constraints&)
 void MultiLineTextCtrlWrapper::render(const Rect& frame)
 {
 	WidgetSnapshot<std::string> snapshot(m_value);
-	char buf[4096] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+	std::string& text = m_value.get(); // any length -- see TextCtrlWrapper
 	const ImVec2 size = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0, 0);
 	ImGui::PushID(snapshot.id());
-	if (ImGui::InputTextMultiline("##multilinetextctrl", buf, sizeof(buf), size))
+	if (ImGui::InputTextMultiline("##multilinetextctrl", &text, size))
 	{
-		m_value.set(buf);
 		if (m_onChange)
 			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)
@@ -240,12 +238,13 @@ Size ReadonlyTextCtrlWrapper::measureIntrinsic(const Constraints&)
 
 void ReadonlyTextCtrlWrapper::render(const Rect& frame)
 {
-	char buf[256] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.c_str());
+	// A copy: ReadOnly never writes, but the std::string overload takes a
+	// non-const pointer.
+	std::string text = m_value;
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	ImGui::InputText("##readonly_textctrl", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
+	ImGui::InputText("##readonly_textctrl", &text, ImGuiInputTextFlags_ReadOnly);
 	ImGui::PopID();
 }
 
@@ -635,26 +634,15 @@ void RadioButtonWrapper<T>::render(const Rect&)
 	WidgetSnapshot<T> snapshot(m_value);
 	const char* label = m_label.empty() ? "##radio" : m_label.c_str();
 	ImGui::PushID(snapshot.id());
-	if constexpr (std::is_same_v<T, bool>)
+	// Picking writes the radio's own value, the same rule as wx and Qt: a bool
+	// radio sets true (it never clears itself), an int radio writes its option.
+	if (ImGui::RadioButton(label, isChecked(m_value.get(), m_option)))
 	{
-		if (ImGui::RadioButton(label, m_value.get()))
-		{
-			m_value.set(!m_value.get());
-			if (m_onChange)
-				m_onChange(m_value.get());
-			else if (m_onChangeWithWidget)
-				m_onChangeWithWidget(m_value.get(), m_nativeWidget);
-		}
-	}
-	else
-	{
-		if (ImGui::RadioButton(label, &m_value.get(), m_index))
-		{
-			if (m_onChange)
-				m_onChange(m_value.get());
-			else if (m_onChangeWithWidget)
-				m_onChangeWithWidget(m_value.get(), m_nativeWidget);
-		}
+		m_value.set(picked(m_option));
+		if (m_onChange)
+			m_onChange(m_value.get());
+		else if (m_onChangeWithWidget)
+			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -1118,11 +1106,6 @@ template class TreeViewWrapper<std::vector<std::string>>;
 namespace
 {
 
-// Text buffer for a cell being edited. Fixed size because imgui_stdlib (the
-// std::string InputText overload) is not part of this build; a longer value is
-// truncated as it is typed, never in the caller's data behind their back.
-constexpr int kCellEditBufferSize = 256;
-
 } // unnamed namespace
 
 template <TableValue T>
@@ -1268,15 +1251,16 @@ void TableWrapper<T>::render(const Rect& frame)
 				const std::string& text = cellText(rows, row, column);
 				if (editRow == row && editColumn == column)
 				{
-					char buffer[kCellEditBufferSize];
-					std::snprintf(buffer, sizeof(buffer), "%s", text.c_str());
+					// A working copy of any length: the cell is committed only on
+					// Enter or deactivation, so nothing is written back while typing.
+					std::string buffer = text;
 					if (focusPending)
 					{
 						ImGui::SetKeyboardFocusHere();
 						focusPending = false;
 					}
 					ImGui::SetNextItemWidth(-FLT_MIN);
-					const bool entered = ImGui::InputText("##edit", buffer, sizeof(buffer),
+					const bool entered = ImGui::InputText("##edit", &buffer,
 						ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 					if (entered || ImGui::IsItemDeactivatedAfterEdit())
 					{
@@ -1666,17 +1650,15 @@ void FilePickerWrapper::render(const Rect& frame)
 	const ImGuiStyle& style = ImGui::GetStyle();
 	const float buttonWidth = browseButtonWidth();
 
-	char buf[512] = {};
-	std::snprintf(buf, sizeof(buf), "%s", m_value.get().c_str());
+	std::string& path = m_value.get(); // any length -- see TextCtrlWrapper
 
 	ImGui::PushID(snapshot.id());
 	if (sized(frame))
 		ImGui::SetNextItemWidth(std::max(1.0f,
 			(float)frame.width - buttonWidth - style.ItemInnerSpacing.x));
-	if (ImGui::InputText("##path", buf, sizeof(buf)))
+	if (ImGui::InputText("##path", &path))
 	{
 		// A typed path is as much a selection as a picked one (R11.4).
-		m_value.set(buf);
 		if (m_onChange)
 			m_onChange(m_value.get());
 		else if (m_onChangeWithWidget)

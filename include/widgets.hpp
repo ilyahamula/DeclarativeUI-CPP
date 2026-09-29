@@ -610,26 +610,47 @@ private:
 };
 
 // RadioButton -----------------------------------------------------------
+// One option of an exclusive choice. Two spellings, picked by the bound type:
+//
+//   RadioButton{flag, "Enabled"}          bool: a lone radio on a caller bool
+//   RadioButton{choice, 2, "Blue"}        int:  picking it writes 2 into choice
+//
+// An int radio names the value it stands for, and its GROUP is simply every
+// radio bound to the same int: each shows itself checked while the int holds
+// its value. Nothing depends on declaration order or on which radios happen to
+// be built next to each other, so a group survives a rebuild -- every ImGui
+// frame, every re-shown wx/Qt dialog -- and two groups can share one parent.
+//
+// An int radio must be BOUND. A snapshot would give every radio a private copy
+// of the choice, so no two of them could know about each other and there would
+// be no group to be exclusive within -- which is why that spelling does not
+// compile rather than quietly producing radios that never uncheck.
 template <RadioButtonValue T>
 struct RadioButton : Widget<RadioButton<T>>
 {
 	using super = Widget<RadioButton<T>>;
 
-	RadioButton()
-		: super()
-	{
-	}
-
-	RadioButton(const T& value, const std::string& label = "")
+	RadioButton(const bool& value, const std::string& label = "")
+		requires std::same_as<T, bool>
 		: super()
 		, m_value(value)
 		, m_label(label)
 	{
 	}
 
-	RadioButton(T& value, const std::string& label = "")
+	RadioButton(bool& value, const std::string& label = "")
+		requires std::same_as<T, bool>
 		: super()
 		, m_value(value)
+		, m_label(label)
+	{
+	}
+
+	RadioButton(int& selected, int option, const std::string& label = "")
+		requires std::same_as<T, int>
+		: super()
+		, m_value(selected)
+		, m_option(option)
 		, m_label(label)
 	{
 	}
@@ -652,27 +673,35 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_value, m_option, pos, size, style, m_onChange, m_onChangeWithWidget);
 	}
 
 private:
 	BoundValue<T> m_value;
+	int m_option = 0; // int radios only: the value picking this radio writes
 	std::string m_label;
 	std::function<void(T)> m_onChange;
 	std::function<void(T, void*)> m_onChangeWithWidget;
 };
 
-template <RadioButtonValue T>
-RadioButton(T&) -> RadioButton<T>;
+// The bool guides are templates constrained to bool on purpose: a plain
+// RadioButton(const bool&, ...) guide would accept an int through conversion,
+// and RadioButton{choice, "Red"} -- the old int spelling -- would then deduce
+// a lone bool radio on a temporary instead of failing to compile.
+template <std::same_as<bool> B>
+RadioButton(B&) -> RadioButton<bool>;
 
-template <RadioButtonValue T>
-RadioButton(T&, const std::string&) -> RadioButton<T>;
+template <std::same_as<bool> B>
+RadioButton(B&, const std::string&) -> RadioButton<bool>;
 
-template <RadioButtonValue T>
-RadioButton(const T&) -> RadioButton<T>;
+template <std::same_as<bool> B>
+RadioButton(const B&) -> RadioButton<bool>;
 
-template <RadioButtonValue T>
-RadioButton(const T&, const std::string&) -> RadioButton<T>;
+template <std::same_as<bool> B>
+RadioButton(const B&, const std::string&) -> RadioButton<bool>;
+
+RadioButton(int&, int) -> RadioButton<int>;
+RadioButton(int&, int, const std::string&) -> RadioButton<int>;
 
 // CheckBox -----------------------------------------------------------
 struct CheckBox : Widget<CheckBox>

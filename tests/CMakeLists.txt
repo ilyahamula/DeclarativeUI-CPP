@@ -30,3 +30,28 @@ target_include_directories(layout_tests PRIVATE
 )
 
 add_test(NAME layout_tests COMMAND layout_tests)
+
+# Backend behaviour tests: the opposite of layout_tests. These link the real
+# library for the configured backend and drive real native widgets (ImGui
+# headless, Qt on the offscreen platform, wx in a real or virtual display), to
+# catch what an engine-only test cannot -- grouping, labels, popups, bindings.
+option(BUILD_BACKEND_TESTS "Build the per-backend behaviour tests" ON)
+if(BUILD_BACKEND_TESTS)
+    if(UI_FRAMEWORK STREQUAL "IMGUI")
+        set(BACKEND_TEST_SOURCES backend/imgui_backend_test.cpp)
+    elseif(UI_FRAMEWORK STREQUAL "QT")
+        set(BACKEND_TEST_SOURCES backend/qt_backend_test.cpp)
+    elseif(UI_FRAMEWORK STREQUAL "WX")
+        set(BACKEND_TEST_SOURCES backend/wx_backend_test.cpp)
+        if(APPLE)
+            list(APPEND BACKEND_TEST_SOURCES backend/wx_native_click.mm)
+        endif()
+    endif()
+
+    add_executable(backend_tests ${BACKEND_TEST_SOURCES})
+    target_link_libraries(backend_tests PRIVATE DeclarativeUI)
+    if(UI_FRAMEWORK STREQUAL "WX" AND APPLE)
+        target_link_libraries(backend_tests PRIVATE "-framework AppKit")
+    endif()
+    add_test(NAME backend_tests COMMAND backend_tests)
+endif()

@@ -32,6 +32,7 @@
 #include <wx/timer.h>
 
 #include "frameworks_core/wx/FileDialogSupport.hpp"
+#include "frameworks_core/wx/Labels.hpp"
 #include "frameworks_core/wx/RichTextPanel.hpp"
 
 // Constructors only collect data and live inline in ControlWrappers.hpp.
@@ -46,7 +47,7 @@ void ButtonWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ButtonWrapper::realize()\t-> new wxButton()\n");
 #endif
-	auto* btn = new wxButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
+	auto* btn = new wxButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = btn;
 
@@ -193,7 +194,7 @@ void ClickableTextWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ClickableTextWrapper::realize()\t-> new wxStaticText()\n");
 #endif
-	auto* st = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
+	auto* st = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_text),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = st;
 
@@ -239,7 +240,7 @@ void StaticTextWrapper::realize(void* parentWindow)
 	else if (m_align == TextAlign::Right)
 		align = wxALIGN_RIGHT | wxST_NO_AUTORESIZE;
 
-	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_text,
+	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_text),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | align);
 
 }
@@ -524,66 +525,46 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("RadioButtonWrapper::realize()\t-> new wxRadioButton()\n");
 #endif
-	const T& val = m_value.get();
-	wxRadioButton* rb = nullptr;
-	if constexpr (std::is_same_v<T, bool>)
-	{
-		rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
-			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
-		rb->SetValue(val);
-	}
-	else
-	{
-		// m_index (assigned at construction) is the radio's position within its
-		// group; index 0 starts a new wx radio group.
-		long groupStyle = (m_index == 0) ? wxRB_GROUP : 0;
-		rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
-			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | groupStyle);
-		rb->SetValue(static_cast<int>(val) == m_index);
-	}
+	// This radio belongs to no native group. wx would otherwise chain it to
+	// every radio created after the last wxRB_GROUP in the same parent -- and
+	// every leaf here is parented flat to its dialog or page, so two groups
+	// declared in one box would become one. The bound int is the group instead
+	// (see RadioButtonWrapper), and the ref sync below unchecks the others.
+	//
+	// wxRB_SINGLE is the style that says so on MSW and GTK, but wxOSX ignores
+	// it and chains the radio into its sibling's cycle anyway. There, wxRB_GROUP
+	// on EVERY radio does the same job: each one starts a cycle nobody joins.
+#ifdef __WXOSX__
+	constexpr long kUngrouped = wxRB_GROUP;
+#else
+	constexpr long kUngrouped = wxRB_SINGLE;
+#endif
+	auto* rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | kUngrouped);
+	rb->SetValue(isChecked(m_value.get(), m_option));
 	m_nativeWidget = rb;
 
+	const T choice = picked(m_option);
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		if constexpr (std::is_same_v<T, bool>)
-			rb->Bind(wxEVT_RADIOBUTTON, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
-				value = true;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
-		else
-			rb->Bind(wxEVT_RADIOBUTTON, [&value, index = m_index, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
-				value = index;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
-		// Every radio in the group syncs itself; wx clears the siblings when one is set.
+		rb->Bind(wxEVT_RADIOBUTTON, [&value, choice, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
+			value = choice;
+			if (cb) cb(value);
+			else if (cbw) cbw(value, nw);
+		});
+		// Every radio on the int mirrors it: the one just picked is already
+		// checked, and the rest see the int move away from their option and
+		// uncheck themselves. SetValue sends no wxEVT_RADIOBUTTON.
 		bindExternalRefSync(rb,
 			[rb] { return rb->GetValue(); },
-			[&value, index = m_index] {
-				if constexpr (std::is_same_v<T, bool>)
-					return static_cast<bool>(value);
-				else
-					return static_cast<int>(value) == index;
-			},
+			[&value, option = m_option] { return isChecked(value, option); },
 			[rb](bool on) { rb->SetValue(on); });
 	}
 	else if (m_onChange)
-	{
-		if constexpr (std::is_same_v<T, bool>)
-			rb->Bind(wxEVT_RADIOBUTTON, [cb = std::move(m_onChange)](wxCommandEvent&) { cb(true); });
-		else
-			rb->Bind(wxEVT_RADIOBUTTON, [index = m_index, cb = std::move(m_onChange)](wxCommandEvent&) { cb(static_cast<T>(index)); });
-	}
+		rb->Bind(wxEVT_RADIOBUTTON, [choice, cb = std::move(m_onChange)](wxCommandEvent&) { cb(choice); });
 	else if (m_onChangeWithWidget)
-	{
-		if constexpr (std::is_same_v<T, bool>)
-			rb->Bind(wxEVT_RADIOBUTTON, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cbw(true, nw); });
-		else
-			rb->Bind(wxEVT_RADIOBUTTON, [index = m_index, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cbw(static_cast<T>(index), nw); });
-	}
-
+		rb->Bind(wxEVT_RADIOBUTTON, [choice, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cbw(choice, nw); });
 }
 
 template class RadioButtonWrapper<bool>;
@@ -597,7 +578,7 @@ void CheckBoxWrapper::realize(void* parentWindow)
 	Logger::instance().log("CheckBoxWrapper::realize()\t-> new wxCheckBox()\n");
 #endif
 	const bool checked = m_value.get();
-	auto* chk = new wxCheckBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
+	auto* chk = new wxCheckBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	chk->SetValue(checked);
 	m_nativeWidget = chk;
@@ -630,7 +611,7 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 	Logger::instance().log("ToggleButtonWrapper::realize()\t-> new wxToggleButton()\n");
 #endif
 	const bool toggled = m_value.get();
-	auto* btn = new wxToggleButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_label,
+	auto* btn = new wxToggleButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	btn->SetValue(toggled);
 	m_nativeWidget = btn;
@@ -1162,7 +1143,7 @@ void ExpanderHeaderWrapper::realize(void* parentWindow)
 	// the pane -- which is precisely what is wanted here, since the content is
 	// an engine-arranged subtree rather than something wx may size for us.
 	auto* header = new wxCollapsibleHeaderCtrl(static_cast<wxWindow*>(parentWindow),
-		wxID_ANY, m_label, wxPoint(m_pos.x, m_pos.y),
+		wxID_ANY, wxLabelText(m_label), wxPoint(m_pos.x, m_pos.y),
 		wxSize(m_size.width, m_size.height), m_style);
 	header->SetCollapsed(!m_state->expanded.get());
 	m_nativeWidget = header;
@@ -1256,10 +1237,15 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 	for (const auto& c : m_choices)
 		items.Add(c);
 	const T& selected = m_value.get();
+	// wxCB_READONLY: a pick from the list and nothing else, as QComboBox and
+	// ImGui::Combo are. An editable wxComboBox would let the user type text no
+	// wxEVT_COMBOBOX ever reports and that an int binding cannot represent.
+	// Selection goes through the index setters, which send no event, so the
+	// ref sync below never re-enters the handler.
 	auto* combo = new wxComboBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, "",
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items, m_style);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items, m_style | wxCB_READONLY);
 	if constexpr (std::is_same_v<T, std::string>)
-		combo->SetValue(selected);
+		combo->SetSelection(combo->FindString(wxString::FromUTF8(selected), true));
 	else
 		combo->SetSelection(selected);
 	m_nativeWidget = combo;
@@ -1281,9 +1267,9 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 			});
 		if constexpr (std::is_same_v<T, std::string>)
 			bindExternalRefSync(combo,
-				[combo] { return combo->GetValue().ToStdString(); },
+				[combo] { return std::string(combo->GetStringSelection().ToUTF8()); },
 				[&value] { return value; },
-				[combo](const std::string& v) { combo->ChangeValue(v); });
+				[combo](const std::string& v) { combo->SetSelection(combo->FindString(wxString::FromUTF8(v), true)); });
 		else
 			bindExternalRefSync(combo,
 				[combo] { return combo->GetSelection(); },

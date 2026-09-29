@@ -27,6 +27,16 @@ static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
 static_assert(NodeBuildable<StatusBar>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
+static_assert(NodeBuildable<RadioButton<bool>>);
+static_assert(NodeBuildable<RadioButton<int>>);
+// An int radio names its own value and must be bound: the radios sharing one
+// int are the group. The old order-based spelling, and a snapshot int that
+// could never know about its siblings, must not compile.
+static_assert(std::is_constructible_v<RadioButton<int>, int&, int, const char*>);
+static_assert(!std::is_constructible_v<RadioButton<int>, int&, const char*>);
+static_assert(!std::is_constructible_v<RadioButton<int>, const int&, int, const char*>);
+static_assert(std::is_constructible_v<RadioButton<bool>, bool&, const char*>);
+static_assert(std::is_constructible_v<RadioButton<bool>, const bool&, const char*>);
 static_assert(NodeBuildable<ProgressBar>);
 // Indeterminate() needs the valueless spelling: a busy bar has no number to show.
 static_assert(std::is_default_constructible_v<ProgressBar>);
