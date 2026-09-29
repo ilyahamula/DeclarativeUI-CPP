@@ -68,6 +68,12 @@ public:
 		callLog.push_back("end:" + node.label);
 	}
 
+	void hide(const LayoutNode& node) override
+	{
+		hiddenNodes.push_back(&node);
+		callLog.push_back("hide:" + node.label);
+	}
+
 	// Frame recorded for a given widget, or a zero Rect if it was never placed.
 	Rect frameOf(const ControlWrapper* widget) const
 	{
@@ -95,6 +101,7 @@ public:
 	std::vector<Placement> placed;
 	std::map<const LayoutNode*, Rect> containerFrames;
 	std::vector<std::string> callLog;
+	std::vector<const LayoutNode*> hiddenNodes;
 
 private:
 	std::map<const ControlWrapper*, Size> m_sizes;

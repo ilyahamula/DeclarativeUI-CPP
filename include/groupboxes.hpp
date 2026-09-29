@@ -43,10 +43,24 @@ struct GroupBox
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	GroupBox& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	GroupBox& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeGroupBox(m_orient, m_label, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		std::apply([&](auto&... widget) {
 			(node->add(widget.buildNode()), ...);
 		}, m_widgets);
@@ -58,6 +72,7 @@ private:
 	std::string m_label;
 	std::optional<LayoutFlags> m_flags;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	std::tuple<W...> m_widgets;
 };
 
@@ -96,6 +111,19 @@ struct HGroupBox : public GroupBox<W...>
 		GroupBox<W...>::isDisabled(disabled);
 		return *this;
 	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	HGroupBox& isHidden(const bool& hidden = true)
+	{
+		GroupBox<W...>::isHidden(hidden);
+		return *this;
+	}
+
+	HGroupBox& isHidden(bool& hidden)
+	{
+		GroupBox<W...>::isHidden(hidden);
+		return *this;
+	}
 };
 
 template<NodeBuildable... W>
@@ -131,6 +159,19 @@ struct VGroupBox : public GroupBox<W...>
 	VGroupBox& isDisabled(bool& disabled)
 	{
 		GroupBox<W...>::isDisabled(disabled);
+		return *this;
+	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	VGroupBox& isHidden(const bool& hidden = true)
+	{
+		GroupBox<W...>::isHidden(hidden);
+		return *this;
+	}
+
+	VGroupBox& isHidden(bool& hidden)
+	{
+		GroupBox<W...>::isHidden(hidden);
 		return *this;
 	}
 };

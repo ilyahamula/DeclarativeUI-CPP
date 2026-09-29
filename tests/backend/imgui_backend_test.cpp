@@ -10,6 +10,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <cmath>
 #include <cstdio>
 #include <functional>
 #include <thread>
@@ -320,6 +321,84 @@ TEST(imgui_post_to_ui_runs_on_the_ui_thread)
 	CHECK(onUiThread);
 	g_ui = nullptr;
 	frames(1);
+}
+
+// A bound StaticText / ReadonlyTextCtrl follows the caller's string, but keeps
+// the size of its first text: an arriving message must not resize an auto-fit
+// window.
+TEST(imgui_bound_labels_do_not_resize_the_window)
+{
+	std::string status = "Ready";
+	g_ui = [&] {
+		Dialog { "Status",
+			VStack { StaticText{status}, ReadonlyTextCtrl{status} }
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Status");
+	const float before = w->Size.x;
+	status = "This status message is far longer than the label it arrives in, by design";
+	frames(3);
+	CHECK_EQ(w->Size.x, before);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// isHidden(): a hidden control takes no space, so an auto-fit window shrinks
+// by its height and its gap, and grows back when it is shown again.
+TEST(imgui_hidden_control_shrinks_and_restores_the_window)
+{
+	bool hide = false;
+	g_ui = [&] {
+		Dialog { "Hide",
+			VStack {
+				Button{"Always"},
+				Button{"Sometimes"}.isHidden(hide),
+				Button{"Also always"}
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Hide");
+	const float shown = w->Size.y;
+	hide = true;
+	frames(3);
+	const float expected = ImGui::GetFrameHeight() + LayoutEngine::kDefaultGap;
+	CHECK(std::fabs((shown - w->Size.y) - expected) < 1.0f);
+	hide = false;
+	frames(3);
+	CHECK_EQ(w->Size.y, shown);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// Bound item lists: a ListBox on a non-const vector draws the caller's current
+// items, and keeps the width it had for the first ones.
+TEST(imgui_bound_list_items_follow_the_vector)
+{
+	ItemList items { "alpha", "beta" };
+	std::string picked;
+	g_ui = [&] {
+		Dialog { "Items",
+			VStack { ListBox{ items, picked }.withVisibleRows(4) }
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Items");
+	const float width = w->Size.x;
+
+	items = { "a much longer first item than before", "beta" };
+	frames(3);
+	CHECK_EQ(w->Size.x, width);
+
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float x = w->Pos.x + st.WindowPadding.x + 20.0f;
+	const float y = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y
+		+ st.FramePadding.y + ImGui::GetTextLineHeightWithSpacing() * 0.5f;
+	click(x, y);
+	CHECK_EQ(picked, std::string("a much longer first item than before"));
+	g_ui = nullptr;
+	frames(2);
 }
 
 int main()

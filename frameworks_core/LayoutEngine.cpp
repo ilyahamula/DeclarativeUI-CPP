@@ -50,15 +50,15 @@ int mainFloorOf(const LayoutNode& node, bool horizontal)
 
 // Distributes positive leftover across Proportion(>0) children (flex-grow),
 // exact to the pixel: the last weighted child absorbs rounding residue.
-void growProportioned(std::vector<int>& mains, const LayoutNode& box, int leftover)
+void growProportioned(std::vector<int>& mains, const std::vector<LayoutNode*>& children, int leftover)
 {
 	int totalWeight = 0;
 	int lastWeighted = -1;
-	for (size_t i = 0; i < box.children.size(); ++i)
+	for (size_t i = 0; i < children.size(); ++i)
 	{
-		if (box.children[i]->flags.proportion() > 0)
+		if (children[i]->flags.proportion() > 0)
 		{
-			totalWeight += box.children[i]->flags.proportion();
+			totalWeight += children[i]->flags.proportion();
 			lastWeighted = (int)i;
 		}
 	}
@@ -66,9 +66,9 @@ void growProportioned(std::vector<int>& mains, const LayoutNode& box, int leftov
 		return;
 
 	int given = 0;
-	for (size_t i = 0; i < box.children.size(); ++i)
+	for (size_t i = 0; i < children.size(); ++i)
 	{
-		const int weight = box.children[i]->flags.proportion();
+		const int weight = children[i]->flags.proportion();
 		if (weight <= 0)
 			continue;
 		const int share = (int)i == lastWeighted
@@ -83,16 +83,16 @@ void growProportioned(std::vector<int>& mains, const LayoutNode& box, int leftov
 // weight, down to their MinSize floors), then everyone in reverse
 // declaration order; any residue overflows the parent and is clipped by
 // the backend.
-void shrinkToFit(std::vector<int>& mains, const LayoutNode& box, int deficit, bool horizontal)
+void shrinkToFit(std::vector<int>& mains, const std::vector<LayoutNode*>& children, int deficit, bool horizontal)
 {
-	const size_t n = box.children.size();
+	const size_t n = children.size();
 
 	while (deficit > 0)
 	{
 		int totalWeight = 0;
 		for (size_t i = 0; i < n; ++i)
 		{
-			const LayoutNode& child = *box.children[i];
+			const LayoutNode& child = *children[i];
 			if (child.flags.proportion() > 0 && mains[i] > mainFloorOf(child, horizontal))
 				totalWeight += child.flags.proportion();
 		}
@@ -102,7 +102,7 @@ void shrinkToFit(std::vector<int>& mains, const LayoutNode& box, int deficit, bo
 		const int deficitBefore = deficit;
 		for (size_t i = 0; i < n && deficit > 0; ++i)
 		{
-			const LayoutNode& child = *box.children[i];
+			const LayoutNode& child = *children[i];
 			const int weight = child.flags.proportion();
 			const int floor = mainFloorOf(child, horizontal);
 			if (weight <= 0 || mains[i] <= floor)
@@ -116,7 +116,7 @@ void shrinkToFit(std::vector<int>& mains, const LayoutNode& box, int deficit, bo
 
 	for (int i = (int)n - 1; i >= 0 && deficit > 0; --i)
 	{
-		const int floor = mainFloorOf(*box.children[i], horizontal);
+		const int floor = mainFloorOf(*children[i], horizontal);
 		const int take = std::min(mains[i] - floor, deficit);
 		if (take > 0)
 		{
@@ -134,9 +134,14 @@ Size boxContentExtent(const LayoutNode& node)
 
 	int main = 0;
 	int cross = 0;
+	const LayoutNode* first = nullptr;
 	const LayoutNode* prev = nullptr;
 	for (const auto& child : node.children)
 	{
+		// A hidden child is not there at all: no size, no margins, and no
+		// gap on either side of it.
+		if (child->hiddenApplied)
+			continue;
 		const EdgeInsets margin = child->flags.border();
 		const int childMain = horizontal ? child->desired.width : child->desired.height;
 		const int childCross = horizontal ? child->desired.height : child->desired.width;
@@ -145,17 +150,19 @@ Size boxContentExtent(const LayoutNode& node)
 
 		if (prev != nullptr)
 			main += LayoutEngine::gapBetween(*prev, *child, node.orientation);
+		else
+			first = child.get();
 		main += childMain;
 		cross = std::max(cross, childCross + crossMargins);
 		prev = child.get();
 	}
 
-	if (!node.children.empty())
+	if (first != nullptr)
 	{
-		const EdgeInsets first = node.children.front()->flags.border();
-		const EdgeInsets last = node.children.back()->flags.border();
-		main += horizontal ? first.left + last.right
-						   : first.top + last.bottom;
+		const EdgeInsets firstMargin = first->flags.border();
+		const EdgeInsets lastMargin = prev->flags.border();
+		main += horizontal ? firstMargin.left + lastMargin.right
+						   : firstMargin.top + lastMargin.bottom;
 	}
 
 	return horizontal ? Size { main, cross } : Size { cross, main };
@@ -302,11 +309,16 @@ int gridRows(const LayoutNode& node)
 	return ((int)node.children.size() + cols - 1) / cols; // ragged last row allowed
 }
 
-// Cell at (row, col), or nullptr when a ragged last row stops short.
+// Cell at (row, col), or nullptr when a ragged last row stops short -- or
+// when the cell is hidden. A hidden cell keeps its SLOT (the cells after it do
+// not reflow into other columns) but, like a missing one, contributes nothing
+// to its bands or the gutters beside it.
 const LayoutNode* gridCell(const LayoutNode& node, int row, int col)
 {
 	const size_t index = (size_t)row * gridColumns(node) + (size_t)col;
-	return index < node.children.size() ? node.children[index].get() : nullptr;
+	if (index >= node.children.size() || node.children[index]->hiddenApplied)
+		return nullptr;
+	return node.children[index].get();
 }
 
 GridBands gridBands(const LayoutNode& node)
@@ -507,6 +519,8 @@ Size tabPanelContentExtent(const LayoutNode& node)
 	Size desired { 0, 0 };
 	for (const auto& child : node.children)
 	{
+		if (child->hiddenApplied)
+			continue;
 		const EdgeInsets margin = child->flags.border();
 		desired.width = std::max(desired.width, child->desired.width + margin.left + margin.right);
 		desired.height = std::max(desired.height, child->desired.height + margin.top + margin.bottom);
@@ -546,6 +560,10 @@ Rect contentArea(const LayoutNode& node)
 
 void collectSizeGroups(LayoutNode& node, std::unordered_map<int, std::vector<LayoutNode*>>& groups)
 {
+	// A hidden subtree takes no part in any group: it would otherwise hold its
+	// group open at a size nobody can see.
+	if (node.hiddenApplied)
+		return;
 	if (const auto id = node.flags.sizeGroup())
 		groups[*id].push_back(&node);
 	for (const auto& child : node.children)
@@ -557,6 +575,8 @@ void collectSizeGroups(LayoutNode& node, std::unordered_map<int, std::vector<Lay
 // desired changed (another pass may then be needed for nested groups).
 bool resumDesired(LayoutNode& node, const std::unordered_map<int, Size>& groupMaxima)
 {
+	if (node.hiddenApplied)
+		return false; // stays {0, 0}, whatever its flags or groups say
 	bool changed = false;
 	for (const auto& child : node.children)
 		changed |= resumDesired(*child, groupMaxima);
@@ -597,6 +617,17 @@ int LayoutEngine::gapBetween(const LayoutNode& prev, const LayoutNode& next, Ori
 
 Size LayoutEngine::measure(LayoutNode& node, const Constraints& c)
 {
+	// Latched here, once per pass, and read by everything after (see
+	// LayoutNode::hiddenApplied). A hidden node is not measured at all -- nor
+	// realized on a retained backend -- and not clamped either: a MinSize
+	// must not give an invisible node a size.
+	node.hiddenApplied = node.hidden.get();
+	if (node.hiddenApplied)
+	{
+		node.desired = Size { 0, 0 };
+		return node.desired;
+	}
+
 	Size desired { 0, 0 };
 	if (node.isLeaf())
 	{
@@ -712,6 +743,12 @@ Size LayoutEngine::measureTabPanel(LayoutNode& node, const Constraints& c)
 
 void LayoutEngine::arrange(LayoutNode& node, const Rect& area)
 {
+	if (node.hiddenApplied)
+	{
+		// No rectangle, and nothing under it is arranged: nothing will draw.
+		node.frame = Rect { area.x, area.y, 0, 0 };
+		return;
+	}
 	node.frame = area;
 	switch (node.kind)
 	{
@@ -746,14 +783,27 @@ void LayoutEngine::arrangeBox(LayoutNode& node)
 
 	const Rect area = contentArea(node);
 	const bool horizontal = node.orientation == Orientation::Horizontal;
-	const size_t n = node.children.size();
+
+	// Hidden children are arranged to nothing and then left out: the rest is
+	// laid out exactly as if they had never been declared.
+	std::vector<LayoutNode*> shown;
+	for (const auto& child : node.children)
+	{
+		if (child->hiddenApplied)
+			arrange(*child, Rect { area.x, area.y, 0, 0 });
+		else
+			shown.push_back(child.get());
+	}
+	const size_t n = shown.size();
+	if (n == 0)
+		return;
 
 	// main-axis extents start from the measured sizes
 	std::vector<int> mains(n);
 	int mainsSum = 0;
 	for (size_t i = 0; i < n; ++i)
 	{
-		const Size& d = node.children[i]->desired;
+		const Size& d = shown[i]->desired;
 		mains[i] = horizontal ? d.width : d.height;
 		mainsSum += mains[i];
 	}
@@ -762,28 +812,28 @@ void LayoutEngine::arrangeBox(LayoutNode& node)
 	int gapsSum = 0;
 	for (size_t i = 0; i + 1 < n; ++i)
 	{
-		gaps[i] = gapBetween(*node.children[i], *node.children[i + 1], node.orientation);
+		gaps[i] = gapBetween(*shown[i], *shown[i + 1], node.orientation);
 		gapsSum += gaps[i];
 	}
 
-	const EdgeInsets firstMargin = node.children.front()->flags.border();
-	const EdgeInsets lastMargin = node.children.back()->flags.border();
+	const EdgeInsets firstMargin = shown.front()->flags.border();
+	const EdgeInsets lastMargin = shown.back()->flags.border();
 	const int leading = horizontal ? firstMargin.left : firstMargin.top;
 	const int trailing = horizontal ? lastMargin.right : lastMargin.bottom;
 
 	const int areaMain = horizontal ? area.width : area.height;
 	const int leftover = areaMain - leading - trailing - gapsSum - mainsSum;
 	if (leftover > 0)
-		growProportioned(mains, node, leftover);
+		growProportioned(mains, shown, leftover);
 	else if (leftover < 0)
-		shrinkToFit(mains, node, -leftover, horizontal);
+		shrinkToFit(mains, shown, -leftover, horizontal);
 
 	// place children along the main axis; cross axis per crossAlign
 	int cursor = (horizontal ? area.x : area.y) + leading;
 	const int areaCross = horizontal ? area.height : area.width;
 	for (size_t i = 0; i < n; ++i)
 	{
-		LayoutNode& child = *node.children[i];
+		LayoutNode& child = *shown[i];
 		const CrossPlacement cross = crossPlacement(child, node.orientation, areaCross);
 		const Rect childArea = horizontal
 			? Rect { cursor, area.y + cross.offset, mains[i], cross.extent }
@@ -839,6 +889,11 @@ void LayoutEngine::arrangeGrid(LayoutNode& node)
 			if (index >= node.children.size())
 				continue; // ragged last row
 			LayoutNode& cell = *node.children[index];
+			if (cell.hiddenApplied)
+			{
+				arrange(cell, Rect { colX[(size_t)c], rowY[(size_t)r], 0, 0 });
+				continue; // an empty slot: nothing drawn, nothing reflowed
+			}
 
 			// The band minus the cell's own margins is what the cell may use;
 			// both axes then resolve independently through the same crossAlign
@@ -1014,6 +1069,11 @@ void LayoutEngine::arrangeTabPanel(LayoutNode& node)
 
 void LayoutEngine::traverse(LayoutNode& node)
 {
+	if (node.hiddenApplied)
+	{
+		m_backend.hide(node); // the backend takes the subtree out of view
+		return;
+	}
 	if (node.isLeaf())
 	{
 		m_backend.place(node, node.frame);

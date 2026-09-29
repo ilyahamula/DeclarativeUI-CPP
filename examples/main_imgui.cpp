@@ -25,16 +25,19 @@ int main(int argc, char** argv)
     std::string workStatus = "Idle";
     bool workBusy = false;
     bool workDetailsOpen = false;
+    bool workHideStatusBar = false;
     // The radio/combo binding: three radios and a combo on one int. Each radio
     // names its own value, so the group is the shared int -- not declaration
     // order -- and `choiceLocked` disables the lot.
     int choice = 1;
     bool choiceLocked = false;
+    // The combo's choices, bound: "Add a colour" appends here.
+    ItemList colours { "Red", "Green", "Blue" };
 
     runImGuiApp([&]
     {
-        drawWorkerAndIdentityUI(workProgress, workStatus, workBusy, workDetailsOpen).show();
-        drawChoiceMirror(choice, choiceLocked).show();
+        drawWorkerAndIdentityUI(workProgress, workStatus, workBusy, workDetailsOpen, workHideStatusBar).show();
+        drawChoiceMirror(choice, choiceLocked, colours).show();
     });
 
     return 0;

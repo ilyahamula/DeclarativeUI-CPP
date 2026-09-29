@@ -217,9 +217,14 @@ void MultiLineTextCtrlWrapper::render(const Rect& frame)
 
 Size ReadonlyTextCtrlWrapper::measureIntrinsic(const Constraints&)
 {
-	// readonly content is static, so it may size to its text (with floor)
+	// A snapshot is static, so it may size to its text (with the floor). A
+	// bound value is written from elsewhere and measures the floor alone, as
+	// every editable field does on this backend -- the tree is rebuilt every
+	// frame, so measuring the live text would resize the window with it.
+	if (m_value.isBound())
+		return Size { editableFloorWidth(), frameHeight() };
 	const ImGuiStyle& style = ImGui::GetStyle();
-	const int contentW = ceilInt(ImGui::CalcTextSize(m_value.c_str()).x + style.FramePadding.x * 2.0f);
+	const int contentW = ceilInt(ImGui::CalcTextSize(m_value.get().c_str()).x + style.FramePadding.x * 2.0f);
 	return Size { std::max(contentW, editableFloorWidth()), frameHeight() };
 }
 
@@ -227,7 +232,7 @@ void ReadonlyTextCtrlWrapper::render(const Rect& frame)
 {
 	// A copy: ReadOnly never writes, but the std::string overload takes a
 	// non-const pointer.
-	std::string text = m_value;
+	std::string text = m_value.get();
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
@@ -281,16 +286,74 @@ void LinkTextWrapper::render(const Rect& frame)
 
 // StaticTextWrapper -----------------------------------------------------------
 
+namespace
+{
+
+// The size a control BOUND to externally written content -- a label's text,
+// a list's items -- had the first time it was measured, kept between frames
+// (the wrapper is rebuilt every frame). Keyed like the Splitter's unbound
+// position: a measure-phase key, since measure runs before ImGui::Begin -- or
+// the control's withId() when it has one. What arrives later never moves it,
+// so a new message or a longer item cannot resize an auto-fit window.
+Size firstMeasured(const std::string& stableId, const Size& now)
+{
+	static std::unordered_map<std::uint64_t, Size> sizes;
+	const int measureId = WidgetIdManager::nextMeasureId();
+	const std::uint64_t key = stableId.empty()
+		? WidgetIdManager::stateKey(measureId, WidgetIdManager::kMeasureSlot)
+		: WidgetIdManager::stableStateKey(stableId, WidgetIdManager::kMeasureSlot);
+	return sizes.try_emplace(key, now).first->second;
+}
+
+float widestItem(const ItemList& items)
+{
+	float widest = 0.0f;
+	for (const auto& item : items)
+		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
+	return widest;
+}
+
+} // unnamed namespace
+
 Size StaticTextWrapper::measureIntrinsic(const Constraints& c)
 {
+	if (m_text.isBound())
+	{
+		// The first text's single-line size, and never the live one: a bound
+		// label shows a string written from elsewhere (see StaticText).
+		return firstMeasured(m_stableId, textItemSize(m_text.get()));
+	}
 	// wraps at the offered width (auto-fit cap / fixed dialog width)
-	const ImVec2 t = ImGui::CalcTextSize(m_text.c_str(), nullptr, false, (float)c.maxWidth);
+	const ImVec2 t = ImGui::CalcTextSize(m_text.get().c_str(), nullptr, false, (float)c.maxWidth);
 	return Size { ceilInt(t.x), ceilInt(t.y) };
 }
 
 void StaticTextWrapper::render(const Rect& frame)
 {
-	const float textWidth = ImGui::CalcTextSize(m_text.c_str()).x;
+	if (m_text.isBound())
+	{
+		// Drawn on the draw list inside a clip of the frame, with a Dummy of
+		// the frame for the item rect: a longer text than the label was
+		// measured for is cut at the frame instead of overrunning it.
+		const std::string& text = m_text.get();
+		const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+		const ImVec2 box = sized(frame)
+			? ImVec2((float)frame.width, (float)std::max(frame.height, 1))
+			: textSize;
+		float offset = 0.0f;
+		if (m_align != TextAlign::Left && box.x > textSize.x)
+			offset = m_align == TextAlign::Center ? (box.x - textSize.x) * 0.5f : box.x - textSize.x;
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		drawList->PushClipRect(origin, ImVec2(origin.x + box.x, origin.y + box.y), true);
+		drawList->AddText(ImVec2(origin.x + offset, origin.y), ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+		drawList->PopClipRect();
+		ImGui::Dummy(box);
+		return;
+	}
+
+	const std::string& text = m_text.get();
+	const float textWidth = ImGui::CalcTextSize(text.c_str()).x;
 	const bool wrap = sized(frame) && textWidth > (float)frame.width;
 
 	// Alignment IS the leftover width, so a block that wraps has none to give
@@ -306,7 +369,7 @@ void StaticTextWrapper::render(const Rect& frame)
 
 	if (wrap)
 		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + (float)frame.width);
-	ImGui::TextUnformatted(m_text.c_str());
+	ImGui::TextUnformatted(text.c_str());
 	if (wrap)
 		ImGui::PopTextWrapPos();
 }
@@ -781,11 +844,10 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 {
 	// widest choice + frame padding + arrow square
 	const ImGuiStyle& style = ImGui::GetStyle();
-	float widest = 0.0f;
-	for (const auto& choice : m_choices)
-		widest = std::max(widest, ImGui::CalcTextSize(choice.c_str()).x);
-	const float w = widest + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
-	return Size { ceilInt(w), frameHeight() };
+	const float w = widestItem(m_choices.get()) + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
+	const Size size { ceilInt(w), frameHeight() };
+	// Bound choices keep the width of the first list (see firstMeasured).
+	return m_choices.isBound() ? firstMeasured(m_stableId, size) : size;
 }
 
 template <ComboBoxValue T>
@@ -801,9 +863,10 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 	}
 	else
 	{
-		for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+		const ItemList& choices = m_choices.get();
+		for (int i = 0; i < static_cast<int>(choices.size()); ++i)
 		{
-			if (m_choices[i] == m_value.get())
+			if (choices[i] == m_value.get())
 			{
 				m_currentItem = i;
 				break;
@@ -818,8 +881,8 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 	{
 		if constexpr (std::is_same_v<T, int>)
 			m_value.set(m_currentItem);
-		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.size()))
-			m_value.set(m_choices[m_currentItem]);
+		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.get().size()))
+			m_value.set(m_choices.get()[m_currentItem]);
 
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
@@ -838,13 +901,12 @@ Size ListBoxWrapper<T>::measureIntrinsic(const Constraints&)
 	// plus vertical frame padding), with the row count coming from the widget and
 	// the width from the widest item + a scrollbar's worth of slack.
 	const ImGuiStyle& style = ImGui::GetStyle();
-	float widest = 0.0f;
-	for (const auto& item : m_items)
-		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
-	const float w = widest + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float w = widestItem(m_items.get()) + style.FramePadding.x * 2.0f + style.ScrollbarSize;
 	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
 		+ style.FramePadding.y * 2.0f;
-	return Size { ceilInt(w), ceilInt(h) };
+	const Size size { ceilInt(w), ceilInt(h) };
+	// Bound items keep the width of the first list (see firstMeasured).
+	return m_items.isBound() ? firstMeasured(m_stableId, size) : size;
 }
 
 template <ListBoxValue T>
@@ -854,7 +916,8 @@ void ListBoxWrapper<T>::render(const Rect& frame)
 	// Read the selection back from the binding every frame: the tree is rebuilt
 	// per frame anyway, so a value written from anywhere else is picked up for
 	// free -- no ref sync needed here, unlike the retained backends.
-	const std::vector<int> selection = indicesFor(m_items, boundValue());
+	const ItemList& items = m_items.get();
+	const std::vector<int> selection = indicesFor(items, boundValue());
 	const auto isSelected = [&selection](int index) {
 		return std::find(selection.begin(), selection.end(), index) != selection.end();
 	};
@@ -865,9 +928,9 @@ void ListBoxWrapper<T>::render(const Rect& frame)
 	snapshot.pushId();
 	if (ImGui::BeginListBox("##listbox", box))
 	{
-		for (int i = 0; i < (int)m_items.size(); ++i)
+		for (int i = 0; i < (int)items.size(); ++i)
 		{
-			if (!ImGui::Selectable(m_items[i].c_str(), isSelected(i)))
+			if (!ImGui::Selectable(items[i].c_str(), isSelected(i)))
 				continue;
 
 			std::vector<int> next { i };
@@ -907,14 +970,13 @@ Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
 	// ListBoxWrapper's shape plus what the boxes cost: ImGui draws a checkbox
 	// square of one frame height followed by ItemInnerSpacing before the label.
 	const ImGuiStyle& style = ImGui::GetStyle();
-	float widest = 0.0f;
-	for (const auto& item : m_items)
-		widest = std::max(widest, ImGui::CalcTextSize(item.c_str()).x);
 	const float boxWidth = ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
-	const float w = widest + boxWidth + style.FramePadding.x * 2.0f + style.ScrollbarSize;
+	const float w = widestItem(m_items.get()) + boxWidth + style.FramePadding.x * 2.0f + style.ScrollbarSize;
 	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
 		+ style.FramePadding.y * 2.0f;
-	return Size { ceilInt(w), ceilInt(h) };
+	const Size size { ceilInt(w), ceilInt(h) };
+	// Bound items keep the width of the first list (see firstMeasured).
+	return m_items.isBound() ? firstMeasured(m_stableId, size) : size;
 }
 
 template <CheckListValue T>
@@ -924,7 +986,8 @@ void CheckListBoxWrapper<T>::render(const Rect& frame)
 	// Read the checked set back from the binding every frame: the tree is
 	// rebuilt per frame anyway, so a value written from anywhere else is picked
 	// up for free -- no ref sync needed here, unlike the retained backends.
-	std::vector<int> checked = indicesFor(m_items, boundValue());
+	const ItemList& items = m_items.get();
+	std::vector<int> checked = indicesFor(items, boundValue());
 
 	const ImVec2 box = sized(frame)
 		? ImVec2((float)frame.width, (float)frame.height)
@@ -932,14 +995,14 @@ void CheckListBoxWrapper<T>::render(const Rect& frame)
 	snapshot.pushId();
 	if (ImGui::BeginListBox("##checklistbox", box))
 	{
-		for (int i = 0; i < (int)m_items.size(); ++i)
+		for (int i = 0; i < (int)items.size(); ++i)
 		{
 			const auto at = std::find(checked.begin(), checked.end(), i);
 			bool ticked = at != checked.end();
 			// Per-row id: two items may legitimately carry the same label, and
 			// the label is all Checkbox has to key itself by.
 			ImGui::PushID(i);
-			const bool toggled = ImGui::Checkbox(m_items[i].c_str(), &ticked);
+			const bool toggled = ImGui::Checkbox(items[i].c_str(), &ticked);
 			ImGui::PopID();
 			if (!toggled)
 				continue;

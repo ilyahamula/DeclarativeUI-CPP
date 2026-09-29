@@ -40,10 +40,24 @@ struct Stack
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	Stack& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	Stack& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeBox(m_orient, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		std::apply([&](auto&... widget) {
 			(node->add(widget.buildNode()), ...);
 		}, m_widgets);
@@ -54,6 +68,7 @@ private:
 	Orientation m_orient;
 	std::optional<LayoutFlags> m_flags;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	std::tuple<W...> m_widgets;
 };
 
@@ -82,6 +97,19 @@ struct HStack : public Stack<W...>
 		Stack<W...>::isDisabled(disabled);
 		return *this;
 	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	HStack& isHidden(const bool& hidden = true)
+	{
+		Stack<W...>::isHidden(hidden);
+		return *this;
+	}
+
+	HStack& isHidden(bool& hidden)
+	{
+		Stack<W...>::isHidden(hidden);
+		return *this;
+	}
 };
 
 template<NodeBuildable... W>
@@ -107,6 +135,19 @@ struct VStack : public Stack<W...>
 	VStack& isDisabled(bool& disabled)
 	{
 		Stack<W...>::isDisabled(disabled);
+		return *this;
+	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	VStack& isHidden(const bool& hidden = true)
+	{
+		Stack<W...>::isHidden(hidden);
+		return *this;
+	}
+
+	VStack& isHidden(bool& hidden)
+	{
+		Stack<W...>::isHidden(hidden);
 		return *this;
 	}
 };

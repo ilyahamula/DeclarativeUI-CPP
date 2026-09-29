@@ -96,10 +96,24 @@ struct Expander
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	Expander& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	Expander& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeExpander(m_title, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		node->expander.expanded = m_expanded;
 
 		// Two children in order: header, content. The header is handed a
@@ -128,6 +142,7 @@ private:
 	std::optional<LayoutFlags> m_flags;
 	BoundValue<bool> m_expanded { false };
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	Content m_content;
 };
 

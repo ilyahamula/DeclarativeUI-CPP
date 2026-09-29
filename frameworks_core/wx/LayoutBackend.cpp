@@ -220,6 +220,8 @@ void WxLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 		return;
 	if (window->GetParent() != currentParent())
 		window->Reparent(currentParent());
+	if (!window->IsShown())
+		window->Show(); // back from isHidden()
 	const Rect local = toLocal(frame);
 #ifdef __WXOSX__
 	// The rounded Cocoa bezel cannot grow in height; switch before SetSize,
@@ -341,6 +343,8 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		wxWindow* window = ensureContainer(node);
 		if (window->GetParent() != scope.parent)
 			window->Reparent(scope.parent);
+		if (!window->IsShown())
+			window->Show(); // back from isHidden()
 		const Rect local = toLocal(frame);
 		window->SetSize(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
@@ -393,4 +397,29 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 void WxLayoutBackend::endContainer(const LayoutNode&)
 {
 	m_stack.pop_back();
+}
+
+// isHidden(): take everything this subtree ever realized out of view. Where a
+// container's window is the native PARENT of its subtree -- a tab widget, a
+// scroll area, an Expander's content panel -- hiding it takes the subtree with
+// it, and the walk stops there; its pages keep whatever visibility their owner
+// gave them, ready for the container to come back. A group box's frame is a
+// SIBLING of its content, so there the walk goes on. place() and
+// beginContainer() show the windows again when the node is laid out once more.
+void WxLayoutBackend::hide(const LayoutNode& node)
+{
+	if (node.isLeaf())
+	{
+		if (auto* window = static_cast<wxWindow*>(node.widget->nativeHandle()))
+			window->Hide();
+		return;
+	}
+	if (const auto it = m_containers.find(&node); it != m_containers.end() && it->second != nullptr)
+	{
+		it->second->Hide();
+		if (node.kind != NodeKind::GroupBox)
+			return;
+	}
+	for (const auto& child : node.children)
+		hide(*child);
 }

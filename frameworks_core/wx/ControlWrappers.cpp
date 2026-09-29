@@ -173,9 +173,19 @@ void ReadonlyTextCtrlWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ReadonlyTextCtrlWrapper::realize()\t-> new wxTextCtrl(wxTE_READONLY)\n");
 #endif
-	m_nativeWidget = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_value,
+	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxString::FromUTF8(m_value.get()),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_READONLY);
+	m_nativeWidget = txt;
 
+	// Bound: the field follows the caller's string. ChangeValue sends no
+	// wxEVT_TEXT, and nothing listens for one anyway -- the user cannot type.
+	if (const std::string* bound = m_value.boundValue())
+	{
+		bindExternalRefSync(txt,
+			[txt] { return std::string(txt->GetValue().ToUTF8()); },
+			[bound] { return *bound; },
+			[txt](const std::string& v) { txt->ChangeValue(wxString::FromUTF8(v)); });
+	}
 }
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -227,9 +237,32 @@ void StaticTextWrapper::realize(void* parentWindow)
 	else if (m_align == TextAlign::Right)
 		align = wxALIGN_RIGHT | wxST_NO_AUTORESIZE;
 
-	m_nativeWidget = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_text),
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | align);
+	// A BOUND label never resizes itself on SetLabel -- the engine owns its
+	// frame, which it keeps from the first text -- and ellipsizes a longer
+	// text instead of spilling past that frame.
+	if (m_text.isBound())
+		align |= wxST_NO_AUTORESIZE | wxST_ELLIPSIZE_END;
 
+	auto* label = new wxStaticText(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_text.get()),
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | align);
+	m_nativeWidget = label;
+	const wxSize best = label->GetBestSize();
+	m_initialSize = Size { best.x, best.y };
+
+	if (const std::string* bound = m_text.boundValue())
+	{
+		bindExternalRefSync(label,
+			[label] { return std::string(label->GetLabelText().ToUTF8()); },
+			[bound] { return *bound; },
+			[label](const std::string& text) { label->SetLabel(wxLabelText(text)); });
+	}
+}
+
+Size StaticTextWrapper::measureIntrinsic(const Constraints&)
+{
+	// Bound labels only (measuresItself): the size of the first text, never
+	// the live one -- see StaticText.
+	return m_initialSize;
 }
 
 // RichTextWrapper -----------------------------------------------------------
@@ -1087,6 +1120,31 @@ void ProgressBarWrapper::realize(void* parentWindow)
 	}
 }
 
+namespace
+{
+
+// The strings a wx item container holds now, and the one call that replaces
+// them. wxComboBox, wxListBox and wxCheckListBox all derive from
+// wxItemContainer, so one pair serves the three. Set() sends no selection event.
+ItemList nativeItems(const wxItemContainerImmutable* container)
+{
+	ItemList items;
+	items.reserve(container->GetCount());
+	for (unsigned int i = 0; i < container->GetCount(); ++i)
+		items.emplace_back(container->GetString(i).ToUTF8());
+	return items;
+}
+
+wxArrayString toArrayString(const ItemList& items)
+{
+	wxArrayString out;
+	for (const auto& item : items)
+		out.Add(wxString::FromUTF8(item));
+	return out;
+}
+
+} // unnamed namespace
+
 // ComboBoxWrapper -----------------------------------------------------------
 
 template <ComboBoxValue T>
@@ -1095,42 +1153,64 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ComboBoxWrapper::realize()\t-> new wxComboBox()\n");
 #endif
-	wxArrayString items;
-	for (const auto& c : m_choices)
-		items.Add(c);
-	const T& selected = m_value.get();
 	// wxCB_READONLY: a pick from the list and nothing else, as QComboBox and
 	// ImGui::Combo are. An editable wxComboBox would let the user type text no
 	// wxEVT_COMBOBOX ever reports and that an int binding cannot represent.
 	// Selection goes through the index setters, which send no event, so the
-	// ref sync below never re-enters the handler.
+	// ref syncs below never re-enter the handler.
 	auto* combo = new wxComboBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, "",
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items, m_style | wxCB_READONLY);
-	if constexpr (std::is_same_v<T, std::string>)
-		combo->SetSelection(combo->FindString(wxString::FromUTF8(selected), true));
-	else
-		combo->SetSelection(selected);
-	m_nativeWidget = combo;
-
-	if constexpr (std::is_same_v<T, std::string>)
-		combo->Bind(wxEVT_COMBOBOX, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
-	else
-		combo->Bind(wxEVT_COMBOBOX, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(static_cast<T>(evt.GetSelection())); });
-	if (m_value.isBound())
-	{
-		auto& value = m_value.get();
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		toArrayString(m_choices.get()), m_style | wxCB_READONLY);
+	const auto select = [combo](const T& value) {
 		if constexpr (std::is_same_v<T, std::string>)
-			bindExternalRefSync(combo,
-				[combo] { return std::string(combo->GetStringSelection().ToUTF8()); },
-				[&value] { return value; },
-				[combo](const std::string& v) { combo->SetSelection(combo->FindString(wxString::FromUTF8(v), true)); });
+			combo->SetSelection(combo->FindString(wxString::FromUTF8(value), true));
 		else
-			bindExternalRefSync(combo,
-				[combo] { return combo->GetSelection(); },
-				[&value] { return static_cast<int>(value); },
-				[combo](int i) { combo->SetSelection(i); });
-	}
+			combo->SetSelection(value >= 0 && value < (int)combo->GetCount() ? value : wxNOT_FOUND);
+	};
+	const auto current = [combo]() -> T {
+		if constexpr (std::is_same_v<T, std::string>)
+			return std::string(combo->GetStringSelection().ToUTF8());
+		else
+			return combo->GetSelection();
+	};
+	select(m_value.get());
+	m_nativeWidget = combo;
+	const wxSize best = combo->GetBestSize();
+	m_initialSize = Size { best.x, best.y };
 
+	combo->Bind(wxEVT_COMBOBOX, [current, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
+		commit(current());
+	});
+
+	// Bound choices: repopulate when the caller's vector changes, keeping the
+	// selection by value -- the bound one when there is one, else whatever was
+	// picked. Registered before the selection sync, so a tick that changes
+	// both sees the new list first.
+	if (const ItemList* boundItems = m_choices.boundValue())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(combo,
+			[combo] { return nativeItems(combo); },
+			[boundItems] { return *boundItems; },
+			[combo, select, current, boundValue](const ItemList& items) {
+				const T keep = boundValue != nullptr ? *boundValue : current();
+				combo->Set(toArrayString(items));
+				select(keep);
+			});
+	}
+	if (const T* boundValue = m_value.boundValue())
+	{
+		bindExternalRefSync(combo,
+			current,
+			[boundValue] { return *boundValue; },
+			select);
+	}
+}
+
+template <ComboBoxValue T>
+Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound choices only (measuresItself)
 }
 
 template class ComboBoxWrapper<std::string>;
@@ -1189,17 +1269,13 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ListBoxWrapper::realize()\t-> new wxListBox()\n");
 #endif
-	wxArrayString items;
-	for (const auto& item : m_items)
-		items.Add(item);
-
 	// wxLB_EXTENDED gives ctrl/shift-click range selection; wxLB_MULTIPLE would
 	// toggle on a plain click, which is not what a desktop list does.
 	const long selectionStyle = kMultiSelect ? wxLB_EXTENDED : wxLB_SINGLE;
 	auto* list = new wxListBox(static_cast<wxWindow*>(parentWindow), wxID_ANY,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), toArrayString(m_items.get()),
 		m_style | selectionStyle | wxLB_NEEDED_SB);
-	setListBoxSelection(list, indicesFor(m_items, boundValue()), kMultiSelect);
+	setListBoxSelection(list, indicesFor(m_items.get(), boundValue()), kMultiSelect);
 	m_nativeWidget = list;
 
 	// wxListBox's own best height grows with the item count, so a long list would
@@ -1210,18 +1286,42 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	const wxSize best = list->GetBestSize();
 	const int rowHeight = list->GetCharHeight() + 2;
 	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
+	m_initialSize = Size { best.x, rowHeight * m_visibleRows + kListBoxFrame };
 
-	list->Bind(wxEVT_LISTBOX, [list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
-		commit(valueFor(items, listBoxSelection(list, kMultiSelect)));
+	const ItemsView items(m_items);
+	list->Bind(wxEVT_LISTBOX, [list, items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
+		commit(valueFor(items(), listBoxSelection(list, kMultiSelect)));
 	});
+
+	// Bound items: repopulate, keeping the selection by value (see ComboBox).
+	if (const ItemList* boundItems = items.bound())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(list,
+			[list] { return nativeItems(list); },
+			[boundItems] { return *boundItems; },
+			[list, boundValue](const ItemList& next) {
+				const T keep = boundValue != nullptr
+					? *boundValue
+					: valueFor(nativeItems(list), listBoxSelection(list, kMultiSelect));
+				list->Set(toArrayString(next));
+				setListBoxSelection(list, indicesFor(next, keep), kMultiSelect);
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
 		bindExternalRefSync(list,
 			[list] { return listBoxSelection(list, kMultiSelect); },
-			[&value, items = m_items] { return indicesFor(items, value); },
+			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setListBoxSelection(list, indices, kMultiSelect); });
 	}
+}
+
+template <ListBoxValue T>
+Size ListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class ListBoxWrapper<int>;
@@ -1262,17 +1362,13 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("CheckListBoxWrapper::realize()\t-> new wxCheckListBox()\n");
 #endif
-	wxArrayString items;
-	for (const auto& item : m_items)
-		items.Add(item);
-
 	// Single-SELECTION, whatever the checked set holds: the highlight and the
 	// ticks are independent, and a multi-selection highlight would only suggest
 	// otherwise.
 	auto* list = new wxCheckListBox(static_cast<wxWindow*>(parentWindow), wxID_ANY,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), items,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), toArrayString(m_items.get()),
 		m_style | wxLB_SINGLE | wxLB_NEEDED_SB);
-	setCheckListChecked(list, indicesFor(m_items, boundValue()));
+	setCheckListChecked(list, indicesFor(m_items.get(), boundValue()));
 	m_nativeWidget = list;
 
 	// Same reason ListBoxWrapper pins its height: the native best size grows
@@ -1282,18 +1378,42 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	const wxSize best = list->GetBestSize();
 	const int rowHeight = list->GetCharHeight() + 2;
 	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
+	m_initialSize = Size { best.x, rowHeight * m_visibleRows + kListBoxFrame };
 
-	list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
-		commit(valueFor(items, checkListChecked(list)));
+	const ItemsView items(m_items);
+	list->Bind(wxEVT_CHECKLISTBOX, [list, items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
+		commit(valueFor(items(), checkListChecked(list)));
 	});
+
+	// Bound items: repopulate, keeping the ticks by value (see ComboBox).
+	if (const ItemList* boundItems = items.bound())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(list,
+			[list] { return nativeItems(list); },
+			[boundItems] { return *boundItems; },
+			[list, boundValue](const ItemList& next) {
+				const T keep = boundValue != nullptr
+					? *boundValue
+					: valueFor(nativeItems(list), checkListChecked(list));
+				list->Set(toArrayString(next));
+				setCheckListChecked(list, indicesFor(next, keep));
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
 		bindExternalRefSync(list,
 			[list] { return checkListChecked(list); },
-			[&value, items = m_items] { return indicesFor(items, value); },
+			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
 	}
+}
+
+template <CheckListValue T>
+Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class CheckListBoxWrapper<std::vector<int>>;

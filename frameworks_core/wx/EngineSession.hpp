@@ -171,6 +171,17 @@ struct EngineSession
 				[expander] { return expander->expanded.get(); },
 				[this](bool) { relayout(); });
 		}
+		// isHidden() bound to a caller's flag: showing or hiding a node changes
+		// what there is to lay out, so -- like an Expander -- a full re-measure.
+		// `hiddenApplied` is what the layout shows, `hidden` what it should.
+		if (node.hidden.isBound())
+		{
+			LayoutNode* shown = &node;
+			bindExternalRefSync(window,
+				[shown] { return shown->hiddenApplied; },
+				[shown] { return shown->hidden.get(); },
+				[this](bool) { relayout(); });
+		}
 		if (node.isLeaf())
 		{
 			if (node.flags.autoGrow() && node.widget != nullptr)

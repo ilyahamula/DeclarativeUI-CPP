@@ -15,6 +15,7 @@ add_executable(layout_tests
     layout_engine_scroll_test.cpp
     layout_engine_splitter_test.cpp
     layout_engine_expander_test.cpp
+    layout_engine_hidden_test.cpp
     golden_cross_backend_test.cpp
     shortcut_parse_test.cpp
     file_filter_parse_test.cpp

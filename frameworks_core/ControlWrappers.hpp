@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <string>
@@ -22,13 +23,52 @@
 
 // Every wrapper declares the same shape of per-backend override: realize() on
 // the retained backends (wx/Qt), measureIntrinsic()/render() on ImGui (see the
-// wrapper contract below). One macro call replaces that repeated block.
+// wrapper contract below). One macro call replaces that repeated block, and
+// the few variations below get one macro each, so no wrapper spells out a
+// backend #if of its own. A macro with nothing to declare on a backend expands
+// to static_assert(true, ""), so every call site is written `MACRO();`.
+//
+//   DECLARE_CONTROL_WRAPPER_OVERRIDES()     the usual shape (see above).
+//   DECLARE_SELF_MEASURED_OVERRIDES(cond)   wx/Qt: the wrapper answers its own
+//       measure whenever `cond` holds -- a bound display frozen at its first
+//       content, or a height that follows the offered width -- instead of the
+//       native best size (ControlWrapper::measuresItself). ImGui always
+//       measures through the wrapper, so there it declares nothing.
+//   DECLARE_MEASURES_ITSELF(cond)           the same, for a wrapper whose
+//       measureIntrinsic() is one inline body shared by all three backends.
+//   DECLARE_PLACED_OVERRIDE()               wx/Qt: placed(frame), for content
+//       composed against the frame the engine assigned (ControlWrapper::placed).
+//   DECLARE_DRAW_OVERRIDES()                realize() / render() only, for a
+//       wrapper whose measure is shared inline.
+//   DECLARE_WINDOWLESS_OVERRIDES()          render() on ImGui and nothing on
+//       wx/Qt, for a leaf that creates no native window (Spacer).
 #if defined(USE_WX) || defined(USE_QT)
 #define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
 	void realize(void* parentWindow) override
+#define DECLARE_MEASURES_ITSELF(cond) \
+	bool measuresItself() const override { return (cond); }
+#define DECLARE_SELF_MEASURED_OVERRIDES(cond) \
+	Size measureIntrinsic(const Constraints& c) override; \
+	DECLARE_MEASURES_ITSELF(cond)
+#define DECLARE_PLACED_OVERRIDE() \
+	void placed(const Rect& frame) override
+#define DECLARE_DRAW_OVERRIDES() \
+	void realize(void* parentWindow) override
+#define DECLARE_WINDOWLESS_OVERRIDES() \
+	static_assert(true, "")
 #elif defined(USE_IMGUI)
 #define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
 	Size measureIntrinsic(const Constraints& c) override; \
+	void render(const Rect& frame) override
+#define DECLARE_MEASURES_ITSELF(cond) \
+	static_assert(true, "")
+#define DECLARE_SELF_MEASURED_OVERRIDES(cond) \
+	static_assert(true, "")
+#define DECLARE_PLACED_OVERRIDE() \
+	static_assert(true, "")
+#define DECLARE_DRAW_OVERRIDES() \
+	void render(const Rect& frame) override
+#define DECLARE_WINDOWLESS_OVERRIDES() \
 	void render(const Rect& frame) override
 #endif
 
@@ -139,17 +179,17 @@ private:
 class ReadonlyTextCtrlWrapper : public ControlWrapper
 {
 public:
-	ReadonlyTextCtrlWrapper(const std::string& value,
+	ReadonlyTextCtrlWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
-		, m_value(value)
+		, m_value(std::move(value))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
-	std::string m_value;
+	BoundValue<std::string> m_value;
 };
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -196,22 +236,29 @@ private:
 // The alignment is a plain TextAlign, not a BoundValue, for the same reason a
 // placeholder is a plain string: it is decided when the tree is described and
 // nothing writes it afterwards, so there is nothing for a ref sync to poll.
+//
+// A BOUND label measures its first text only (see StaticText): on wx/Qt the
+// size is captured at realize() and answered through measuresItself(), since
+// the native best size would follow every SetLabel; on ImGui it is parked
+// under a measure-phase key the first time the label is measured.
 class StaticTextWrapper : public ControlWrapper
 {
 public:
-	StaticTextWrapper(const std::string& text, TextAlign align,
+	StaticTextWrapper(BoundValue<std::string> text, TextAlign align,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
-		, m_text(text)
+		, m_text(std::move(text))
 		, m_align(align)
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_SELF_MEASURED_OVERRIDES(m_text.isBound());
 
 private:
-	std::string m_text;
+	BoundValue<std::string> m_text;
 	TextAlign m_align = TextAlign::Left;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound only: the size of the first text
 };
 
 // RichTextWrapper -----------------------------------------------------------
@@ -238,10 +285,7 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-#if defined(USE_WX) || defined(USE_QT)
-	Size measureIntrinsic(const Constraints& c) override;
-	bool measuresItself() const override { return true; }
-#endif
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
 
 private:
 	int wrapWidth(const Constraints& c) const
@@ -469,12 +513,10 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-#if defined(USE_WX) || defined(USE_QT)
 	// The one wrapper that needs the frame AFTER the engine has computed it:
 	// every mode but Stretch decides what the pixels do from the frame's shape,
 	// and neither a wxStaticBitmap nor a QLabel can work that out for itself.
-	void placed(const Rect& frame) override;
-#endif
+	DECLARE_PLACED_OVERRIDE();
 
 private:
 	std::string m_filePath;
@@ -535,12 +577,9 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-#if defined(USE_WX) || defined(USE_QT)
 	// Width from statusBarContentWidth() on all three, height from the native
 	// bar -- never the native best width, which differs per toolkit.
-	Size measureIntrinsic(const Constraints& c) override;
-	bool measuresItself() const override { return true; }
-#endif
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
 
 private:
 	StatusFields m_fields;
@@ -628,9 +667,7 @@ public:
 		return m_fixedSize;
 	}
 
-#ifdef USE_IMGUI
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_WINDOWLESS_OVERRIDES();
 
 private:
 	Size m_fixedSize;
@@ -652,12 +689,8 @@ public:
 	{
 	}
 
-#if defined(USE_WX) || defined(USE_QT)
-	void realize(void* parentWindow) override;
-	bool measuresItself() const override { return true; }
-#elif defined(USE_IMGUI)
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_DRAW_OVERRIDES();
+	DECLARE_MEASURES_ITSELF(true);
 
 	Size measureIntrinsic(const Constraints&) override
 	{
@@ -761,12 +794,40 @@ private:
 	bool m_indeterminate = false;
 };
 
+// Item lists -----------------------------------------------------------------
+// The choices of a ComboBox, ListBox or CheckListBox: a snapshot, or the
+// caller's vector BOUND, in which case the native control is repopulated when
+// the vector changes (see the backends' syncItems).
+using ItemList = std::vector<std::string>;
+
+// The item list an event handler or RefSync poll reads: the caller's vector
+// while bound, a shared copy of the snapshot otherwise. Holds no wrapper --
+// handlers outlive it (wx/RefSync.hpp) -- and copies cheaply.
+class ItemsView
+{
+public:
+	explicit ItemsView(const BoundValue<ItemList>& items)
+		: m_bound(items.boundValue())
+		, m_snapshot(m_bound != nullptr ? nullptr : std::make_shared<const ItemList>(items.get()))
+	{
+	}
+
+	const ItemList& operator()() const { return m_bound != nullptr ? *m_bound : *m_snapshot; }
+
+	// Non-null only while bound: what a repopulating RefSync watches.
+	const ItemList* bound() const { return m_bound; }
+
+private:
+	const ItemList* m_bound;
+	std::shared_ptr<const ItemList> m_snapshot;
+};
+
 // ComboBoxWrapper -----------------------------------------------------------
 template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper
 {
 public:
-	ComboBoxWrapper(std::vector<std::string> choices,
+	ComboBoxWrapper(BoundValue<ItemList> choices,
 		BoundValue<T> selected, const Position& pos, const Size& size, long style,
 		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -778,13 +839,16 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound choices: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_choices.isBound());
 
 private:
 	// Builds the '\0'-separated item string and resolves the initial index
 	// from the selection (used by the ImGui backend).
 	void buildItems()
 	{
-		for (const auto& c : m_choices)
+		for (const auto& c : m_choices.get())
 		{
 			m_items += c;
 			m_items += '\0';
@@ -796,9 +860,10 @@ private:
 		}
 		else
 		{
-			for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+			const ItemList& choices = m_choices.get();
+			for (int i = 0; i < static_cast<int>(choices.size()); ++i)
 			{
-				if (m_choices[i] == m_value.get())
+				if (choices[i] == m_value.get())
 				{
 					m_currentItem = i;
 					break;
@@ -808,10 +873,11 @@ private:
 	}
 
 	std::string m_items;
-	std::vector<std::string> m_choices;
+	BoundValue<ItemList> m_choices;
 	int m_currentItem = 0;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class ComboBoxWrapper<std::string>;
@@ -902,7 +968,7 @@ class ListBoxWrapper : public ControlWrapper
 public:
 	static constexpr bool kMultiSelect = MultiSelectListBoxValue<T>;
 
-	ListBoxWrapper(std::vector<std::string> items,
+	ListBoxWrapper(BoundValue<ItemList> items,
 		BoundValue<T> selected, int visibleRows, const Position& pos, const Size& size, long style,
 		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -914,6 +980,9 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	// The backends reach the shared decode/encode pair through these names.
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
@@ -930,17 +999,18 @@ public:
 	// handler reading the bound value sees the new one.
 	void commit(const std::vector<int>& indices)
 	{
-		m_value.set(valueFor(m_items, indices));
+		m_value.set(valueFor(m_items.get(), indices));
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class ListBoxWrapper<int>;
@@ -959,7 +1029,7 @@ template <CheckListValue T>
 class CheckListBoxWrapper : public ControlWrapper
 {
 public:
-	CheckListBoxWrapper(std::vector<std::string> items,
+	CheckListBoxWrapper(BoundValue<ItemList> items,
 		BoundValue<T> checked, int visibleRows, const Position& pos, const Size& size, long style,
 		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
@@ -971,6 +1041,9 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
 	{
@@ -986,17 +1059,18 @@ public:
 	// handler reading the bound value sees the new one.
 	void commit(const std::vector<int>& indices)
 	{
-		m_value.set(valueFor(m_items, indices));
+		m_value.set(valueFor(m_items.get(), indices));
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class CheckListBoxWrapper<std::vector<int>>;
@@ -1352,12 +1426,10 @@ private:
 	EventCallback<const T&> m_onChange;
 	std::function<void(int, int, const std::string&)> m_onCellChange;
 
-#ifdef USE_IMGUI
-	// Column widths measureIntrinsic() computed this frame, reused by render()
-	// on the same wrapper so every cell's text is measured once per frame, not
-	// twice. Empty until measured.
+	// ImGui: column widths measureIntrinsic() computed this frame, reused by
+	// render() on the same wrapper so every cell's text is measured once per
+	// frame, not twice. Empty until measured, and unused on wx/Qt.
 	std::vector<int> m_columnWidths;
-#endif
 };
 
 extern template class TableWrapper<int>;

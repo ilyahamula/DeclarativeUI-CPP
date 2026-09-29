@@ -28,6 +28,12 @@ static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
 static_assert(NodeBuildable<StatusBar>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
+// Display content binds like any value: a non-const lvalue follows the caller.
+static_assert(std::is_constructible_v<StaticText, std::string&>);
+static_assert(std::is_constructible_v<ReadonlyTextCtrl, std::string&>);
+static_assert(std::is_constructible_v<ListBox<std::string>, ItemList&, std::string&>);
+static_assert(std::is_constructible_v<ComboBox<int>, ItemList&, int&>);
+static_assert(std::is_constructible_v<CheckListBox<std::vector<int>>, ItemList&, std::vector<int>&>);
 static_assert(NodeBuildable<RadioButton<bool>>);
 static_assert(NodeBuildable<RadioButton<int>>);
 // An int radio names its own value and must be bound: the radios sharing one
@@ -162,6 +168,26 @@ static_assert(!TimedNotice<MessageBox>);
 // postToUi() takes a plain command, like ShowAction(): anything a click handler
 // could be, including a ShowAction itself.
 static_assert(std::is_invocable_v<decltype(&postToUi), std::function<void()>>);
+
+// isHidden() is everywhere a node is: on every widget and every container --
+// except a single Tab, since wxNotebook cannot hide a page without removing it
+// (hide the whole TabPanel instead).
+template <typename T>
+concept Hideable = requires(T element, bool& flag) {
+	{ element.isHidden(flag) } -> std::same_as<T&>;
+	{ element.isHidden(true) } -> std::same_as<T&>;
+};
+static_assert(Hideable<Button>);
+static_assert(Hideable<StaticText>);
+static_assert(Hideable<VStack<Button>>);
+static_assert(Hideable<HStack<Button>>);
+static_assert(Hideable<VGroupBox<Button>>);
+static_assert(Hideable<Grid<Button>>);
+static_assert(Hideable<ScrollPanel<VStack<Button>>>);
+static_assert(Hideable<HSplitter<VStack<Button>, VStack<Button>>>);
+static_assert(Hideable<Expander<VStack<Button>>>);
+static_assert(Hideable<TabPanel<Tab<VStack<Button>>>>);
+static_assert(!Hideable<Tab<VStack<Button>>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

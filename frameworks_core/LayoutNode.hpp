@@ -43,6 +43,15 @@ struct LayoutNode
 	// is how wx, Qt and ImGui::BeginDisabled all behave natively.
 	DisabledFlag disabled;
 
+	// isHidden(): a hidden node takes no part in the layout. `hidden` is the
+	// caller's flag, snapshot or bound; `hiddenApplied` is what the last
+	// measure pass latched from it, and what arrange, traversal and the
+	// backends read -- the Expander's `applied` move, for the same reason: on
+	// ImGui a handler can flip the flag mid-frame, after measure has sized
+	// everything. It is also what the wx/Qt relayout poll compares against.
+	BoundValue<bool> hidden { false };
+	bool hiddenApplied = false;
+
 	ControlWrapper* widget = nullptr;                // set for Leaf nodes
 	std::unique_ptr<ControlWrapper> ownedWidget;     // set when the tree owns the wrapper
 	                                                 // (engine path: wrappers must

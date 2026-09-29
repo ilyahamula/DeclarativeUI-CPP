@@ -201,6 +201,8 @@ void QtLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 		window->setParent(currentParent()); // setParent hides the widget
 		window->show();
 	}
+	else if (window->isHidden())
+		window->show(); // back from isHidden()
 	const Rect local = toLocal(frame);
 	window->setGeometry(local.x, local.y, local.width, local.height);
 	// After the move, so a wrapper that composes its content against the frame
@@ -343,6 +345,8 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 			window->setParent(scope.parent);
 			window->show();
 		}
+		else if (window->isHidden())
+			window->show(); // back from isHidden()
 		const Rect local = toLocal(frame);
 		window->setGeometry(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
@@ -400,4 +404,29 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 void QtLayoutBackend::endContainer(const LayoutNode&)
 {
 	m_stack.pop_back();
+}
+
+// isHidden(): take everything this subtree ever realized out of view. Where a
+// container's window is the native PARENT of its subtree -- a tab widget, a
+// scroll area, an Expander's content panel -- hiding it takes the subtree with
+// it, and the walk stops there; its pages keep whatever visibility their owner
+// gave them, ready for the container to come back. A group box's frame is a
+// SIBLING of its content, so there the walk goes on. place() and
+// beginContainer() show the windows again when the node is laid out once more.
+void QtLayoutBackend::hide(const LayoutNode& node)
+{
+	if (node.isLeaf())
+	{
+		if (auto* window = static_cast<QWidget*>(node.widget->nativeHandle()))
+			window->hide();
+		return;
+	}
+	if (const auto it = m_containers.find(&node); it != m_containers.end() && it->second != nullptr)
+	{
+		it->second->hide();
+		if (node.kind != NodeKind::GroupBox)
+			return;
+	}
+	for (const auto& child : node.children)
+		hide(*child);
 }

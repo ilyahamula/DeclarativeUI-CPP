@@ -63,10 +63,24 @@ struct ScrollPanel
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	ScrollPanel& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	ScrollPanel& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeScrollPanel(m_scroll, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		node->add(m_content.buildNode());
 		return node;
 	}
@@ -75,5 +89,6 @@ private:
 	ScrollAxis m_scroll = ScrollAxis::Vertical;
 	std::optional<LayoutFlags> m_flags;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	Content m_content;
 };

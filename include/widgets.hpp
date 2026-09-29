@@ -39,6 +39,7 @@ struct Widget
 		wrapper->setContextMenu(m_contextMenu);
 		wrapper->setStableId(m_id);
 		auto node = makeLeaf(std::move(wrapper), m_flags.value_or(defaultFlags()));
+		node->hidden = m_hidden;
 
 		if (m_postCreateCallback)
 			m_postCreateCallback();
@@ -95,6 +96,23 @@ struct Widget
 	W& isDisabled(bool& disabled)
 	{
 		m_disabled.bind(disabled);
+		return static_cast<W&>(*this);
+	}
+
+	// Take the control out of the layout: a hidden control takes no space (in a
+	// stack not even the gap beside it; in a grid its cell stays empty), draws
+	// nothing and joins no SizeGroup. Snapshot the flag as it stands now.
+	W& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return static_cast<W&>(*this);
+	}
+
+	// Bind to a caller-owned flag: flipping it shows or hides the control, and
+	// an auto-fit window grows or shrinks to match, without rebuilding the tree.
+	W& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
 		return static_cast<W&>(*this);
 	}
 
@@ -174,6 +192,7 @@ private: // callbacks
 
 private:
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	TooltipText m_tooltip;
 	ContextMenu m_contextMenu;
 	std::string m_id;
@@ -188,7 +207,21 @@ struct StaticText : Widget<StaticText>
 {
 	using super = Widget<StaticText>;
 
+	// The usual pair: a literal (or const) snapshots, a non-const lvalue BINDS
+	// and the label then shows whatever the caller's string says, live.
+	//
+	// A bound label keeps the size it had for its FIRST text: it shows a string
+	// written from elsewhere, and measuring every new value would let an
+	// arriving message resize an auto-fit window. Longer text is clipped (wx
+	// ellipsizes it); give the label room with withSize(), Expand() or a
+	// SizeGroup when its text will grow. A bound label is a single line.
 	explicit StaticText(const std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+	explicit StaticText(std::string& text)
 		: super()
 		, m_text(text)
 	{
@@ -215,7 +248,7 @@ private:
 	}
 
 private:
-	std::string m_text;
+	BoundValue<std::string> m_text;
 	TextAlign m_align = TextAlign::Left;
 };
 
@@ -394,7 +427,18 @@ struct ReadonlyTextCtrl : Widget<ReadonlyTextCtrl>
 {
 	using super = Widget<ReadonlyTextCtrl>;
 
+	// A literal (or const) snapshots; a non-const lvalue BINDS, and the field
+	// then follows the caller's string live -- the user can still select and
+	// copy, never type. Measured like an editable field: from its initial
+	// content on wx/Qt, a content-independent floor on ImGui, never from a
+	// value that arrives later.
 	explicit ReadonlyTextCtrl(const std::string& text)
+		: super()
+		, m_text(text)
+	{
+	}
+
+	explicit ReadonlyTextCtrl(std::string& text)
 		: super()
 		, m_text(text)
 	{
@@ -410,11 +454,10 @@ private:
 	}
 
 private:
-	// Owned, like every other text widget's: the argument is usually a literal
-	// or a temporary, and this widget is itself a temporary that dies with the
-	// enclosing declarative expression -- so a reference here would dangle long
-	// before the backend realizes or renders the control.
-	std::string m_text;
+	// A snapshot is OWNED, like every other text widget's: the argument is
+	// usually a literal or a temporary, and this widget is itself a temporary
+	// that dies with the enclosing declarative expression.
+	BoundValue<std::string> m_text;
 };
 
 // ClickableText -----------------------------------------------------------
@@ -761,24 +804,49 @@ struct ComboBox : Widget<ComboBox<T>>
 {
 	using super = Widget<ComboBox<T>>;
 
-	ComboBox(std::vector<std::string> choices)
+	// The choices follow the usual pair too: a braced list, a temporary or a
+	// const vector is a snapshot; a non-const std::vector<std::string>& BINDS,
+	// and the control is repopulated whenever the caller's vector changes. A
+	// bound list keeps the width it had for its first items, so new choices
+	// never resize an auto-fit window.
+	ComboBox(const ItemList& choices)
 		: super()
-		, m_choices(std::move(choices))
+		, m_choices(choices)
 	{
-		if constexpr (std::is_same_v<T, std::string>)
-			m_value.snapshot(m_choices.empty() ? T{} : m_choices.front());
+		selectFirst();
 	}
 
-	ComboBox(std::vector<std::string> choices, const T& selected)
+	ComboBox(ItemList& choices)
 		: super()
-		, m_choices(std::move(choices))
+		, m_choices(choices)
+	{
+		selectFirst();
+	}
+
+	ComboBox(const ItemList& choices, const T& selected)
+		: super()
+		, m_choices(choices)
 		, m_value(selected)
 	{
 	}
 
-	ComboBox(std::vector<std::string> choices, T& selected)
+	ComboBox(const ItemList& choices, T& selected)
 		: super()
-		, m_choices(std::move(choices))
+		, m_choices(choices)
+		, m_value(selected)
+	{
+	}
+
+	ComboBox(ItemList& choices, const T& selected)
+		: super()
+		, m_choices(choices)
+		, m_value(selected)
+	{
+	}
+
+	ComboBox(ItemList& choices, T& selected)
+		: super()
+		, m_choices(choices)
 		, m_value(selected)
 	{
 	}
@@ -804,17 +872,32 @@ private:
 		return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_value, pos, size, style, m_onChange);
 	}
 
+	// With no selection given, a string combo starts on its first choice.
+	void selectFirst()
+	{
+		if constexpr (std::is_same_v<T, std::string>)
+			m_value.snapshot(m_choices.get().empty() ? T{} : m_choices.get().front());
+	}
+
 private:
-	std::vector<std::string> m_choices;
+	BoundValue<ItemList> m_choices;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
 };
 
+// const& and & rather than by value: a non-const vector lvalue then prefers
+// the binding guide instead of finding the two equally good.
 template <ComboBoxValue T>
-ComboBox(std::vector<std::string>, T&) -> ComboBox<T>;
+ComboBox(const ItemList&, T&) -> ComboBox<T>;
 
 template <ComboBoxValue T>
-ComboBox(std::vector<std::string>, const T&) -> ComboBox<T>;
+ComboBox(const ItemList&, const T&) -> ComboBox<T>;
+
+template <ComboBoxValue T>
+ComboBox(ItemList&, T&) -> ComboBox<T>;
+
+template <ComboBoxValue T>
+ComboBox(ItemList&, const T&) -> ComboBox<T>;
 
 // ListBox -----------------------------------------------------------
 // Scrollable list of selectable items. The bound type picks the mode:
@@ -832,26 +915,48 @@ struct ListBox : Widget<ListBox<T>>
 	// same tree to lay out identically otherwise.
 	static constexpr int kDefaultVisibleRows = 6;
 
-	explicit ListBox(std::vector<std::string> items)
+	// Items: a braced list, a temporary or a const vector is a snapshot; a
+	// non-const std::vector<std::string>& BINDS, and the list is repopulated
+	// whenever the caller's vector changes -- the selection is re-applied by
+	// value. A bound list keeps the width it had for its first items.
+	explicit ListBox(const ItemList& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
 	{
-		// Single-select starts on the first item (as ComboBox does); multi-select
-		// starts empty -- "no rows selected" is the honest default for a list.
-		if constexpr (std::is_same_v<T, std::string>)
-			m_value.snapshot(m_items.empty() ? T{} : m_items.front());
+		init();
 	}
 
-	ListBox(std::vector<std::string> items, const T& selected)
+	explicit ListBox(ItemList& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+	{
+		init();
+	}
+
+	ListBox(const ItemList& items, const T& selected)
+		: super()
+		, m_items(items)
 		, m_value(selected)
 	{
 	}
 
-	ListBox(std::vector<std::string> items, T& selected)
+	ListBox(ItemList& items, const T& selected)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+		, m_value(selected)
+	{
+	}
+
+	ListBox(ItemList& items, T& selected)
+		: super()
+		, m_items(items)
+		, m_value(selected)
+	{
+	}
+
+	ListBox(const ItemList& items, T& selected)
+		: super()
+		, m_items(items)
 		, m_value(selected)
 	{
 	}
@@ -875,6 +980,14 @@ struct ListBox : Widget<ListBox<T>>
 	}
 
 private:
+	void init()
+	{
+		// Single-select starts on the first item (as ComboBox does); multi-select
+		// starts empty -- "no rows selected" is the honest default for a list.
+		if constexpr (std::is_same_v<T, std::string>)
+			m_value.snapshot(m_items.get().empty() ? T{} : m_items.get().front());
+	}
+
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
@@ -884,17 +997,23 @@ private:
 	}
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
 };
 
 template <ListBoxValue T>
-ListBox(std::vector<std::string>, T&) -> ListBox<T>;
+ListBox(const ItemList&, T&) -> ListBox<T>;
 
 template <ListBoxValue T>
-ListBox(std::vector<std::string>, const T&) -> ListBox<T>;
+ListBox(const ItemList&, const T&) -> ListBox<T>;
+
+template <ListBoxValue T>
+ListBox(ItemList&, T&) -> ListBox<T>;
+
+template <ListBoxValue T>
+ListBox(ItemList&, const T&) -> ListBox<T>;
 
 // CheckListBox -----------------------------------------------------------
 // A list with a checkbox on every row. The bound value is the CHECKED SET, so
@@ -915,24 +1034,48 @@ struct CheckListBox : Widget<CheckListBox<T>>
 	// hints disagree far too much for the same tree to lay out identically.
 	static constexpr int kDefaultVisibleRows = ListBox<T>::kDefaultVisibleRows;
 
-	explicit CheckListBox(std::vector<std::string> items)
+	// Items: a braced list, a temporary or a const vector is a snapshot; a
+	// non-const std::vector<std::string>& BINDS, and the list is repopulated
+	// whenever the caller's vector changes -- the selection is re-applied by
+	// value. A bound list keeps the width it had for its first items.
+	explicit CheckListBox(const ItemList& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
 	{
-		// Nothing ticked is the honest default: a checked set the caller never
-		// asked for would be a decision made on their behalf.
+		init();
 	}
 
-	CheckListBox(std::vector<std::string> items, const T& checked)
+	explicit CheckListBox(ItemList& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+	{
+		init();
+	}
+
+	CheckListBox(const ItemList& items, const T& checked)
+		: super()
+		, m_items(items)
 		, m_value(checked)
 	{
 	}
 
-	CheckListBox(std::vector<std::string> items, T& checked)
+	CheckListBox(ItemList& items, const T& checked)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox(ItemList& items, T& checked)
+		: super()
+		, m_items(items)
+		, m_value(checked)
+	{
+	}
+
+	CheckListBox(const ItemList& items, T& checked)
+		: super()
+		, m_items(items)
 		, m_value(checked)
 	{
 	}
@@ -956,6 +1099,12 @@ struct CheckListBox : Widget<CheckListBox<T>>
 	}
 
 private:
+	void init()
+	{
+		// Nothing ticked is the honest default: a checked set the caller never
+		// asked for would be a decision made on their behalf.
+	}
+
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
@@ -965,17 +1114,23 @@ private:
 	}
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
 };
 
 template <CheckListValue T>
-CheckListBox(std::vector<std::string>, T&) -> CheckListBox<T>;
+CheckListBox(const ItemList&, T&) -> CheckListBox<T>;
 
 template <CheckListValue T>
-CheckListBox(std::vector<std::string>, const T&) -> CheckListBox<T>;
+CheckListBox(const ItemList&, const T&) -> CheckListBox<T>;
+
+template <CheckListValue T>
+CheckListBox(ItemList&, T&) -> CheckListBox<T>;
+
+template <CheckListValue T>
+CheckListBox(ItemList&, const T&) -> CheckListBox<T>;
 
 // TreeView -----------------------------------------------------------
 // Hierarchical, collapsible list. Items are a nested TreeItem literal and the

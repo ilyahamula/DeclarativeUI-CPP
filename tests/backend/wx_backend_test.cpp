@@ -8,6 +8,7 @@
 #include "declarative_ui.hpp"
 
 #include <wx/combobox.h>
+#include <wx/listbox.h>
 #include <wx/statline.h>
 #include <wx/statusbr.h>
 #include <wx/wx.h>
@@ -265,6 +266,125 @@ TEST(wx_with_id_names_the_window_and_post_to_ui_crosses_threads)
 	CHECK(flag);
 	CHECK(onUiThread);
 	CHECK(box != nullptr && box->GetValue()); // and RefSync mirrored it
+	w->Close();
+	pump();
+}
+
+// A bound StaticText / ReadonlyTextCtrl follows the caller's string but keeps
+// the size of its first text, even through a full re-measure (an Expander
+// opening forces one).
+TEST(wx_bound_labels_follow_text_without_resizing)
+{
+	std::string status = "Ready";
+	bool open = false;
+	Dialog { "Status",
+		VStack {
+			StaticText{status},
+			ReadonlyTextCtrl{status},
+			Expander { "More", open, StaticText{"x"} }
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Status");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* label = find<wxStaticText>(w, [](wxStaticText* t) { return t->GetLabelText() == "Ready"; });
+	auto* field = find<wxTextCtrl>(w, [](wxTextCtrl*) { return true; });
+	CHECK(label != nullptr && field != nullptr);
+	if (label == nullptr || field == nullptr)
+		return;
+	const int labelWidth = label->GetSize().x;
+
+	status = "This status message is far longer than the label it arrives in, by design";
+	open = true;
+	pump(40);
+	CHECK(std::string(label->GetLabelText().ToUTF8()) == status);
+	CHECK(std::string(field->GetValue().ToUTF8()) == status);
+	CHECK_EQ(label->GetSize().x, labelWidth);
+	w->Close();
+	pump();
+}
+
+// isHidden(): a hidden control and a hidden group box are taken out of view
+// and out of the layout; flipping the bound flag back restores both.
+TEST(wx_hidden_nodes_leave_and_return)
+{
+	bool hideButton = false;
+	bool hideBox = false;
+	Dialog { "Hide",
+		VStack {
+			Button{"Always"},
+			Button{"Sometimes"}.isHidden(hideButton),
+			VGroupBox { "Box", Button{"Inside"} }.isHidden(hideBox)
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Hide");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* sometimes = find<wxButton>(w, [](wxButton* b) { return b->GetLabelText() == "Sometimes"; });
+	auto* inside = find<wxButton>(w, [](wxButton* b) { return b->GetLabelText() == "Inside"; });
+	auto* box = find<wxStaticBox>(w, [](wxStaticBox*) { return true; });
+	CHECK(sometimes && inside && box);
+	if (!(sometimes && inside && box))
+		return;
+	const int fullHeight = w->GetClientSize().y;
+
+	hideButton = true;
+	hideBox = true;
+	pump(40);
+	CHECK(!sometimes->IsShown());
+	CHECK(!box->IsShown());
+	CHECK(!inside->IsShown());
+	CHECK(w->GetClientSize().y < fullHeight);
+
+	hideButton = false;
+	hideBox = false;
+	pump(40);
+	CHECK(sometimes->IsShown());
+	CHECK(box->IsShown());
+	CHECK(inside->IsShown());
+	CHECK_EQ(w->GetClientSize().y, fullHeight);
+	w->Close();
+	pump();
+}
+
+// Bound item lists: the native list and combo are repopulated when the
+// caller's vector changes, the selection stays on the same item by value, and
+// the window does not resize.
+TEST(wx_bound_item_lists_repopulate_and_keep_the_selection)
+{
+	ItemList items { "alpha", "beta", "gamma" };
+	std::string listPick = "beta";
+	std::string comboPick = "gamma";
+	Dialog { "Items",
+		VStack {
+			ListBox{ items, listPick }.withVisibleRows(4),
+			ComboBox{ items, comboPick }
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Items");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* list = find<wxListBox>(w, [](wxListBox*) { return true; });
+	auto* combo = find<wxComboBox>(w, [](wxComboBox*) { return true; });
+	CHECK(list && combo);
+	if (!(list && combo))
+		return;
+	const int width = w->GetClientSize().x;
+
+	items = { "gamma", "a considerably longer new item", "beta" };
+	pump(40);
+	CHECK_EQ(list->GetCount(), 3u);
+	CHECK_EQ(combo->GetCount(), 3u);
+	CHECK(list->GetStringSelection() == "beta");
+	CHECK(combo->GetStringSelection() == "gamma");
+	CHECK_EQ(listPick, std::string("beta"));
+	CHECK_EQ(w->GetClientSize().x, width);
 	w->Close();
 	pump();
 }

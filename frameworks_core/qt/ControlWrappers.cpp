@@ -281,10 +281,18 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 
 void ReadonlyTextCtrlWrapper::realize(void* parentWindow)
 {
-	auto* edit = new QLineEdit(qstr(m_value), static_cast<QWidget*>(parentWindow));
+	auto* edit = new QLineEdit(qstr(m_value.get()), static_cast<QWidget*>(parentWindow));
 	edit->setReadOnly(true);
 	m_nativeWidget = edit;
 
+	// Bound: the field follows the caller's string.
+	if (const std::string* bound = m_value.boundValue())
+	{
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[bound] { return *bound; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
+	}
 }
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -319,7 +327,7 @@ void LinkTextWrapper::realize(void* parentWindow)
 void StaticTextWrapper::realize(void* parentWindow)
 {
 	auto* label = new QLabel(static_cast<QWidget*>(parentWindow));
-	qtSetPlainText(label, m_text);
+	qtSetPlainText(label, m_text.get());
 	// AlignVCenter is QLabel's own default and is kept, so a Left label reads
 	// exactly as it always did; only the horizontal half follows withAlign().
 	const Qt::Alignment horizontal = m_align == TextAlign::Center ? Qt::AlignHCenter
@@ -327,7 +335,25 @@ void StaticTextWrapper::realize(void* parentWindow)
 		: Qt::AlignLeft;
 	label->setAlignment(horizontal | Qt::AlignVCenter);
 	m_nativeWidget = label;
+	const QSize hint = label->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
 
+	// Bound: the label follows the caller's string. Its sizeHint would follow
+	// too, which is why a bound label answers measure itself (the first
+	// text's size) instead; a longer text is clipped by the label's geometry.
+	if (const std::string* bound = m_text.boundValue())
+	{
+		bindExternalRefSync(label,
+			[label] { return label->text().toStdString(); },
+			[bound] { return *bound; },
+			[label](const std::string& text) { label->setText(qstr(text)); });
+	}
+}
+
+Size StaticTextWrapper::measureIntrinsic(const Constraints&)
+{
+	// Bound labels only (measuresItself): the size of the first text.
+	return m_initialSize;
 }
 
 // RichTextWrapper -----------------------------------------------------------
@@ -995,40 +1021,83 @@ void ProgressBarWrapper::realize(void* parentWindow)
 
 // ComboBoxWrapper -----------------------------------------------------------
 
+namespace
+{
+
+ItemList comboItems(const QComboBox* combo)
+{
+	ItemList items;
+	items.reserve(combo->count());
+	for (int i = 0; i < combo->count(); ++i)
+		items.push_back(combo->itemText(i).toStdString());
+	return items;
+}
+
+void setComboItems(QComboBox* combo, const ItemList& items)
+{
+	combo->clear();
+	for (const auto& item : items)
+		combo->addItem(qstr(item));
+}
+
+} // unnamed namespace
+
 template <ComboBoxValue T>
 void ComboBoxWrapper<T>::realize(void* parentWindow)
 {
 	auto* combo = new QComboBox(static_cast<QWidget*>(parentWindow));
-	for (const auto& choice : m_choices)
-		combo->addItem(qstr(choice));
-	const T& selected = m_value.get();
-	if constexpr (std::is_same_v<T, std::string>)
-		combo->setCurrentText(qstr(selected));
-	else
-		combo->setCurrentIndex(selected);
-	m_nativeWidget = combo;
-
-	if constexpr (std::is_same_v<T, std::string>)
-		QObject::connect(combo, &QComboBox::currentTextChanged,
-			[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
-	else
-		QObject::connect(combo, &QComboBox::currentIndexChanged,
-			[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](int index) { commit(static_cast<T>(index)); });
-	if (m_value.isBound())
-	{
-		auto& value = m_value.get();
+	setComboItems(combo, m_choices.get());
+	const auto select = [combo](const T& value) {
 		if constexpr (std::is_same_v<T, std::string>)
-			bindExternalRefSync(combo,
-				[combo] { return combo->currentText().toStdString(); },
-				[&value] { return value; },
-				[combo](const std::string& v) { combo->setCurrentText(qstr(v)); });
+			combo->setCurrentIndex(combo->findText(qstr(value)));
 		else
-			bindExternalRefSync(combo,
-				[combo] { return combo->currentIndex(); },
-				[&value] { return static_cast<int>(value); },
-				[combo](int i) { combo->setCurrentIndex(i); });
-	}
+			combo->setCurrentIndex(value >= 0 && value < combo->count() ? value : -1);
+	};
+	const auto current = [combo]() -> T {
+		if constexpr (std::is_same_v<T, std::string>)
+			return combo->currentText().toStdString();
+		else
+			return combo->currentIndex();
+	};
+	select(m_value.get());
+	m_nativeWidget = combo;
+	const QSize hint = combo->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
 
+	// currentIndexChanged for both spellings: it is the one signal a pick
+	// always raises, and the RefSync pushes below run under a QSignalBlocker.
+	QObject::connect(combo, &QComboBox::currentIndexChanged,
+		[current, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](int) { commit(current()); });
+
+	// Bound choices: repopulate when the caller's vector changes, keeping the
+	// selection by value -- the bound one when there is one, else whatever was
+	// picked. Registered before the selection sync, so a tick that changes
+	// both sees the new list first.
+	if (const ItemList* boundItems = m_choices.boundValue())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(combo,
+			[combo] { return comboItems(combo); },
+			[boundItems] { return *boundItems; },
+			[combo, select, current, boundValue](const ItemList& items) {
+				const T keep = boundValue != nullptr ? *boundValue : current();
+				setComboItems(combo, items);
+				select(keep);
+			});
+	}
+	if (const T* boundValue = m_value.boundValue())
+	{
+		bindExternalRefSync(combo,
+			current,
+			[boundValue] { return *boundValue; },
+			select);
+	}
+}
+
+template <ComboBoxValue T>
+Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound choices only (measuresItself)
 }
 
 template class ComboBoxWrapper<std::string>;
@@ -1079,33 +1148,74 @@ void setListWidgetSelection(QListWidget* list, const std::vector<int>& indices)
 
 } // unnamed namespace
 
+namespace
+{
+
+ItemList listItems(const QListWidget* list)
+{
+	ItemList items;
+	items.reserve(list->count());
+	for (int i = 0; i < list->count(); ++i)
+		items.push_back(list->item(i)->text().toStdString());
+	return items;
+}
+
+} // unnamed namespace
+
 template <ListBoxValue T>
 void ListBoxWrapper<T>::realize(void* parentWindow)
 {
 	auto* list = new SizedListWidget(static_cast<QWidget*>(parentWindow));
 	list->visibleRows = m_visibleRows;
-	for (const auto& item : m_items)
+	for (const auto& item : m_items.get())
 		list->addItem(qstr(item));
 	// ExtendedSelection is Qt's ctrl/shift-click mode; MultiSelection would
 	// toggle on a plain click, which is not what a desktop list does.
 	list->setSelectionMode(kMultiSelect
 		? QAbstractItemView::ExtendedSelection
 		: QAbstractItemView::SingleSelection);
-	setListWidgetSelection(list, indicesFor(m_items, boundValue()));
+	setListWidgetSelection(list, indicesFor(m_items.get(), boundValue()));
 	m_nativeWidget = list;
+	const QSize hint = list->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
 
+	const ItemsView items(m_items);
 	QObject::connect(list, &QListWidget::itemSelectionChanged, list,
-		[list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
-			commit(valueFor(items, listWidgetSelection(list)));
+		[list, items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
+			commit(valueFor(items(), listWidgetSelection(list)));
 		});
+
+	// Bound items: repopulate, keeping the selection by value (see ComboBox).
+	if (const ItemList* boundItems = items.bound())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(list,
+			[list] { return listItems(list); },
+			[boundItems] { return *boundItems; },
+			[list, boundValue](const ItemList& next) {
+				const T keep = boundValue != nullptr
+					? *boundValue
+					: valueFor(listItems(list), listWidgetSelection(list));
+				list->clear();
+				for (const auto& item : next)
+					list->addItem(qstr(item));
+				setListWidgetSelection(list, indicesFor(next, keep));
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
 		bindExternalRefSync(list,
 			[list] { return listWidgetSelection(list); },
-			[&value, items = m_items] { return indicesFor(items, value); },
+			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setListWidgetSelection(list, indices); });
 	}
+}
+
+template <ListBoxValue T>
+Size ListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class ListBoxWrapper<int>;
@@ -1140,6 +1250,23 @@ void setCheckListChecked(QListWidget* list, const std::vector<int>& indices)
 
 } // unnamed namespace
 
+namespace
+{
+
+void setCheckListItems(QListWidget* list, const ItemList& items, const std::vector<int>& checked)
+{
+	list->clear();
+	for (int i = 0; i < static_cast<int>(items.size()); ++i)
+	{
+		auto* item = new QListWidgetItem(qstr(items[i]), list);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+		item->setCheckState(std::find(checked.begin(), checked.end(), i) != checked.end()
+			? Qt::Checked : Qt::Unchecked);
+	}
+}
+
+} // unnamed namespace
+
 template <CheckListValue T>
 void CheckListBoxWrapper<T>::realize(void* parentWindow)
 {
@@ -1151,32 +1278,49 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	// Single-SELECTION, whatever the checked set holds: the highlight and the
 	// ticks are independent, as on wx.
 	list->setSelectionMode(QAbstractItemView::SingleSelection);
-
-	const std::vector<int> checked = indicesFor(m_items, boundValue());
-	for (int i = 0; i < static_cast<int>(m_items.size()); ++i)
-	{
-		auto* item = new QListWidgetItem(qstr(m_items[i]), list);
-		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-		item->setCheckState(std::find(checked.begin(), checked.end(), i) != checked.end()
-			? Qt::Checked : Qt::Unchecked);
-	}
+	setCheckListItems(list, m_items.get(), indicesFor(m_items.get(), boundValue()));
 	m_nativeWidget = list;
+	const QSize hint = list->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
 
 	// itemChanged is connected only AFTER the population above: every
 	// setCheckState() there emits it, so connecting first would read the
-	// initial state as a series of user ticks.
+	// initial state as a series of user ticks. Repopulating later runs under
+	// RefSync's QSignalBlocker for the same reason.
+	const ItemsView items(m_items);
 	QObject::connect(list, &QListWidget::itemChanged, list,
-		[list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](QListWidgetItem*) {
-			commit(valueFor(items, checkListChecked(list)));
+		[list, items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](QListWidgetItem*) {
+			commit(valueFor(items(), checkListChecked(list)));
 		});
+
+	// Bound items: repopulate, keeping the ticks by value (see ComboBox).
+	if (const ItemList* boundItems = items.bound())
+	{
+		const T* boundValue = m_value.boundValue();
+		bindExternalRefSync(list,
+			[list] { return listItems(list); },
+			[boundItems] { return *boundItems; },
+			[list, boundValue](const ItemList& next) {
+				const T keep = boundValue != nullptr
+					? *boundValue
+					: valueFor(listItems(list), checkListChecked(list));
+				setCheckListItems(list, next, indicesFor(next, keep));
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
 		bindExternalRefSync(list,
 			[list] { return checkListChecked(list); },
-			[&value, items = m_items] { return indicesFor(items, value); },
+			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
 	}
+}
+
+template <CheckListValue T>
+Size CheckListBoxWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class CheckListBoxWrapper<std::vector<int>>;

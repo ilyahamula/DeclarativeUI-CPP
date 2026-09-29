@@ -11,6 +11,8 @@
 #include <thread>
 #include <QElapsedTimer>
 #include <QCheckBox>
+#include <QComboBox>
+#include <QListWidget>
 #include <QFrame>
 #include <QGroupBox>
 #include <QStatusBar>
@@ -348,6 +350,133 @@ TEST(qt_with_id_names_the_widget_and_post_to_ui_crosses_threads)
 	CHECK(flag);
 	CHECK(onUiThread);
 	CHECK(w->findChild<QCheckBox*>(QStringLiteral("named-box"))->isChecked()); // and RefSync mirrored it
+	w->close();
+	pump();
+}
+
+// A bound StaticText / ReadonlyTextCtrl follows the caller's string but keeps
+// the size of its first text, even through a full re-measure (an Expander
+// opening forces one).
+TEST(qt_bound_labels_follow_text_without_resizing)
+{
+	std::string status = "Ready";
+	bool open = false;
+	Dialog { "Status",
+		VStack {
+			StaticText{status},
+			ReadonlyTextCtrl{status},
+			Expander { "More", open, StaticText{"x"} }
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Status");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	QLabel* label = nullptr;
+	for (auto* l : w->findChildren<QLabel*>())
+		if (l->text() == "Ready")
+			label = l;
+	auto* field = w->findChild<QLineEdit*>();
+	CHECK(label != nullptr && field != nullptr);
+	if (label == nullptr || field == nullptr)
+		return;
+	const int labelWidth = label->width();
+
+	status = "This status message is far longer than the label it arrives in, by design";
+	open = true;
+	pump(200);
+	CHECK(label->text().toStdString() == status);
+	CHECK(field->text().toStdString() == status);
+	CHECK_EQ(label->width(), labelWidth);
+	w->close();
+	pump();
+}
+
+// isHidden(): a hidden control and a hidden group box are taken out of view
+// and out of the layout; flipping the bound flag back restores both.
+TEST(qt_hidden_nodes_leave_and_return)
+{
+	bool hideButton = false;
+	bool hideBox = false;
+	Dialog { "Hide",
+		VStack {
+			Button{"Always"},
+			Button{"Sometimes"}.isHidden(hideButton),
+			VGroupBox { "Box", Button{"Inside"} }.isHidden(hideBox)
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Hide");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	QPushButton* sometimes = nullptr;
+	QPushButton* inside = nullptr;
+	for (auto* b : w->findChildren<QPushButton*>())
+	{
+		if (b->text() == "Sometimes") sometimes = b;
+		if (b->text() == "Inside") inside = b;
+	}
+	auto* box = w->findChild<QGroupBox*>();
+	CHECK(sometimes && inside && box);
+	if (!(sometimes && inside && box))
+		return;
+	const int fullHeight = w->height();
+
+	hideButton = true;
+	hideBox = true;
+	pump(200);
+	CHECK(!sometimes->isVisible());
+	CHECK(!box->isVisible());
+	CHECK(!inside->isVisible());
+	CHECK(w->height() < fullHeight);
+
+	hideButton = false;
+	hideBox = false;
+	pump(200);
+	CHECK(sometimes->isVisible());
+	CHECK(box->isVisible());
+	CHECK(inside->isVisible());
+	CHECK_EQ(w->height(), fullHeight);
+	w->close();
+	pump();
+}
+
+// Bound item lists: the native list and combo are repopulated when the
+// caller's vector changes, the selection stays on the same item by value, and
+// the window does not resize.
+TEST(qt_bound_item_lists_repopulate_and_keep_the_selection)
+{
+	ItemList items { "alpha", "beta", "gamma" };
+	std::string listPick = "beta";
+	std::string comboPick = "gamma";
+	Dialog { "Items",
+		VStack {
+			ListBox{ items, listPick }.withVisibleRows(4),
+			ComboBox{ items, comboPick }
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Items");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* list = w->findChild<QListWidget*>();
+	auto* combo = w->findChild<QComboBox*>();
+	CHECK(list && combo);
+	if (!(list && combo))
+		return;
+	const int width = w->width();
+
+	items = { "gamma", "a considerably longer new item", "beta" };
+	pump(200);
+	CHECK_EQ(list->count(), 3);
+	CHECK_EQ(combo->count(), 3);
+	CHECK(list->selectedItems().size() == 1 && list->selectedItems().front()->text() == "beta");
+	CHECK(combo->currentText() == "gamma");
+	CHECK_EQ(listPick, std::string("beta"));
+	CHECK_EQ(w->width(), width);
 	w->close();
 	pump();
 }

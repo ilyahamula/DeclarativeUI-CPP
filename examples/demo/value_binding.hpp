@@ -97,15 +97,23 @@ inline auto drawTextMirror(std::string& text, bool& disabled)
 // for, so it lines up with the combo's item of the same index -- and the three
 // radios are one group because they share `choice`, not because of where they
 // are declared.
-inline auto drawChoiceMirror(int& choice, bool& disabled)
+//
+// The combo's CHOICES are bound too: `colours` is the caller's vector, and
+// "Add a colour" appends to it -- the combo repopulates on every backend and
+// keeps its selection. The radios name the first three indices only.
+inline auto drawChoiceMirror(int& choice, bool& disabled, ItemList& colours)
 {
     return Dialog {
         "Combo + Radios (shared index)",
         VStack {
             LayoutFlags().Expand().Border(Side::All, 12),
-            ComboBox{ {"Red", "Green", "Blue"}, choice }
+            ComboBox{ colours, choice }
                 .withFlags(LayoutFlags().Expand())
                 .isDisabled(disabled),
+            Button{"Add a colour"}
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(disabled)
+                .onClick([&colours] { colours.push_back("Colour " + std::to_string(colours.size() + 1)); }),
             VGroupBox { "Same value as radios",
                 LayoutFlags().Expand().Border(Side::Top, 10),
                 RadioButton{choice, 0, "Red"}
@@ -1346,7 +1354,8 @@ inline auto drawRichTextBinding(std::string& lastLink, int& linkClicks, bool& lo
 // the section folds or unfolds, while the one named with withId() keeps it. On
 // wx and Qt both keep their state natively; there the id is the native window
 // or object name, which is what tests find the control by.
-inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& busy, bool& detailsOpen)
+inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& busy, bool& detailsOpen,
+    bool& hideStatusBar)
 {
     return Dialog {
         "Background work & stable ids",
@@ -1381,8 +1390,32 @@ inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& 
                         .withId("worker-start"),
                     Spacer{}
                 },
+                // isHidden(): the bar leaves the layout entirely -- the dialog
+                // shrinks by its height and its gap -- and comes back when the
+                // box is unticked. Bound, so no rebuild is involved.
+                CheckBox{hideStatusBar, "Hide the status bar"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 8)),
                 StatusBar{status}
-                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+                    .isHidden(hideStatusBar)
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
+                // The same bound string in a label and a read-only field: both
+                // follow it live, and both keep the size they had for "Idle",
+                // so the dialog does not grow when "Working..." arrives. The
+                // label is pinned wide enough for the longest message.
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    StaticText{"Label:"}
+                        .withSize({50, -1})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    StaticText{status}
+                        .withSize({110, -1})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    StaticText{"Field:"}
+                        .withSize({50, -1})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 8)),
+                    ReadonlyTextCtrl{status}
+                        .withFlags(LayoutFlags().Proportion(1))
+                }
             },
             VGroupBox { "withId -- unbound values that survive a fold",
                 LayoutFlags().Expand().Border(Side::Top, 10),

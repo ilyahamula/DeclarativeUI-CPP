@@ -57,10 +57,24 @@ struct Grid
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	Grid& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	Grid& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeGrid(m_columns, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		// Declaration order IS the grid order: the node's child index carries
 		// both the row (index / columns) and the column (index % columns).
 		std::apply([&](auto&... cell) {
@@ -73,5 +87,6 @@ private:
 	int m_columns;
 	std::optional<LayoutFlags> m_flags;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	std::tuple<W...> m_cells;
 };
