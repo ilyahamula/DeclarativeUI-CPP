@@ -22,6 +22,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Sources are UTF-8 without a BOM; MSVC would otherwise read them in the
+# system code page.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 set(UI_FRAMEWORK "WX" CACHE STRING "UI framework to use")
 set_property(CACHE UI_FRAMEWORK PROPERTY STRINGS WX QT IMGUI)
 
