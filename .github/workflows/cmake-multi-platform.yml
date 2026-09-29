@@ -1,0 +1,127 @@
+# .github/workflows/cmake-multi-platform.yml
+name: CMake on multiple platforms
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.backend }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Keep going when one combination fails, so every OS/backend reports its own result.
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04, macos-15, windows-2022 ]
+        backend: [ IMGUI, WX, QT ]
+        build_type: [ Release ]
+
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-bincache
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Linux dependencies ────────────────────────────────────────────────
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          case "${{ matrix.backend }}" in
+            IMGUI)
+              # GLFW 3.4 (fetched by CMake) needs X11 + GL headers
+              sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
+                libxcursor-dev libxi-dev libgl1-mesa-dev ;;
+            WX)
+              sudo apt-get install -y libwxgtk3.2-dev ;;
+            QT)
+              sudo apt-get install -y qt6-base-dev libgl1-mesa-dev ;;
+          esac
+
+      # ── macOS dependencies ────────────────────────────────────────────────
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja
+          if [ "${{ matrix.backend }}" = "WX" ]; then
+            brew install wxwidgets
+          fi
+
+      # ── Qt (macOS + Windows) ──────────────────────────────────────────────
+      - name: Install Qt
+        if: matrix.backend == 'QT' && runner.os != 'Linux'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          cache: true
+
+      # ── wxWidgets on Windows via vcpkg (cached; first run takes a while) ──
+      - name: Restore vcpkg binary cache
+        if: matrix.backend == 'WX' && runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-wxwidgets-${{ matrix.os }}-v1
+
+      - name: Install wxWidgets (Windows)
+        if: matrix.backend == 'WX' && runner.os == 'Windows'
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          "$VCPKG_INSTALLATION_ROOT/vcpkg" install wxwidgets:x64-windows
+
+      # ── Configure ─────────────────────────────────────────────────────────
+      - name: Configure CMake
+        run: |
+          ARGS=(
+            -B "$BUILD_DIR"
+            -S "${{ github.workspace }}"
+            -DUI_FRAMEWORK=${{ matrix.backend }}
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DBUILD_EXAMPLES=ON
+            -DBUILD_TESTS=ON
+            -DUSE_LOGGER=ON
+          )
+
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            ARGS+=( -G Ninja )
+          fi
+
+          case "${{ runner.os }}" in
+            Linux)
+              # GLFW 3.4 builds Wayland support by default; X11 is enough for CI
+              ARGS+=( -DGLFW_BUILD_WAYLAND=OFF ) ;;
+            macOS)
+              ARGS+=( -DCMAKE_PREFIX_PATH="$(brew --prefix)" ) ;;
+            Windows)
+              # Sources contain UTF-8 (comments with em dashes etc.)
+              ARGS+=( -DCMAKE_CXX_FLAGS_INIT=/utf-8 )
+              if [ "${{ matrix.backend }}" = "WX" ]; then
+                ARGS+=( -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+                        -DVCPKG_TARGET_TRIPLET=x64-windows )
+              fi ;;
+          esac
+
+          cmake "${ARGS[@]}"
+
+      # ── Build ─────────────────────────────────────────────────────────────
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --config ${{ matrix.build_type }} --parallel
+
+      # ── Test (layout_tests is backend-free, no display needed) ────────────
+      - name: Test
+        run: ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
