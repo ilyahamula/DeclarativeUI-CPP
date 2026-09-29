@@ -18,28 +18,6 @@
 
 #include "imgui.h"
 
-DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::DialogWrapper()\t-> ImGui::Begin()\n");
-#endif
-	ImGuiWindowFlags flags = ImGuiWindowFlags_None;
-	if (size.width > 0 && size.height > 0)
-		ImGui::SetNextWindowSize(ImVec2((float)size.width, (float)size.height), ImGuiCond_FirstUseEver);
-	else
-		flags |= ImGuiWindowFlags_AlwaysAutoResize;
-	ImGui::Begin(title.c_str(), nullptr, flags);
-}
-
-void DialogWrapper::show()
-{
-#ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::show()\t-> ImGui::End()\n");
-	Logger::instance().stopLogging();
-#endif
-	ImGui::End();
-}
-
 namespace
 {
 

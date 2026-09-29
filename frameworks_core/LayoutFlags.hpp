@@ -40,17 +40,6 @@ public:
 	std::optional<int> sizeGroup() const;
 	bool autoGrow() const;
 
-	// -- legacy accessors ----------------------------------------------------
-	// Used by the pre-engine backends; deleted in Phase 4
-	// (docs/specs/custom_layout_system/tasks.md, T4.1/T4.2).
-	bool expand() const;
-	bool centerVertical() const;
-	bool centerHorizontal() const;
-	int borderLeft() const;
-	int borderRight() const;
-	int borderTop() const;
-	int borderBottom() const;
-
 private:
 	bool m_expand = false;
 	bool m_centerVertical = false;

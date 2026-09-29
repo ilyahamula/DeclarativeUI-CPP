@@ -167,6 +167,53 @@ TEST(wx_labels_keep_ampersands)
 	pump();
 }
 
+// The collapsed callback path (EventCallback + commitTo): the bound value is
+// written first, then the callback runs with the native widget -- for both
+// spellings of onChange, bound and unbound.
+TEST(wx_change_callbacks_write_the_value_first_then_report)
+{
+	std::string text = "start";
+	std::string seenValue;
+	void* seenNative = nullptr;
+	int shortCalls = 0;
+	std::string unboundSeen;
+	Dialog { "Callbacks",
+		VStack {
+			TextCtrl{text}.onChange([&](const std::string&, void* native) {
+				seenValue = text; // the bound variable, read inside the handler
+				seenNative = native;
+			}),
+			TextCtrl{std::string("fixed")}.onChange([&](const std::string& v) {
+				++shortCalls;
+				unboundSeen = v;
+			})
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Callbacks");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* bound = find<wxTextCtrl>(w, [](wxTextCtrl* t) { return t->GetValue() == "start"; });
+	auto* unbound = find<wxTextCtrl>(w, [](wxTextCtrl* t) { return t->GetValue() == "fixed"; });
+	CHECK(bound != nullptr && unbound != nullptr);
+	if (bound == nullptr || unbound == nullptr)
+		return;
+
+	bound->SetValue("typed"); // SetValue, unlike ChangeValue, sends wxEVT_TEXT
+	pump();
+	CHECK_EQ(text, std::string("typed"));
+	CHECK_EQ(seenValue, std::string("typed"));
+	CHECK(seenNative == bound);
+
+	unbound->SetValue("other");
+	pump();
+	CHECK_EQ(shortCalls, 1);
+	CHECK_EQ(unboundSeen, std::string("other"));
+	w->Close();
+	pump();
+}
+
 namespace
 {
 struct TestApp : wxApp

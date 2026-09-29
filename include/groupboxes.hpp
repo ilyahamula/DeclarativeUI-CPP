@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <utility>
 
 #include "buildable.hpp"
 
@@ -13,7 +14,7 @@ struct GroupBox
 	GroupBox(Orientation orient, const std::string& label, W... widgets)
 		: m_orient(orient)
 		, m_label(label)
-		, m_widgets(std::make_tuple(widgets...))
+		, m_widgets(std::make_tuple(std::move(widgets)...))
 	{
 	}
 
@@ -21,7 +22,7 @@ struct GroupBox
 		: m_orient(orient)
 		, m_label(label)
 		, m_flags(flags)
-		, m_widgets(std::make_tuple(widgets...))
+		, m_widgets(std::make_tuple(std::move(widgets)...))
 	{
 	}
 
@@ -64,22 +65,22 @@ template<NodeBuildable... W>
 struct HGroupBox : public GroupBox<W...>
 {
 	HGroupBox(W... widgets)
-		: GroupBox<W...>(Orientation::Horizontal, "", widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, "", std::move(widgets)...)
 	{
 	}
 
 	HGroupBox(LayoutFlags flags, W... widgets)
-		: GroupBox<W...>(Orientation::Horizontal, "", flags, widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, "", flags, std::move(widgets)...)
 	{
 	}
 
 	HGroupBox(const std::string& label, W... widgets)
-		: GroupBox<W...>(Orientation::Horizontal, label, widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, label, std::move(widgets)...)
 	{
 	}
 
 	HGroupBox(const std::string& label, LayoutFlags flags, W... widgets)
-		: GroupBox<W...>(Orientation::Horizontal, label, flags, widgets...)
+		: GroupBox<W...>(Orientation::Horizontal, label, flags, std::move(widgets)...)
 	{
 	}
 
@@ -101,22 +102,22 @@ template<NodeBuildable... W>
 struct VGroupBox : public GroupBox<W...>
 {
 	VGroupBox(W... widgets)
-		: GroupBox<W...>(Orientation::Vertical, "", widgets...)
+		: GroupBox<W...>(Orientation::Vertical, "", std::move(widgets)...)
 	{
 	}
 
 	VGroupBox(LayoutFlags flags, W... widgets)
-		: GroupBox<W...>(Orientation::Vertical, "", flags, widgets...)
+		: GroupBox<W...>(Orientation::Vertical, "", flags, std::move(widgets)...)
 	{
 	}
 
 	VGroupBox(const std::string& label, W... widgets)
-		: GroupBox<W...>(Orientation::Vertical, label, widgets...)
+		: GroupBox<W...>(Orientation::Vertical, label, std::move(widgets)...)
 	{
 	}
 
 	VGroupBox(const std::string& label, LayoutFlags flags, W... widgets)
-		: GroupBox<W...>(Orientation::Vertical, label, flags, widgets...)
+		: GroupBox<W...>(Orientation::Vertical, label, flags, std::move(widgets)...)
 	{
 	}
 

@@ -13,11 +13,6 @@ public:
 	ControlWrapper() = default;
 	virtual ~ControlWrapper() = default;
 
-	ControlWrapper(void* nativeWidget)
-		: m_nativeWidget(nativeWidget)
-	{
-	}
-
 	ControlWrapper(const Position& pos, const Size& size, long style)
 		: m_pos(pos)
 		, m_size(size)
@@ -66,9 +61,10 @@ public:
 		return false;
 	}
 
-	// Draw/realize the widget at the frame the engine assigned (the backend
-	// adapter has already positioned the cursor/window). frame.width < 0
-	// means "natural size" (legacy path).
+	// Draw the widget at the frame the engine assigned (immediate backends;
+	// the backend adapter has already positioned the cursor). A zero-width
+	// frame is legal -- a squeezed or collapsed leaf -- and draws at the
+	// widget's own size.
 	virtual void render(const Rect& frame)
 	{
 		(void)frame;

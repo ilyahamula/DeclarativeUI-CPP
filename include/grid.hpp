@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <utility>
 
 #include "buildable.hpp"
 
@@ -28,14 +29,14 @@ struct Grid
 {
 	Grid(int columns, W... cells)
 		: m_columns(columns)
-		, m_cells(std::make_tuple(cells...))
+		, m_cells(std::make_tuple(std::move(cells)...))
 	{
 	}
 
 	Grid(int columns, LayoutFlags flags, W... cells)
 		: m_columns(columns)
 		, m_flags(flags)
-		, m_cells(std::make_tuple(cells...))
+		, m_cells(std::make_tuple(std::move(cells)...))
 	{
 	}
 

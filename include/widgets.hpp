@@ -240,13 +240,13 @@ struct TextCtrl : Widget<TextCtrl>
 
 	TextCtrl& onChange(std::function<void(const std::string&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	TextCtrl& onChange(std::function<void(const std::string&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -256,14 +256,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // PasswordInput -----------------------------------------------------------
@@ -299,13 +298,13 @@ struct PasswordInput : Widget<PasswordInput>
 
 	PasswordInput& onChange(std::function<void(const std::string&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	PasswordInput& onChange(std::function<void(const std::string&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -315,14 +314,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // MultiLineTextCtrl -----------------------------------------------------------
@@ -349,13 +347,13 @@ struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
 
 	MultiLineTextCtrl& onChange(std::function<void(const std::string&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	MultiLineTextCtrl& onChange(std::function<void(const std::string&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -365,13 +363,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<MultiLineTextCtrlWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<MultiLineTextCtrlWrapper>(m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<std::string> m_value;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // ReadonlyTextCtrl -----------------------------------------------------------
@@ -415,13 +412,13 @@ struct ClickableText : Widget<ClickableText>
 
 	ClickableText& onClick(std::function<void()> callback)
 	{
-		m_onClick = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
 	ClickableText& onClick(std::function<void(void*)> callback)
 	{
-		m_onClickWithWidget = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
@@ -431,12 +428,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ClickableTextWrapper>(m_text, pos, size, style, m_onClick, m_onClickWithWidget);
+		return std::make_unique<ClickableTextWrapper>(m_text, pos, size, style, m_onClick);
 	}
 
 private:
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 	std::string m_text;
 };
 
@@ -453,13 +449,13 @@ struct LinkText : Widget<LinkText>
 
 	LinkText& onClick(std::function<void()> callback)
 	{
-		m_onClick = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
 	LinkText& onClick(std::function<void(void*)> callback)
 	{
-		m_onClickWithWidget = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
@@ -469,12 +465,11 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<LinkTextWrapper>(m_text, pos, size, style, m_onClick, m_onClickWithWidget);
+		return std::make_unique<LinkTextWrapper>(m_text, pos, size, style, m_onClick);
 	}
 
 private:
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 	std::string m_text;
 };
 
@@ -502,13 +497,13 @@ struct RichText : Widget<RichText>
 	// link means -- a browser, a help page, another dialog -- is the caller's.
 	RichText& onLink(std::function<void(const std::string&)> callback)
 	{
-		m_onLink = std::move(callback);
+		m_onLink.set(std::move(callback));
 		return *this;
 	}
 
 	RichText& onLink(std::function<void(const std::string&, void*)> callback)
 	{
-		m_onLinkWithWidget = std::move(callback);
+		m_onLink.set(std::move(callback));
 		return *this;
 	}
 
@@ -518,13 +513,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<RichTextWrapper>(m_markup, pos, size, style, m_onLink, m_onLinkWithWidget);
+		return std::make_unique<RichTextWrapper>(m_markup, pos, size, style, m_onLink);
 	}
 
 private:
 	std::string m_markup;
-	std::function<void(const std::string&)> m_onLink;
-	std::function<void(const std::string&, void*)> m_onLinkWithWidget;
+	EventCallback<const std::string&> m_onLink;
 };
 
 // Button -----------------------------------------------------------
@@ -540,13 +534,13 @@ struct Button : Widget<Button>
 
 	Button& onClick(std::function<void()> callback)
 	{
-		m_onClick = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
 	Button& onClick(std::function<void(void*)> callback)
 	{
-		m_onClickWithWidget = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
@@ -580,31 +574,21 @@ private:
 		long style) override
 	{
 		// The wrapper fires one callback per click, so onClickShow() rides in
-		// whichever one the caller set -- after it, so a handler can prepare
-		// state the window then shows.
-		std::function<void()> onClick = m_onClick;
-		std::function<void(void*)> onClickWithWidget = m_onClickWithWidget;
+		// it -- after the caller's own, so a handler can prepare state the
+		// window then shows.
+		EventCallback<> onClick = m_onClick;
 		if (m_onClickShow)
 		{
-			if (onClickWithWidget)
-				onClickWithWidget = [first = std::move(onClickWithWidget), show = m_onClickShow](void* widget) {
-					first(widget);
-					show();
-				};
-			else
-				onClick = [first = std::move(onClick), show = m_onClickShow]() {
-					if (first)
-						first();
-					show();
-				};
+			onClick.set(EventCallback<>::Full([first = m_onClick, show = m_onClickShow](void* widget) {
+				first(widget);
+				show();
+			}));
 		}
-		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style,
-			std::move(onClick), std::move(onClickWithWidget));
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, std::move(onClick));
 	}
 
 private:
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 	std::function<void()> m_onClickShow;
 	std::string m_btnTitle;
 };
@@ -657,13 +641,13 @@ struct RadioButton : Widget<RadioButton<T>>
 
 	RadioButton& onChange(std::function<void(T)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	RadioButton& onChange(std::function<void(T, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -673,15 +657,14 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_value, m_option, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<RadioButtonWrapper<T>>(m_label, m_value, m_option, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<T> m_value;
 	int m_option = 0; // int radios only: the value picking this radio writes
 	std::string m_label;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 // The bool guides are templates constrained to bool on purpose: a plain
@@ -729,13 +712,13 @@ struct CheckBox : Widget<CheckBox>
 
 	CheckBox& onChange(std::function<void(bool)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	CheckBox& onChange(std::function<void(bool, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -745,14 +728,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_value, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<CheckBoxWrapper>(m_label, pos, size, style, m_value, m_onChange);
 	}
 
 private:
 	BoundValue<bool> m_value;
 	std::string m_label;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ComboBox -----------------------------------------------------------
@@ -785,13 +767,13 @@ struct ComboBox : Widget<ComboBox<T>>
 
 	ComboBox& onChange(std::function<void(const T&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	ComboBox& onChange(std::function<void(const T&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -801,14 +783,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ComboBoxWrapper<T>>(m_choices, m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	std::vector<std::string> m_choices;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 template <ComboBoxValue T>
@@ -865,13 +846,13 @@ struct ListBox : Widget<ListBox<T>>
 
 	ListBox& onChange(std::function<void(const T&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	ListBox& onChange(std::function<void(const T&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -881,15 +862,14 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange);
 	}
 
 private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 template <ListBoxValue T>
@@ -947,13 +927,13 @@ struct CheckListBox : Widget<CheckListBox<T>>
 
 	CheckListBox& onChange(std::function<void(const T&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	CheckListBox& onChange(std::function<void(const T&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -963,15 +943,14 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<CheckListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<CheckListBoxWrapper<T>>(m_items, m_value, m_visibleRows, pos, size, style, m_onChange);
 	}
 
 private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 template <CheckListValue T>
@@ -1043,13 +1022,13 @@ struct TreeView : Widget<TreeView<T>>
 
 	TreeView& onChange(std::function<void(const T&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	TreeView& onChange(std::function<void(const T&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1059,7 +1038,7 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TreeViewWrapper<T>>(m_items, m_value, m_visibleRows, m_multiSelect, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TreeViewWrapper<T>>(m_items, m_value, m_visibleRows, m_multiSelect, pos, size, style, m_onChange);
 	}
 
 private:
@@ -1067,8 +1046,7 @@ private:
 	int m_visibleRows = kDefaultVisibleRows;
 	bool m_multiSelect = false;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 // An unbound tree reports its selection through onChange only, so the single
@@ -1246,13 +1224,13 @@ struct Table : Widget<Table<T>>
 
 	Table& onChange(std::function<void(const T&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	Table& onChange(std::function<void(const T&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1281,7 +1259,7 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TableWrapper<T>>(m_columns, m_rows, m_value, m_visibleRows, pos, size, style, m_onChange, m_onChangeWithWidget, m_onCellChange);
+		return std::make_unique<TableWrapper<T>>(m_columns, m_rows, m_value, m_visibleRows, pos, size, style, m_onChange, m_onCellChange);
 	}
 
 private:
@@ -1289,8 +1267,7 @@ private:
 	BoundValue<TableRows> m_rows;
 	int m_visibleRows = kDefaultVisibleRows;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 	std::function<void(int, int, const std::string&)> m_onCellChange;
 };
 
@@ -1354,13 +1331,13 @@ struct Slider : Widget<Slider<T>>
 
 	Slider& onChange(std::function<void(T)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	Slider& onChange(std::function<void(T, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1370,14 +1347,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SliderWrapper<T>>(m_range, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SliderWrapper<T>>(m_range, m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 template <SliderValue T>
@@ -1418,13 +1394,13 @@ struct SpinBox : Widget<SpinBox<T>>
 
 	SpinBox& onChange(std::function<void(T)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	SpinBox& onChange(std::function<void(T, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1434,14 +1410,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SpinBoxWrapper<T>>(m_range, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<SpinBoxWrapper<T>>(m_range, m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 template <SpinBoxValue T>
@@ -1477,13 +1452,13 @@ struct DatePicker : Widget<DatePicker>
 
 	DatePicker& onChange(std::function<void(const Date&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	DatePicker& onChange(std::function<void(const Date&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1493,13 +1468,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<DatePickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<DatePickerWrapper>(m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<Date> m_value;
-	std::function<void(const Date&)> m_onChange;
-	std::function<void(const Date&, void*)> m_onChangeWithWidget;
+	EventCallback<const Date&> m_onChange;
 };
 
 // ToggleButton -----------------------------------------------------------
@@ -1652,13 +1626,13 @@ struct ToggleButton : Widget<ToggleButton>
 
 	ToggleButton& onChange(std::function<void(bool)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	ToggleButton& onChange(std::function<void(bool, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1668,14 +1642,13 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ToggleButtonWrapper>(m_label, m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ToggleButtonWrapper>(m_label, m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	std::string m_label;
 	BoundValue<bool> m_value;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ColorPicker -----------------------------------------------------------
@@ -1697,13 +1670,13 @@ struct ColorPicker : Widget<ColorPicker>
 
 	ColorPicker& onChange(std::function<void(const Color&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	ColorPicker& onChange(std::function<void(const Color&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1713,13 +1686,12 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ColorPickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<ColorPickerWrapper>(m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<Color> m_value;
-	std::function<void(const Color&)> m_onChange;
-	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+	EventCallback<const Color&> m_onChange;
 };
 
 // FilePicker -----------------------------------------------------------
@@ -1779,13 +1751,13 @@ struct FilePicker : Widget<FilePicker>
 
 	FilePicker& onChange(std::function<void(const std::string&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	FilePicker& onChange(std::function<void(const std::string&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -1796,7 +1768,7 @@ private:
 		long style) override
 	{
 		return std::make_unique<FilePickerWrapper>(m_value, m_mode, m_filters, m_dialogTitle,
-			pos, size, style, m_onChange, m_onChangeWithWidget);
+			pos, size, style, m_onChange);
 	}
 
 private:
@@ -1804,8 +1776,7 @@ private:
 	FileMode m_mode = FileMode::Open;
 	std::vector<FileFilter> m_filters;
 	std::string m_dialogTitle;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // Spacer -----------------------------------------------------------
@@ -1951,25 +1922,25 @@ struct Image : Widget<Image>
 
 	Image& onClick(std::function<void()> callback)
 	{
-		m_onClick = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
 	Image& onClick(std::function<void(void*)> callback)
 	{
-		m_onClickWithWidget = std::move(callback);
+		m_onClick.set(std::move(callback));
 		return *this;
 	}
 
 	Image& onHover(std::function<void()> callback)
 	{
-		m_onHover = std::move(callback);
+		m_onHover.set(std::move(callback));
 		return *this;
 	}
 
 	Image& onHover(std::function<void(void*)> callback)
 	{
-		m_onHoverWithWidget = std::move(callback);
+		m_onHover.set(std::move(callback));
 		return *this;
 	}
 
@@ -1989,16 +1960,14 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<ImageWrapper>(m_filePath, m_scaleMode, pos, size, style, m_onClick, m_onClickWithWidget, m_onHover, m_onHoverWithWidget);
+		return std::make_unique<ImageWrapper>(m_filePath, m_scaleMode, pos, size, style, m_onClick, m_onHover);
 	}
 
 private:
 	std::string m_filePath;
 	ScaleMode m_scaleMode = ScaleMode::Stretch;
-	std::function<void()> m_onClick;
-	std::function<void()> m_onHover;
-	std::function<void(void*)> m_onClickWithWidget;
-	std::function<void(void*)> m_onHoverWithWidget;
+	EventCallback<> m_onClick;
+	EventCallback<> m_onHover;
 };
 
 // TimePicker -----------------------------------------------------------
@@ -2025,13 +1994,13 @@ struct TimePicker : Widget<TimePicker>
 
 	TimePicker& onChange(std::function<void(const Time&)> callback)
 	{
-		m_onChange = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
 	TimePicker& onChange(std::function<void(const Time&, void*)> callback)
 	{
-		m_onChangeWithWidget = std::move(callback);
+		m_onChange.set(std::move(callback));
 		return *this;
 	}
 
@@ -2041,11 +2010,10 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TimePickerWrapper>(m_value, pos, size, style, m_onChange, m_onChangeWithWidget);
+		return std::make_unique<TimePickerWrapper>(m_value, pos, size, style, m_onChange);
 	}
 
 private:
 	BoundValue<Time> m_value;
-	std::function<void(const Time&)> m_onChange;
-	std::function<void(const Time&, void*)> m_onChangeWithWidget;
+	EventCallback<const Time&> m_onChange;
 };

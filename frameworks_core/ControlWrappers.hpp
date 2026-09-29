@@ -2,6 +2,7 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/EventCallback.hpp"
 #include "frameworks_core/CoreTypes/StatusField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
@@ -50,12 +51,10 @@ class ButtonWrapper : public ControlWrapper
 public:
 	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -63,8 +62,7 @@ public:
 
 private:
 	std::string m_label;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 };
 
 // TextCtrlWrapper -----------------------------------------------------------
@@ -79,13 +77,11 @@ class TextCtrlWrapper : public ControlWrapper
 public:
 	TextCtrlWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -94,8 +90,7 @@ public:
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -104,13 +99,11 @@ class PasswordInputWrapper : public ControlWrapper
 public:
 	PasswordInputWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -119,8 +112,7 @@ public:
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -129,12 +121,10 @@ class MultiLineTextCtrlWrapper : public ControlWrapper
 public:
 	MultiLineTextCtrlWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -142,8 +132,7 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------
@@ -169,12 +158,10 @@ class ClickableTextWrapper : public ControlWrapper
 public:
 	ClickableTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -182,8 +169,7 @@ public:
 
 private:
 	std::string m_text;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 };
 
 // LinkTextWrapper -----------------------------------------------------------
@@ -192,12 +178,10 @@ class LinkTextWrapper : public ControlWrapper
 public:
 	LinkTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -205,8 +189,7 @@ public:
 
 private:
 	std::string m_text;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 };
 
 // StaticTextWrapper -----------------------------------------------------------
@@ -247,12 +230,10 @@ class RichTextWrapper : public ControlWrapper
 public:
 	RichTextWrapper(std::string_view markup,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onLink = {},
-		std::function<void(const std::string&, void*)> onLinkWithWidget = {})
+		EventCallback<const std::string&> onLink = {})
 		: ControlWrapper(pos, size, style)
 		, m_runs(parseMarkup(markup))
 		, m_onLink(std::move(onLink))
-		, m_onLinkWithWidget(std::move(onLinkWithWidget))
 	{
 	}
 
@@ -269,8 +250,7 @@ private:
 	}
 
 	std::vector<TextRun> m_runs;
-	std::function<void(const std::string&)> m_onLink;
-	std::function<void(const std::string&, void*)> m_onLinkWithWidget;
+	EventCallback<const std::string&> m_onLink;
 };
 
 // DatePickerWrapper -----------------------------------------------------------
@@ -279,12 +259,10 @@ class DatePickerWrapper : public ControlWrapper
 public:
 	DatePickerWrapper(BoundValue<Date> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&)> onChange = {},
-		std::function<void(const Date&, void*)> onChangeWithWidget = {})
+		EventCallback<const Date&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -292,8 +270,7 @@ public:
 
 private:
 	BoundValue<Date> m_value;
-	std::function<void(const Date&)> m_onChange;
-	std::function<void(const Date&, void*)> m_onChangeWithWidget;
+	EventCallback<const Date&> m_onChange;
 };
 
 // TimePickerWrapper -----------------------------------------------------------
@@ -302,12 +279,10 @@ class TimePickerWrapper : public ControlWrapper
 public:
 	TimePickerWrapper(BoundValue<Time> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&)> onChange = {},
-		std::function<void(const Time&, void*)> onChangeWithWidget = {})
+		EventCallback<const Time&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -315,8 +290,7 @@ public:
 
 private:
 	BoundValue<Time> m_value;
-	std::function<void(const Time&)> m_onChange;
-	std::function<void(const Time&, void*)> m_onChangeWithWidget;
+	EventCallback<const Time&> m_onChange;
 };
 
 // SliderWrapper -----------------------------------------------------------
@@ -326,13 +300,11 @@ class SliderWrapper : public ControlWrapper
 public:
 	SliderWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -341,8 +313,7 @@ public:
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 extern template class SliderWrapper<int>;
@@ -355,13 +326,11 @@ class SpinBoxWrapper : public ControlWrapper
 public:
 	SpinBoxWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -370,8 +339,7 @@ public:
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 extern template class SpinBoxWrapper<int>;
@@ -396,14 +364,12 @@ class RadioButtonWrapper : public ControlWrapper
 public:
 	RadioButtonWrapper(const std::string& label,
 		BoundValue<T> value, int option, const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(value))
 		, m_option(option)
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -433,8 +399,7 @@ private:
 	std::string m_label;
 	BoundValue<T> m_value;
 	int m_option = 0;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 extern template class RadioButtonWrapper<bool>;
@@ -447,13 +412,11 @@ public:
 	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		BoundValue<bool> checked,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
+		EventCallback<bool> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(checked))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -462,8 +425,7 @@ public:
 private:
 	std::string m_label;
 	BoundValue<bool> m_value;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ToggleButtonWrapper -----------------------------------------------------------
@@ -472,13 +434,11 @@ class ToggleButtonWrapper : public ControlWrapper
 public:
 	ToggleButtonWrapper(const std::string& label,
 		BoundValue<bool> toggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
+		EventCallback<bool> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(toggled))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -487,8 +447,7 @@ public:
 private:
 	std::string m_label;
 	BoundValue<bool> m_value;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ImageWrapper -----------------------------------------------------------
@@ -497,19 +456,15 @@ class ImageWrapper : public ControlWrapper
 public:
 	ImageWrapper(const std::string& filePath, ScaleMode scaleMode,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {},
-		std::function<void()> onHover = {},
-		std::function<void(void*)> onHoverWithWidget = {})
+		EventCallback<> onClick = {},
+		EventCallback<> onHover = {})
 		: ControlWrapper(pos, size, style)
 		, m_filePath(filePath)
 		, m_scaleMode(scaleMode)
 		, m_displayWidth(size.width)
 		, m_displayHeight(size.height)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 		, m_onHover(std::move(onHover))
-		, m_onHoverWithWidget(std::move(onHoverWithWidget))
 	{
 	}
 
@@ -532,10 +487,8 @@ private:
 	int m_imgHeight = 0;
 	int m_displayWidth = -1;
 	int m_displayHeight = -1;
-	std::function<void()> m_onClick;
-	std::function<void()> m_onHover;
-	std::function<void(void*)> m_onClickWithWidget;
-	std::function<void(void*)> m_onHoverWithWidget;
+	EventCallback<> m_onClick;
+	EventCallback<> m_onHover;
 };
 
 // ToolBarWrapper -----------------------------------------------------------
@@ -593,12 +546,10 @@ class ColorPickerWrapper : public ControlWrapper
 public:
 	ColorPickerWrapper(BoundValue<Color> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&)> onChange = {},
-		std::function<void(const Color&, void*)> onChangeWithWidget = {})
+		EventCallback<const Color&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -606,8 +557,7 @@ public:
 
 private:
 	BoundValue<Color> m_value;
-	std::function<void(const Color&)> m_onChange;
-	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+	EventCallback<const Color&> m_onChange;
 };
 
 // FilePickerWrapper -----------------------------------------------------------
@@ -627,15 +577,13 @@ public:
 	FilePickerWrapper(BoundValue<std::string> value,
 		FileMode mode, std::vector<FileFilter> filters, std::string dialogTitle,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_mode(mode)
 		, m_filters(std::move(filters))
 		, m_dialogTitle(std::move(dialogTitle))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -646,8 +594,7 @@ private:
 	FileMode m_mode = FileMode::Open;
 	std::vector<FileFilter> m_filters;
 	std::string m_dialogTitle;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // SpacerWrapper -----------------------------------------------------------
@@ -800,13 +747,11 @@ class ComboBoxWrapper : public ControlWrapper
 public:
 	ComboBoxWrapper(std::vector<std::string> choices,
 		BoundValue<T> selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_choices(std::move(choices))
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		buildItems();
 	}
@@ -845,8 +790,7 @@ private:
 	std::vector<std::string> m_choices;
 	int m_currentItem = 0;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 extern template class ComboBoxWrapper<std::string>;
@@ -939,14 +883,12 @@ public:
 
 	ListBoxWrapper(std::vector<std::string> items,
 		BoundValue<T> selected, int visibleRows, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -968,10 +910,7 @@ public:
 	void commit(const std::vector<int>& indices)
 	{
 		m_value.set(valueFor(m_items, indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
@@ -980,8 +919,7 @@ private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 extern template class ListBoxWrapper<int>;
@@ -1002,14 +940,12 @@ class CheckListBoxWrapper : public ControlWrapper
 public:
 	CheckListBoxWrapper(std::vector<std::string> items,
 		BoundValue<T> checked, int visibleRows, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(checked))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -1030,10 +966,7 @@ public:
 	void commit(const std::vector<int>& indices)
 	{
 		m_value.set(valueFor(m_items, indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
@@ -1042,8 +975,7 @@ private:
 	std::vector<std::string> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 extern template class CheckListBoxWrapper<std::vector<int>>;
@@ -1076,15 +1008,13 @@ public:
 	TreeViewWrapper(std::vector<TreeItem> items,
 		BoundValue<T> selected, int visibleRows, bool multiSelect,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_multiSelect(multiSelect)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -1153,10 +1083,7 @@ public:
 	void commit(const std::vector<std::string>& paths)
 	{
 		m_value.set(valueFor(paths));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
@@ -1166,8 +1093,7 @@ private:
 	int m_visibleRows = 1;
 	bool m_multiSelect = false;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 };
 
 extern template class TreeViewWrapper<std::string>;
@@ -1210,8 +1136,7 @@ public:
 		BoundValue<TableRows> rows,
 		BoundValue<T> selected, int visibleRows,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {},
+		EventCallback<const T&> onChange = {},
 		std::function<void(int, int, const std::string&)> onCellChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_columns(std::move(columns))
@@ -1219,7 +1144,6 @@ public:
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 		, m_onCellChange(std::move(onCellChange))
 	{
 	}
@@ -1380,10 +1304,7 @@ public:
 	void commit(const std::vector<int>& indices)
 	{
 		m_value.set(valueFor(m_rows.get(), indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	// Commit a cell edit, in the same order and for the same reason: the data
@@ -1407,8 +1328,7 @@ private:
 	BoundValue<TableRows> m_rows;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 	std::function<void(int, int, const std::string&)> m_onCellChange;
 };
 

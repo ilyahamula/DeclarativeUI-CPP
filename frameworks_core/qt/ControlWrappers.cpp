@@ -203,10 +203,7 @@ void ButtonWrapper::realize(void* parentWindow)
 	m_nativeWidget = button;
 
 	if (m_onClick)
-		QObject::connect(button, &QPushButton::clicked, [cb = std::move(m_onClick)] { cb(); });
-	else if (m_onClickWithWidget)
-		QObject::connect(button, &QPushButton::clicked,
-			[cb = std::move(m_onClickWithWidget), nw = m_nativeWidget] { cb(nw); });
+		QObject::connect(button, &QPushButton::clicked, [cb = std::move(m_onClick), nw = m_nativeWidget] { cb(nw); });
 
 }
 
@@ -222,26 +219,16 @@ void TextCtrlWrapper::realize(void* parentWindow)
 		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
+	QObject::connect(edit, &QLineEdit::textChanged,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
-				value = text.toStdString();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(edit,
 			[edit] { return edit->text().toStdString(); },
 			[&value] { return value; },
 			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
-	else if (m_onChange)
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) { cbw(text.toStdString(), nw); });
 
 }
 
@@ -256,26 +243,16 @@ void PasswordInputWrapper::realize(void* parentWindow)
 		edit->setPlaceholderText(qstr(m_placeholder));
 	m_nativeWidget = edit;
 
+	QObject::connect(edit, &QLineEdit::textChanged,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
-				value = text.toStdString();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(edit,
 			[edit] { return edit->text().toStdString(); },
 			[&value] { return value; },
 			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
-	else if (m_onChange)
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(edit, &QLineEdit::textChanged,
-			[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) { cbw(text.toStdString(), nw); });
 
 }
 
@@ -287,26 +264,16 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 	auto* edit = new QPlainTextEdit(qstr(initial), static_cast<QWidget*>(parentWindow));
 	m_nativeWidget = edit;
 
+	QObject::connect(edit, &QPlainTextEdit::textChanged,
+		[edit, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)] { commit(edit->toPlainText().toStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(edit, &QPlainTextEdit::textChanged,
-			[edit, &value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget] {
-				value = edit->toPlainText().toStdString();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(edit,
 			[edit] { return edit->toPlainText().toStdString(); },
 			[&value] { return value; },
 			[edit](const std::string& v) { edit->setPlainText(qstr(v)); });
 	}
-	else if (m_onChange)
-		QObject::connect(edit, &QPlainTextEdit::textChanged,
-			[edit, cb = std::move(m_onChange)] { cb(edit->toPlainText().toStdString()); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(edit, &QPlainTextEdit::textChanged,
-			[edit, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget] { cbw(edit->toPlainText().toStdString(), nw); });
 
 }
 
@@ -328,9 +295,7 @@ void ClickableTextWrapper::realize(void* parentWindow)
 	qtSetPlainText(label, m_text);
 	m_nativeWidget = label;
 	if (m_onClick)
-		label->onClick = std::move(m_onClick);
-	else if (m_onClickWithWidget)
-		label->onClick = [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget] { cb(nw); };
+		label->onClick = [cb = std::move(m_onClick), nw = m_nativeWidget] { cb(nw); };
 
 }
 
@@ -345,10 +310,7 @@ void LinkTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = label;
 
 	if (m_onClick)
-		QObject::connect(label, &QLabel::linkActivated, [cb = std::move(m_onClick)](const QString&) { cb(); });
-	else if (m_onClickWithWidget)
-		QObject::connect(label, &QLabel::linkActivated,
-			[cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](const QString&) { cb(nw); });
+		QObject::connect(label, &QLabel::linkActivated, [cb = std::move(m_onClick), nw = m_nativeWidget](const QString&) { cb(nw); });
 
 }
 
@@ -376,9 +338,7 @@ void RichTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = view;
 
 	if (m_onLink)
-		view->setOnLink(std::move(m_onLink));
-	else if (m_onLinkWithWidget)
-		view->setOnLink([cb = std::move(m_onLinkWithWidget), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
+		view->setOnLink([cb = std::move(m_onLink), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
 }
 
 Size RichTextWrapper::measureIntrinsic(const Constraints& c)
@@ -386,7 +346,7 @@ Size RichTextWrapper::measureIntrinsic(const Constraints& c)
 	const auto* view = static_cast<const RichTextView*>(m_nativeWidget);
 	if (view == nullptr)
 		return Size { 0, 0 };
-	const RichTextLayout layout = view->layoutFor(wrapWidth(c));
+	const RichTextLayout& layout = view->layoutFor(wrapWidth(c));
 	return Size { layout.width, layout.height };
 }
 
@@ -400,26 +360,16 @@ void DatePickerWrapper::realize(void* parentWindow)
 	m_nativeWidget = picker;
 
 	auto toDate = [](const QDate& d) { return Date { d.year(), d.month(), d.day() }; };
+	QObject::connect(picker, &QDateEdit::dateChanged,
+		[toDate, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](QDate d) { commit(toDate(d)); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(picker, &QDateEdit::dateChanged,
-			[&value, toDate, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QDate d) {
-				value = toDate(d);
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(picker,
 			[picker] { return picker->date(); },
 			[&value] { return QDate(value.year, value.month, value.day); },
 			[picker](const QDate& d) { picker->setDate(d); });
 	}
-	else if (m_onChange)
-		QObject::connect(picker, &QDateEdit::dateChanged,
-			[toDate, cb = std::move(m_onChange)](QDate d) { cb(toDate(d)); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(picker, &QDateEdit::dateChanged,
-			[toDate, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QDate d) { cbw(toDate(d), nw); });
 
 }
 
@@ -433,26 +383,16 @@ void TimePickerWrapper::realize(void* parentWindow)
 	m_nativeWidget = picker;
 
 	auto toTime = [](QTime t) { return Time { t.hour(), t.minute(), t.second() }; };
+	QObject::connect(picker, &QTimeEdit::timeChanged,
+		[toTime, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](QTime t) { commit(toTime(t)); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(picker, &QTimeEdit::timeChanged,
-			[&value, toTime, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QTime t) {
-				value = toTime(t);
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(picker,
 			[picker] { return picker->time(); },
 			[&value] { return QTime(value.hour, value.minute, value.second); },
 			[picker](const QTime& t) { picker->setTime(t); });
 	}
-	else if (m_onChange)
-		QObject::connect(picker, &QTimeEdit::timeChanged,
-			[toTime, cb = std::move(m_onChange)](QTime t) { cb(toTime(t)); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(picker, &QTimeEdit::timeChanged,
-			[toTime, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QTime t) { cbw(toTime(t), nw); });
 
 }
 
@@ -482,6 +422,8 @@ void SliderWrapper<T>::realize(void* parentWindow)
 		else
 			return static_cast<T>(raw);
 	};
+	QObject::connect(slider, &QSlider::valueChanged,
+		[toValue, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](int raw) { commit(toValue(raw)); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
@@ -495,19 +437,7 @@ void SliderWrapper<T>::realize(void* parentWindow)
 					return static_cast<int>(value);
 			},
 			[slider](int raw) { slider->setValue(raw); });
-		QObject::connect(slider, &QSlider::valueChanged,
-			[&value, toValue, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int raw) {
-				value = toValue(raw);
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 	}
-	else if (m_onChange)
-		QObject::connect(slider, &QSlider::valueChanged,
-			[toValue, cb = std::move(m_onChange)](int raw) { cb(toValue(raw)); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(slider, &QSlider::valueChanged,
-			[toValue, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int raw) { cbw(toValue(raw), nw); });
 
 }
 
@@ -528,25 +458,15 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 		spin->setValue(initial);
 		m_nativeWidget = spin;
 
+		QObject::connect(spin, &QSpinBox::valueChanged, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](int v) { commit(v); });
 		if (m_value.isBound())
 		{
 			auto& value = m_value.get();
-			QObject::connect(spin, &QSpinBox::valueChanged,
-				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int v) {
-					value = v;
-					if (cb) cb(value);
-					else if (cbw) cbw(value, nw);
-				});
 			bindExternalRefSync(spin,
 				[spin] { return spin->value(); },
 				[&value] { return static_cast<int>(value); },
 				[spin](int v) { spin->setValue(v); });
 		}
-		else if (m_onChange)
-			QObject::connect(spin, &QSpinBox::valueChanged, [cb = std::move(m_onChange)](int v) { cb(v); });
-		else if (m_onChangeWithWidget)
-			QObject::connect(spin, &QSpinBox::valueChanged,
-				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int v) { cbw(v, nw); });
 	}
 	else
 	{
@@ -556,15 +476,11 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 		spin->setValue(initial);
 		m_nativeWidget = spin;
 
+		QObject::connect(spin, &QDoubleSpinBox::valueChanged,
+			[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](double v) { commit(static_cast<T>(v)); });
 		if (m_value.isBound())
 		{
 			auto& value = m_value.get();
-			QObject::connect(spin, &QDoubleSpinBox::valueChanged,
-				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](double v) {
-					value = static_cast<T>(v);
-					if (cb) cb(value);
-					else if (cbw) cbw(value, nw);
-				});
 			// Quantise to step units: QDoubleSpinBox rounds what it stores to its
 			// decimals() setting, so a raw double compare would never settle.
 			bindExternalRefSync(spin,
@@ -572,12 +488,6 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 				[&value, step = m_range.step] { return std::lround(value / step); },
 				[spin, step = m_range.step](long units) { spin->setValue(static_cast<double>(units) * step); });
 		}
-		else if (m_onChange)
-			QObject::connect(spin, &QDoubleSpinBox::valueChanged,
-				[cb = std::move(m_onChange)](double v) { cb(static_cast<T>(v)); });
-		else if (m_onChangeWithWidget)
-			QObject::connect(spin, &QDoubleSpinBox::valueChanged,
-				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](double v) { cbw(static_cast<T>(v), nw); });
 	}
 
 }
@@ -621,18 +531,14 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 
 	// toggled(true) is connected only after the initial setChecked above, so
 	// the starting state is not read as a pick.
-	const T choice = picked(m_option);
+	QObject::connect(radio, &QRadioButton::toggled,
+		[choice = picked(m_option), commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](bool checked) {
+			if (checked)
+				commit(choice);
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(radio, &QRadioButton::toggled,
-			[&value, choice, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
-				if (!checked)
-					return;
-				value = choice;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		// Every radio on the int mirrors it: the one just picked is already
 		// checked, and the rest see the int move away from their option and
 		// uncheck themselves. The push runs under RefSync's QSignalBlocker, so
@@ -642,18 +548,6 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 			[&value, option = m_option] { return isChecked(value, option); },
 			[radio](bool on) { radio->setChecked(on); });
 	}
-	else if (m_onChange)
-		QObject::connect(radio, &QRadioButton::toggled,
-			[choice, cb = std::move(m_onChange)](bool checked) {
-				if (checked)
-					cb(choice);
-			});
-	else if (m_onChangeWithWidget)
-		QObject::connect(radio, &QRadioButton::toggled,
-			[choice, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool checked) {
-				if (checked)
-					cbw(choice, nw);
-			});
 }
 
 template class RadioButtonWrapper<bool>;
@@ -668,25 +562,16 @@ void CheckBoxWrapper::realize(void* parentWindow)
 	box->setChecked(checked);
 	m_nativeWidget = box;
 
+	QObject::connect(box, &QCheckBox::toggled,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](bool v) { commit(v); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(box, &QCheckBox::toggled,
-			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) {
-				value = v;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(box,
 			[box] { return box->isChecked(); },
 			[&value] { return value; },
 			[box](bool on) { box->setChecked(on); });
 	}
-	else if (m_onChange)
-		QObject::connect(box, &QCheckBox::toggled, [cb = std::move(m_onChange)](bool v) { cb(v); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(box, &QCheckBox::toggled,
-			[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) { cbw(v, nw); });
 
 }
 
@@ -701,25 +586,16 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 	button->setAutoDefault(false);
 	m_nativeWidget = button;
 
+	QObject::connect(button, &QPushButton::toggled,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](bool v) { commit(v); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(button, &QPushButton::toggled,
-			[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) {
-				value = v;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(button,
 			[button] { return button->isChecked(); },
 			[&value] { return value; },
 			[button](bool on) { button->setChecked(on); });
 	}
-	else if (m_onChange)
-		QObject::connect(button, &QPushButton::toggled, [cb = std::move(m_onChange)](bool v) { cb(v); });
-	else if (m_onChangeWithWidget)
-		QObject::connect(button, &QPushButton::toggled,
-			[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](bool v) { cbw(v, nw); });
 
 }
 
@@ -746,13 +622,9 @@ void ImageWrapper::realize(void* parentWindow)
 	m_nativeWidget = label;
 
 	if (m_onClick)
-		label->onClick = std::move(m_onClick);
-	else if (m_onClickWithWidget)
-		label->onClick = [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget] { cb(nw); };
+		label->onClick = [cb = std::move(m_onClick), nw = m_nativeWidget] { cb(nw); };
 	if (m_onHover)
-		label->onHover = std::move(m_onHover);
-	else if (m_onHoverWithWidget)
-		label->onHover = [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget] { cb(nw); };
+		label->onHover = [cb = std::move(m_onHover), nw = m_nativeWidget] { cb(nw); };
 
 }
 
@@ -931,7 +803,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 	Color* bound = m_value.isBound() ? &m_value.get() : nullptr;
 	QObject::connect(button, &QPushButton::clicked,
 		[button, applySwatch, bound, initial,
-			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
+			cb = std::move(m_onChange), nw = m_nativeWidget]() {
 			const Color current = bound ? *bound : initial;
 			const QColor start((int)(current.r * 255), (int)(current.g * 255),
 				(int)(current.b * 255), (int)(current.a * 255));
@@ -944,8 +816,7 @@ void ColorPickerWrapper::realize(void* parentWindow)
 			if (bound)
 				*bound = color;
 			applySwatch(color);
-			if (cb) cb(color);
-			else if (cbw) cbw(color, nw);
+			cb(color, nw);
 		});
 
 }
@@ -971,63 +842,39 @@ void FilePickerWrapper::realize(void* parentWindow)
 	row->addWidget(browse, 0);
 	m_nativeWidget = composite;
 
-	// One commit path for both halves: the dialog writes the field, and the
-	// field is what everything else reads. That is what makes a typed path and
-	// a picked one indistinguishable downstream (R11.4).
-	auto commit = [edit](const std::string& path) { edit->setText(qstr(path)); };
-
+	// One commit path for both halves: typing and picking both end in
+	// commitTo(), which writes the bound string (when there is one) and then
+	// reports. That is what makes a typed path and a picked one
+	// indistinguishable downstream (R11.4).
+	//
+	// textEdited, not textChanged: it fires for user typing only, so the
+	// dialog's own setText below does not report the pick a second time.
+	QObject::connect(edit, &QLineEdit::textEdited,
+		[commit = commitTo(m_value, m_onChange, m_nativeWidget)](const QString& text) {
+			commit(text.toStdString());
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		// textEdited, not textChanged: it fires for user typing only, so the
-		// dialog's own setText below re-enters this through exactly one route
-		// rather than two.
-		QObject::connect(edit, &QLineEdit::textEdited,
-			[&value, cb = m_onChange, cbw = m_onChangeWithWidget, nw = m_nativeWidget](const QString& text) {
-				value = text.toStdString();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(edit,
 			[edit] { return edit->text().toStdString(); },
 			[&value] { return value; },
 			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
 
-	// The dialog leg. It writes the field and then reports, in that order, so a
-	// handler reading the bound value already sees the new one (rules.md C4).
+	// The dialog leg: the field shows the pick, then the pick is committed.
 	// Everything it needs is captured by value -- the wrapper is not, since its
 	// teardown order against the widget is not fixed.
-	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
 	QObject::connect(browse, &QToolButton::clicked,
-		[composite, edit, commit, bound, mode = m_mode, filters = m_filters,
-			title = m_dialogTitle, cb = m_onChange, cbw = m_onChangeWithWidget,
-			nw = m_nativeWidget]() {
+		[composite, edit, mode = m_mode, filters = m_filters, title = m_dialogTitle,
+			commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
 			const std::string current = edit->text().toStdString();
 			const std::string chosen = qtRunFileDialog(composite, title, mode, filters, current);
 			if (chosen.empty())
 				return; // cancel leaves the path alone -- it is not a selection of ""
+			edit->setText(qstr(chosen));
 			commit(chosen);
-			if (bound)
-				*bound = chosen;
-			if (cb) cb(chosen);
-			else if (cbw) cbw(chosen, nw);
 		});
-
-	// Unbound and with a callback: the field is still the value, so typing has
-	// to report too. (Bound values took this leg above.)
-	if (!m_value.isBound())
-	{
-		if (m_onChange)
-			QObject::connect(edit, &QLineEdit::textEdited,
-				[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
-		else if (m_onChangeWithWidget)
-			QObject::connect(edit, &QLineEdit::textEdited,
-				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
-					cbw(text.toStdString(), nw);
-				});
-	}
-
 }
 
 // SeparatorWrapper -----------------------------------------------------------
@@ -1155,23 +1002,15 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 		combo->setCurrentIndex(selected);
 	m_nativeWidget = combo;
 
+	if constexpr (std::is_same_v<T, std::string>)
+		QObject::connect(combo, &QComboBox::currentTextChanged,
+			[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
+	else
+		QObject::connect(combo, &QComboBox::currentIndexChanged,
+			[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](int index) { commit(static_cast<T>(index)); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		if constexpr (std::is_same_v<T, std::string>)
-			QObject::connect(combo, &QComboBox::currentTextChanged,
-				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) {
-					value = text.toStdString();
-					if (cb) cb(value);
-					else if (cbw) cbw(value, nw);
-				});
-		else
-			QObject::connect(combo, &QComboBox::currentIndexChanged,
-				[&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int index) {
-					value = index;
-					if (cb) cb(value);
-					else if (cbw) cbw(value, nw);
-				});
 		if constexpr (std::is_same_v<T, std::string>)
 			bindExternalRefSync(combo,
 				[combo] { return combo->currentText().toStdString(); },
@@ -1182,24 +1021,6 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 				[combo] { return combo->currentIndex(); },
 				[&value] { return static_cast<int>(value); },
 				[combo](int i) { combo->setCurrentIndex(i); });
-	}
-	else if (m_onChange)
-	{
-		if constexpr (std::is_same_v<T, std::string>)
-			QObject::connect(combo, &QComboBox::currentTextChanged,
-				[cb = std::move(m_onChange)](const QString& text) { cb(text.toStdString()); });
-		else
-			QObject::connect(combo, &QComboBox::currentIndexChanged,
-				[cb = std::move(m_onChange)](int index) { cb(static_cast<T>(index)); });
-	}
-	else if (m_onChangeWithWidget)
-	{
-		if constexpr (std::is_same_v<T, std::string>)
-			QObject::connect(combo, &QComboBox::currentTextChanged,
-				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const QString& text) { cbw(text.toStdString(), nw); });
-		else
-			QObject::connect(combo, &QComboBox::currentIndexChanged,
-				[cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](int index) { cbw(static_cast<T>(index), nw); });
 	}
 
 }
@@ -1267,34 +1088,17 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	setListWidgetSelection(list, indicesFor(m_items, boundValue()));
 	m_nativeWidget = list;
 
+	QObject::connect(list, &QListWidget::itemSelectionChanged, list,
+		[list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
+			commit(valueFor(items, listWidgetSelection(list)));
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
-			[&value, list, items = m_items, cb = std::move(m_onChange),
-				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-				value = valueFor(items, listWidgetSelection(list));
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(list,
 			[list] { return listWidgetSelection(list); },
 			[&value, items = m_items] { return indicesFor(items, value); },
 			[list](const std::vector<int>& indices) { setListWidgetSelection(list, indices); });
-	}
-	else if (m_onChange)
-	{
-		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
-			[list, items = m_items, cb = std::move(m_onChange)]() {
-				cb(valueFor(items, listWidgetSelection(list)));
-			});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		QObject::connect(list, &QListWidget::itemSelectionChanged, list,
-			[list, items = m_items, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-				cbw(valueFor(items, listWidgetSelection(list)), nw);
-			});
 	}
 }
 
@@ -1355,34 +1159,17 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	// itemChanged is connected only AFTER the population above: every
 	// setCheckState() there emits it, so connecting first would read the
 	// initial state as a series of user ticks.
+	QObject::connect(list, &QListWidget::itemChanged, list,
+		[list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](QListWidgetItem*) {
+			commit(valueFor(items, checkListChecked(list)));
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(list, &QListWidget::itemChanged, list,
-			[&value, list, items = m_items, cb = std::move(m_onChange),
-				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
-				value = valueFor(items, checkListChecked(list));
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		bindExternalRefSync(list,
 			[list] { return checkListChecked(list); },
 			[&value, items = m_items] { return indicesFor(items, value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
-	}
-	else if (m_onChange)
-	{
-		QObject::connect(list, &QListWidget::itemChanged, list,
-			[list, items = m_items, cb = std::move(m_onChange)](QListWidgetItem*) {
-				cb(valueFor(items, checkListChecked(list)));
-			});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		QObject::connect(list, &QListWidget::itemChanged, list,
-			[list, items = m_items, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](QListWidgetItem*) {
-				cbw(valueFor(items, checkListChecked(list)), nw);
-			});
 	}
 }
 
@@ -1498,16 +1285,13 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	setTreeSelection(tree, pathsFor(boundValue()));
 	m_nativeWidget = tree;
 
+	QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
+		[tree, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
+			commit(valueFor(treeSelection(tree)));
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
-			[&value, tree, cb = std::move(m_onChange),
-				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-				value = valueFor(treeSelection(tree));
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		// setSelected() emits itemSelectionChanged for programmatic writes too,
 		// but the ref sync already wraps every push in a QSignalBlocker on the
 		// widget, so mirroring never re-enters the handler above.
@@ -1515,20 +1299,6 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 			[tree] { return treeSelection(tree); },
 			[&value] { return pathsFor(value); },
 			[tree](const std::vector<std::string>& paths) { setTreeSelection(tree, paths); });
-	}
-	else if (m_onChange)
-	{
-		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
-			[tree, cb = std::move(m_onChange)]() {
-				cb(valueFor(treeSelection(tree)));
-			});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		QObject::connect(tree, &QTreeWidget::itemSelectionChanged, tree,
-			[tree, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-				cbw(valueFor(treeSelection(tree)), nw);
-			});
 	}
 }
 
@@ -1745,18 +1515,14 @@ void TableWrapper<T>::realize(void* parentWindow)
 			});
 	}
 
+	QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
+		[table, syncing, liveRows, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
+			if (!*syncing)
+				commit(valueFor(liveRows(), tableSelection(table)));
+		});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
-			[&value, table, syncing, liveRows, cb = std::move(m_onChange),
-				cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget]() {
-				if (*syncing)
-					return;
-				value = valueFor(liveRows(), tableSelection(table));
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		// select() emits itemSelectionChanged for programmatic writes too, but
 		// the ref sync already wraps every push in a QSignalBlocker on the
 		// widget, so mirroring never re-enters the handler above.
@@ -1764,23 +1530,6 @@ void TableWrapper<T>::realize(void* parentWindow)
 			[table] { return tableSelection(table); },
 			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
 			[table](const std::vector<int>& indices) { setTableSelection(table, indices); });
-	}
-	else if (m_onChange)
-	{
-		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
-			[table, syncing, liveRows, cb = std::move(m_onChange)]() {
-				if (!*syncing)
-					cb(valueFor(liveRows(), tableSelection(table)));
-			});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		QObject::connect(table, &QTableWidget::itemSelectionChanged, table,
-			[table, syncing, liveRows, cbw = std::move(m_onChangeWithWidget),
-				nw = m_nativeWidget]() {
-				if (!*syncing)
-					cbw(valueFor(liveRows(), tableSelection(table)), nw);
-			});
 	}
 }
 

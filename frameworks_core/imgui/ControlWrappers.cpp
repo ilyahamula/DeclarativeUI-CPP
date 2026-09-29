@@ -39,9 +39,6 @@
 namespace
 {
 
-// "natural size" frame for the legacy path: render() applies no explicit size
-const Rect kNaturalFrame { -1, -1, -1, -1 };
-
 bool sized(const Rect& frame)
 {
 	return frame.width > 0;
@@ -130,10 +127,7 @@ void ButtonWrapper::render(const Rect& frame)
 	ImGui::PopID();
 	if (clicked)
 	{
-		if (m_onClick)
-			m_onClick();
-		else if (m_onClickWithWidget)
-			m_onClickWithWidget(m_nativeWidget);
+		m_onClick(m_nativeWidget);
 	}
 }
 
@@ -162,10 +156,7 @@ void TextCtrlWrapper::render(const Rect& frame)
 		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), &text);
 	if (edited)
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -190,10 +181,7 @@ void PasswordInputWrapper::render(const Rect& frame)
 			ImGuiInputTextFlags_Password);
 	if (edited)
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -218,10 +206,7 @@ void MultiLineTextCtrlWrapper::render(const Rect& frame)
 	ImGui::PushID(snapshot.id());
 	if (ImGui::InputTextMultiline("##multilinetextctrl", &text, size))
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -265,10 +250,7 @@ void ClickableTextWrapper::render(const Rect& frame)
 	ImGui::PopID();
 	if (clicked)
 	{
-		if (m_onClick)
-			m_onClick();
-		else if (m_onClickWithWidget)
-			m_onClickWithWidget(m_nativeWidget);
+		m_onClick(m_nativeWidget);
 	}
 }
 
@@ -291,10 +273,7 @@ void LinkTextWrapper::render(const Rect& frame)
 	ImGui::PopID();
 	if (clicked)
 	{
-		if (m_onClick)
-			m_onClick();
-		else if (m_onClickWithWidget)
-			m_onClickWithWidget(m_nativeWidget);
+		m_onClick(m_nativeWidget);
 	}
 }
 
@@ -426,10 +405,7 @@ void RichTextWrapper::render(const Rect& frame)
 	if (released && hovered != nullptr && linkUnder(io.MouseClickedPos[0]) == hovered)
 	{
 		const std::string url = *hovered;
-		if (m_onLink)
-			m_onLink(url);
-		else if (m_onLinkWithWidget)
-			m_onLinkWithWidget(url, m_nativeWidget);
+		m_onLink(url, m_nativeWidget);
 	}
 }
 
@@ -472,11 +448,8 @@ void DatePickerWrapper::render(const Rect&)
 	if (changed)
 	{
 		date.month = std::clamp(date.month, 1, 12);
-		date.day   = std::clamp(date.day,   1, 31);
-		if (m_onChange)
-			m_onChange(date);
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(date, m_nativeWidget);
+		date.day   = std::clamp(date.day,   1, daysInMonth(date.year, date.month));
+		m_onChange(date, m_nativeWidget);
 	}
 }
 
@@ -522,10 +495,7 @@ void TimePickerWrapper::render(const Rect&)
 		time.hour   = std::clamp(time.hour,   0, 23);
 		time.minute = std::clamp(time.minute, 0, 59);
 		time.second = std::clamp(time.second, 0, 59);
-		if (m_onChange)
-			m_onChange(time);
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(time, m_nativeWidget);
+		m_onChange(time, m_nativeWidget);
 	}
 }
 
@@ -553,10 +523,7 @@ void SliderWrapper<T>::render(const Rect& frame)
 
 	if (changed)
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 }
 
@@ -610,10 +577,7 @@ void SpinBoxWrapper<T>::render(const Rect& frame)
 
 	if (changed)
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 }
 
@@ -639,10 +603,7 @@ void RadioButtonWrapper<T>::render(const Rect&)
 	if (ImGui::RadioButton(label, isChecked(m_value.get(), m_option)))
 	{
 		m_value.set(picked(m_option));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -664,10 +625,7 @@ void CheckBoxWrapper::render(const Rect&)
 	ImGui::PushID(snapshot.id());
 	if (ImGui::Checkbox(label, &m_value.get()))
 	{
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -696,10 +654,7 @@ void ToggleButtonWrapper::render(const Rect& frame)
 	if (clicked)
 	{
 		m_value.set(!m_value.get());
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	if (wasToggled)
 		ImGui::PopStyleColor(2);
@@ -772,17 +727,11 @@ void ImageWrapper::render(const Rect& frame)
 		ImGui::Dummy(ImVec2((float)box.width, (float)box.height));
 		if (ImGui::IsItemHovered())
 		{
-			if (m_onHover)
-				m_onHover();
-			else if (m_onHoverWithWidget)
-				m_onHoverWithWidget(m_nativeWidget);
+			m_onHover(m_nativeWidget);
 		}
 		if (ImGui::IsItemClicked())
 		{
-			if (m_onClick)
-				m_onClick();
-			else if (m_onClickWithWidget)
-				m_onClickWithWidget(m_nativeWidget);
+			m_onClick(m_nativeWidget);
 		}
 	}
 	else
@@ -839,10 +788,7 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.size()))
 			m_value.set(m_choices[m_currentItem]);
 
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -1610,10 +1556,7 @@ void ColorPickerWrapper::render(const Rect& frame)
 	if (ImGui::ColorEdit4("##colorpicker", col))
 	{
 		m_value.set(Color{ col[0], col[1], col[2], col[3] });
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::PopID();
 }
@@ -1659,10 +1602,7 @@ void FilePickerWrapper::render(const Rect& frame)
 	if (ImGui::InputText("##path", &path))
 	{
 		// A typed path is as much a selection as a picked one (R11.4).
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 	ImGui::SameLine(0, style.ItemInnerSpacing.x);
 	const bool browse = ImGui::Button("...", ImVec2(buttonWidth, 0));
@@ -1679,7 +1619,7 @@ void FilePickerWrapper::render(const Rect& frame)
 	std::string* bound = m_value.isBound() ? &m_value.get() : nullptr;
 	const std::uint64_t snapshotKey = snapshot.slotKey(0);
 	FileBrowser::request(m_dialogTitle, m_mode, m_filters, m_value.get(),
-		[bound, snapshotKey, cb = m_onChange, cbw = m_onChangeWithWidget](const std::string& chosen) {
+		[bound, snapshotKey, cb = m_onChange](const std::string& chosen) {
 			if (chosen.empty())
 				return; // cancel leaves the path alone -- it is not a selection of ""
 			if (bound != nullptr)
@@ -1691,8 +1631,7 @@ void FilePickerWrapper::render(const Rect& frame)
 			}
 			// Value first, then the callback, as everywhere else: a handler
 			// reading the bound value sees the new one.
-			if (cb) cb(chosen);
-			else if (cbw) cbw(chosen, nullptr);
+			cb(chosen, nullptr);
 		});
 }
 

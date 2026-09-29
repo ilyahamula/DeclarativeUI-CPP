@@ -119,6 +119,16 @@ struct Date
 	int day   = 1;    // 1-31
 };
 
+// Days in `month` (1-12) of `year`, Gregorian. What a date field clamps its day
+// to, so a hand-typed 31 February becomes the 28th/29th rather than a date no
+// native picker would accept.
+inline int daysInMonth(int year, int month)
+{
+	constexpr int kDays[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+	return month == 2 && leap ? 29 : kDays[std::clamp(month, 1, 12) - 1];
+}
+
 struct Time
 {
 	int hour   = 0;   // 0-23

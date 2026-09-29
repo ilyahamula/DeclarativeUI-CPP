@@ -17,10 +17,6 @@ public:
     // Sequential integer for ImGui::PushID() — unique within the current ImGui scope.
     static int nextWidgetId()  { return next(s_widgetIds); }
 
-    // Sequential integer for naming BeginChild windows (GroupBoxes) —
-    // unique within the current parent scope (called before BeginChild).
-    static int nextGroupBoxId() { return next(s_groupBoxIds); }
-
     // Sequential integer for state a wrapper has to reach during the MEASURE
     // pass (an unbound Splitter position). It needs its own counter because the
     // engine resolves before ImGui::Begin, so measure runs in a different ImGui
@@ -72,7 +68,6 @@ private:
     }
 
     static inline std::unordered_map<ImGuiID, ScopeState> s_widgetIds;
-    static inline std::unordered_map<ImGuiID, ScopeState> s_groupBoxIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_measureIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_contextMenuIds;
 };

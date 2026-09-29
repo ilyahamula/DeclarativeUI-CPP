@@ -17,20 +17,6 @@
 #include <QScreen>
 #include <QWindow>
 
-DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
-{
-	auto* dialog = new QDialog(nullptr);
-	dialog->setWindowTitle(QString::fromStdString(title));
-	if (size.width > 0 && size.height > 0)
-		dialog->resize(size.width, size.height);
-	m_nativeWidget = dialog;
-}
-
-void DialogWrapper::show()
-{
-	static_cast<QDialog*>(m_nativeWidget)->show();
-}
-
 namespace
 {
 

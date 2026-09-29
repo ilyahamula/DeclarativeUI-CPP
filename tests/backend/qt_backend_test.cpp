@@ -8,9 +8,12 @@
 
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QCheckBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QTimer>
 
 namespace
 {
@@ -127,6 +130,92 @@ TEST(qt_labels_are_plain_text_and_keep_ampersands)
 		sawPlain |= l->text().contains(QStringLiteral("not bold")) && l->textFormat() == Qt::PlainText;
 	CHECK(sawPlain);
 
+	w->close();
+	pump();
+}
+
+// The collapsed callback path (EventCallback + commitTo): the bound value is
+// written first, then the callback runs with the native widget -- for both
+// spellings of onChange, bound and unbound.
+TEST(qt_change_callbacks_write_the_value_first_then_report)
+{
+	std::string text = "start";
+	std::string seenValue;
+	void* seenNative = nullptr;
+	int shortCalls = 0;
+	std::string unboundSeen;
+	Dialog { "Callbacks",
+		VStack {
+			TextCtrl{text}.onChange([&](const std::string& v, void* native) {
+				seenValue = text; // the bound variable, read inside the handler
+				seenNative = native;
+				(void)v;
+			}),
+			TextCtrl{std::string("fixed")}.onChange([&](const std::string& v) {
+				++shortCalls;
+				unboundSeen = v;
+			})
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Callbacks");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	const auto edits = w->findChildren<QLineEdit*>();
+	CHECK_EQ(edits.size(), 2);
+	if (edits.size() != 2)
+		return;
+	QLineEdit* bound = edits[0]->text() == "start" ? edits[0] : edits[1];
+	QLineEdit* unbound = bound == edits[0] ? edits[1] : edits[0];
+
+	bound->setText("typed");
+	pump();
+	CHECK_EQ(text, std::string("typed"));
+	CHECK_EQ(seenValue, std::string("typed"));
+	CHECK(seenNative == bound);
+
+	unbound->setText("other");
+	pump();
+	CHECK_EQ(shortCalls, 1);
+	CHECK_EQ(unboundSeen, std::string("other"));
+	w->close();
+	pump();
+}
+
+// Review finding 7: RefSync ran one 16 ms QTimer per bound property. It now runs
+// one per window, and every binding under it still follows external writes.
+TEST(qt_ref_sync_runs_one_timer_per_window)
+{
+	bool a = false;
+	bool b = false;
+	std::string text = "one";
+	Dialog { "Clock",
+		VStack {
+			CheckBox{a, "A"},
+			CheckBox{b, "B"},
+			TextCtrl{text}
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Clock");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	CHECK_EQ(w->findChildren<QTimer*>().size(), 1);
+
+	a = true;
+	b = true;
+	text = "two";
+	pump();
+	int checked = 0;
+	for (auto* box : w->findChildren<QCheckBox*>())
+		checked += box->isChecked() ? 1 : 0;
+	CHECK_EQ(checked, 2);
+	bool sawText = false;
+	for (auto* edit : w->findChildren<QLineEdit*>())
+		sawText |= edit->text() == QStringLiteral("two");
+	CHECK(sawText);
 	w->close();
 	pump();
 }

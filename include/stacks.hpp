@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <utility>
 
 #include "buildable.hpp"
 
@@ -11,14 +12,14 @@ struct Stack
 {
 	Stack(Orientation orient, W... widgets)
 		: m_orient(orient)
-		, m_widgets(std::make_tuple(widgets...))
+		, m_widgets(std::make_tuple(std::move(widgets)...))
 	{
 	}
 
 	Stack(Orientation orient, LayoutFlags flags, W... widgets)
 		: m_orient(orient)
 		, m_flags(flags)
-		, m_widgets(std::make_tuple(widgets...))
+		, m_widgets(std::make_tuple(std::move(widgets)...))
 	{
 	}
 
@@ -60,12 +61,12 @@ template<NodeBuildable... W>
 struct HStack : public Stack<W...>
 {
 	HStack(W... widgets)
-		: Stack<W...>(Orientation::Horizontal, widgets...)
+		: Stack<W...>(Orientation::Horizontal, std::move(widgets)...)
 	{
 	}
 
 	HStack(LayoutFlags flags, W... widgets)
-		: Stack<W...>(Orientation::Horizontal, flags, widgets...)
+		: Stack<W...>(Orientation::Horizontal, flags, std::move(widgets)...)
 	{
 	}
 
@@ -87,12 +88,12 @@ template<NodeBuildable... W>
 struct VStack : public Stack<W...>
 {
 	VStack(W... widgets)
-		: Stack<W...>(Orientation::Vertical, widgets...)
+		: Stack<W...>(Orientation::Vertical, std::move(widgets)...)
 	{
 	}
 
 	VStack(LayoutFlags flags, W... widgets)
-		: Stack<W...>(Orientation::Vertical, flags, widgets...)
+		: Stack<W...>(Orientation::Vertical, flags, std::move(widgets)...)
 	{
 	}
 

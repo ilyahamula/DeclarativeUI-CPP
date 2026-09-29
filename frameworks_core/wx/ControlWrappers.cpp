@@ -40,6 +40,23 @@
 // position/size/style stored in the ControlWrapper base) under the given
 // parent window and binds its events; the layout engine measures and places.
 
+namespace
+{
+
+// wxImage can decode nothing until its handlers are registered, and the
+// registration is process-wide -- so it is done once, by whichever of Image or
+// ToolBar is realized first.
+void ensureImageHandlers()
+{
+	static const bool registered = [] {
+		wxInitAllImageHandlers();
+		return true;
+	}();
+	(void)registered;
+}
+
+} // unnamed namespace
+
 // ButtonWrapper -----------------------------------------------------------
 
 void ButtonWrapper::realize(void* parentWindow)
@@ -52,9 +69,7 @@ void ButtonWrapper::realize(void* parentWindow)
 	m_nativeWidget = btn;
 
 	if (m_onClick)
-		btn->Bind(wxEVT_BUTTON, [cb = std::move(m_onClick)](wxCommandEvent&) { cb(); });
-	else if (m_onClickWithWidget)
-		btn->Bind(wxEVT_BUTTON, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cb(nw); });
+		btn->Bind(wxEVT_BUTTON, [cb = std::move(m_onClick), nw = m_nativeWidget](wxCommandEvent&) { cb(nw); });
 
 }
 
@@ -90,23 +105,15 @@ void TextCtrlWrapper::realize(void* parentWindow)
 	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
+	txt->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-			value = evt.GetString().ToStdString();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(txt,
 			[txt] { return txt->GetValue().ToStdString(); },
 			[&value] { return value; },
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
-	else if (m_onChange)
-		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
-	else if (m_onChangeWithWidget)
-		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
 }
 
@@ -123,23 +130,15 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
+	txt->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-			value = evt.GetString().ToStdString();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(txt,
 			[txt] { return txt->GetValue().ToStdString(); },
 			[&value] { return value; },
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
-	else if (m_onChange)
-		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
-	else if (m_onChangeWithWidget)
-		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
 }
 
@@ -155,23 +154,15 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_MULTILINE);
 	m_nativeWidget = txt;
 
+	txt->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		txt->Bind(wxEVT_TEXT, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-			value = evt.GetString().ToStdString();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(txt,
 			[txt] { return txt->GetValue().ToStdString(); },
 			[&value] { return value; },
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
-	else if (m_onChange)
-		txt->Bind(wxEVT_TEXT, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
-	else if (m_onChangeWithWidget)
-		txt->Bind(wxEVT_TEXT, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
 
 }
 
@@ -199,9 +190,7 @@ void ClickableTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = st;
 
 	if (m_onClick)
-		st->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClick)](wxMouseEvent&) { cb(); });
-	else if (m_onClickWithWidget)
-		st->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
+		st->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClick), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
 }
 
@@ -217,9 +206,7 @@ void LinkTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = link;
 
 	if (m_onClick)
-		link->Bind(wxEVT_HYPERLINK, [cb = std::move(m_onClick)](wxHyperlinkEvent&) { cb(); });
-	else if (m_onClickWithWidget)
-		link->Bind(wxEVT_HYPERLINK, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxHyperlinkEvent&) { cb(nw); });
+		link->Bind(wxEVT_HYPERLINK, [cb = std::move(m_onClick), nw = m_nativeWidget](wxHyperlinkEvent&) { cb(nw); });
 
 }
 
@@ -256,9 +243,7 @@ void RichTextWrapper::realize(void* parentWindow)
 	m_nativeWidget = panel;
 
 	if (m_onLink)
-		panel->setOnLink(std::move(m_onLink));
-	else if (m_onLinkWithWidget)
-		panel->setOnLink([cb = std::move(m_onLinkWithWidget), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
+		panel->setOnLink([cb = std::move(m_onLink), nw = m_nativeWidget](const std::string& url) { cb(url, nw); });
 }
 
 Size RichTextWrapper::measureIntrinsic(const Constraints& c)
@@ -266,7 +251,7 @@ Size RichTextWrapper::measureIntrinsic(const Constraints& c)
 	const auto* panel = static_cast<const RichTextPanel*>(m_nativeWidget);
 	if (panel == nullptr)
 		return Size { 0, 0 };
-	const RichTextLayout layout = panel->layoutFor(wrapWidth(c));
+	const RichTextLayout& layout = panel->layoutFor(wrapWidth(c));
 	return Size { layout.width, layout.height };
 }
 
@@ -286,17 +271,14 @@ void DatePickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = dp;
 
+	dp->Bind(wxEVT_DATE_CHANGED, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxDateEvent& evt) {
+		const wxDateTime& d = evt.GetDate();
+		Date date{ d.GetYear(), static_cast<int>(d.GetMonth()) + 1, d.GetDay() };
+		commit(date);
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		dp->Bind(wxEVT_DATE_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			value.year  = d.GetYear();
-			value.month = static_cast<int>(d.GetMonth()) + 1;
-			value.day   = d.GetDay();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		// Compare the Y/M/D triple, not the wxDateTime: the picker keeps a time-of-day
 		// component that Date has no opinion about.
 		bindExternalRefSync(dp,
@@ -313,18 +295,6 @@ void DatePickerWrapper::realize(void* parentWindow)
 				dp->SetValue(d);
 			});
 	}
-	else if (m_onChange)
-		dp->Bind(wxEVT_DATE_CHANGED, [cb = std::move(m_onChange)](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			Date date{ d.GetYear(), static_cast<int>(d.GetMonth()) + 1, d.GetDay() };
-			cb(date);
-		});
-	else if (m_onChangeWithWidget)
-		dp->Bind(wxEVT_DATE_CHANGED, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			Date date{ d.GetYear(), static_cast<int>(d.GetMonth()) + 1, d.GetDay() };
-			cbw(date, nw);
-		});
 
 }
 
@@ -344,17 +314,14 @@ void TimePickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = tp;
 
+	tp->Bind(wxEVT_TIME_CHANGED, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxDateEvent& evt) {
+		const wxDateTime& d = evt.GetDate();
+		Time time{ d.GetHour(), d.GetMinute(), d.GetSecond() };
+		commit(time);
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		tp->Bind(wxEVT_TIME_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			value.hour   = d.GetHour();
-			value.minute = d.GetMinute();
-			value.second = d.GetSecond();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(tp,
 			[tp] {
 				int h = 0, m = 0, s = 0;
@@ -364,18 +331,6 @@ void TimePickerWrapper::realize(void* parentWindow)
 			[&value] { return std::tuple{ value.hour, value.minute, value.second }; },
 			[tp](const std::tuple<int, int, int>& hms) { tp->SetTime(std::get<0>(hms), std::get<1>(hms), std::get<2>(hms)); });
 	}
-	else if (m_onChange)
-		tp->Bind(wxEVT_TIME_CHANGED, [cb = std::move(m_onChange)](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			Time time{ d.GetHour(), d.GetMinute(), d.GetSecond() };
-			cb(time);
-		});
-	else if (m_onChangeWithWidget)
-		tp->Bind(wxEVT_TIME_CHANGED, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDateEvent& evt) {
-			const wxDateTime& d = evt.GetDate();
-			Time time{ d.GetHour(), d.GetMinute(), d.GetSecond() };
-			cbw(time, nw);
-		});
 
 }
 
@@ -404,21 +359,13 @@ void SliderWrapper<T>::realize(void* parentWindow)
 	}
 	m_nativeWidget = sl;
 
+	if constexpr (std::is_floating_point_v<T>)
+		sl->Bind(wxEVT_SLIDER, [step = m_range.step, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(static_cast<T>(evt.GetInt()) * step); });
+	else
+		sl->Bind(wxEVT_SLIDER, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(static_cast<T>(evt.GetInt())); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		if constexpr (std::is_floating_point_v<T>)
-			sl->Bind(wxEVT_SLIDER, [&value, step = m_range.step, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-				value = static_cast<T>(evt.GetInt()) * step;
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
-		else
-			sl->Bind(wxEVT_SLIDER, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-				value = evt.GetInt();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		// wxSlider is integral; a float slider lives in step units, so compare there.
 		bindExternalRefSync(sl,
 			[sl] { return sl->GetValue(); },
@@ -429,20 +376,6 @@ void SliderWrapper<T>::realize(void* parentWindow)
 					return static_cast<int>(value);
 			},
 			[sl](int v) { sl->SetValue(v); });
-	}
-	else if (m_onChange)
-	{
-		if constexpr (std::is_floating_point_v<T>)
-			sl->Bind(wxEVT_SLIDER, [step = m_range.step, cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(static_cast<T>(evt.GetInt()) * step); });
-		else
-			sl->Bind(wxEVT_SLIDER, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(static_cast<T>(evt.GetInt())); });
-	}
-	else if (m_onChangeWithWidget)
-	{
-		if constexpr (std::is_floating_point_v<T>)
-			sl->Bind(wxEVT_SLIDER, [step = m_range.step, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(static_cast<T>(evt.GetInt()) * step, nw); });
-		else
-			sl->Bind(wxEVT_SLIDER, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(static_cast<T>(evt.GetInt()), nw); });
 	}
 
 }
@@ -466,23 +399,15 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 			m_range.min, m_range.max, static_cast<int>(val));
 		m_nativeWidget = spin;
 
+		spin->Bind(wxEVT_SPINCTRL, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxSpinEvent& evt) { commit(evt.GetInt()); });
 		if (m_value.isBound())
 		{
 			auto& value = m_value.get();
-			spin->Bind(wxEVT_SPINCTRL, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinEvent& evt) {
-				value = evt.GetInt();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 			bindExternalRefSync(spin,
 				[spin] { return spin->GetValue(); },
 				[&value] { return static_cast<int>(value); },
 				[spin](int v) { spin->SetValue(v); });
 		}
-		else if (m_onChange)
-			spin->Bind(wxEVT_SPINCTRL, [cb = std::move(m_onChange)](wxSpinEvent& evt) { cb(evt.GetInt()); });
-		else if (m_onChangeWithWidget)
-			spin->Bind(wxEVT_SPINCTRL, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinEvent& evt) { cbw(evt.GetInt(), nw); });
 	}
 	else
 	{
@@ -491,14 +416,10 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 			m_range.min, m_range.max, static_cast<double>(val), m_range.step);
 		m_nativeWidget = spin;
 
+		spin->Bind(wxEVT_SPINCTRLDOUBLE, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxSpinDoubleEvent& evt) { commit(static_cast<T>(evt.GetValue())); });
 		if (m_value.isBound())
 		{
 			auto& value = m_value.get();
-			spin->Bind(wxEVT_SPINCTRLDOUBLE, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinDoubleEvent& evt) {
-				value = static_cast<T>(evt.GetValue());
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 			// Quantise both sides to step units: wxSpinCtrlDouble rounds what it stores to
 			// its display precision, so a raw double compare would push-and-round forever.
 			bindExternalRefSync(spin,
@@ -506,10 +427,6 @@ void SpinBoxWrapper<T>::realize(void* parentWindow)
 				[&value, step = m_range.step] { return std::lround(value / step); },
 				[spin, step = m_range.step](long units) { spin->SetValue(static_cast<double>(units) * step); });
 		}
-		else if (m_onChange)
-			spin->Bind(wxEVT_SPINCTRLDOUBLE, [cb = std::move(m_onChange)](wxSpinDoubleEvent& evt) { cb(static_cast<T>(evt.GetValue())); });
-		else if (m_onChangeWithWidget)
-			spin->Bind(wxEVT_SPINCTRLDOUBLE, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxSpinDoubleEvent& evt) { cbw(static_cast<T>(evt.GetValue()), nw); });
 	}
 
 }
@@ -545,14 +462,10 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 	m_nativeWidget = rb;
 
 	const T choice = picked(m_option);
+	rb->Bind(wxEVT_RADIOBUTTON, [choice, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) { commit(choice); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		rb->Bind(wxEVT_RADIOBUTTON, [&value, choice, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
-			value = choice;
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		// Every radio on the int mirrors it: the one just picked is already
 		// checked, and the rest see the int move away from their option and
 		// uncheck themselves. SetValue sends no wxEVT_RADIOBUTTON.
@@ -561,10 +474,6 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 			[&value, option = m_option] { return isChecked(value, option); },
 			[rb](bool on) { rb->SetValue(on); });
 	}
-	else if (m_onChange)
-		rb->Bind(wxEVT_RADIOBUTTON, [choice, cb = std::move(m_onChange)](wxCommandEvent&) { cb(choice); });
-	else if (m_onChangeWithWidget)
-		rb->Bind(wxEVT_RADIOBUTTON, [choice, cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) { cbw(choice, nw); });
 }
 
 template class RadioButtonWrapper<bool>;
@@ -583,23 +492,15 @@ void CheckBoxWrapper::realize(void* parentWindow)
 	chk->SetValue(checked);
 	m_nativeWidget = chk;
 
+	chk->Bind(wxEVT_CHECKBOX, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.IsChecked()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		chk->Bind(wxEVT_CHECKBOX, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-			value = evt.IsChecked();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(chk,
 			[chk] { return chk->GetValue(); },
 			[&value] { return value; },
 			[chk](bool on) { chk->SetValue(on); });
 	}
-	else if (m_onChange)
-		chk->Bind(wxEVT_CHECKBOX, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.IsChecked()); });
-	else if (m_onChangeWithWidget)
-		chk->Bind(wxEVT_CHECKBOX, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.IsChecked(), nw); });
 
 }
 
@@ -616,23 +517,15 @@ void ToggleButtonWrapper::realize(void* parentWindow)
 	btn->SetValue(toggled);
 	m_nativeWidget = btn;
 
+	btn->Bind(wxEVT_TOGGLEBUTTON, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.IsChecked()); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		btn->Bind(wxEVT_TOGGLEBUTTON, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-			value = evt.IsChecked();
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(btn,
 			[btn] { return btn->GetValue(); },
 			[&value] { return value; },
 			[btn](bool on) { btn->SetValue(on); });
 	}
-	else if (m_onChange)
-		btn->Bind(wxEVT_TOGGLEBUTTON, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.IsChecked()); });
-	else if (m_onChangeWithWidget)
-		btn->Bind(wxEVT_TOGGLEBUTTON, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.IsChecked(), nw); });
 
 }
 
@@ -722,12 +615,7 @@ void ImageWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ImageWrapper::realize()\t-> new wxStaticBitmap()\n");
 #endif
-	static bool s_handlersInit = false;
-	if (!s_handlersInit)
-	{
-		wxInitAllImageHandlers();
-		s_handlersInit = true;
-	}
+	ensureImageHandlers();
 
 	// The ORIGINAL picture goes in, unscaled: the scaling needs the frame, and
 	// the frame is not decided until the engine places the control.
@@ -738,14 +626,10 @@ void ImageWrapper::realize(void* parentWindow)
 	m_nativeWidget = bmpCtrl;
 
 	if (m_onClick)
-		bmpCtrl->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClick)](wxMouseEvent&) { cb(); });
-	else if (m_onClickWithWidget)
-		bmpCtrl->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClickWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
+		bmpCtrl->Bind(wxEVT_LEFT_DOWN, [cb = std::move(m_onClick), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
 	if (m_onHover)
-		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHover)](wxMouseEvent&) { cb(); });
-	else if (m_onHoverWithWidget)
-		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHoverWithWidget), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
+		bmpCtrl->Bind(wxEVT_ENTER_WINDOW, [cb = std::move(m_onHover), nw = m_nativeWidget](wxMouseEvent&) { cb(nw); });
 
 }
 
@@ -762,12 +646,7 @@ void ToolBarWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ToolBarWrapper::realize()\t-> new wxToolBar()\n");
 #endif
-	static bool s_handlersInit = false;
-	if (!s_handlersInit)
-	{
-		wxInitAllImageHandlers();
-		s_handlersInit = true;
-	}
+	ensureImageHandlers();
 
 	// A CHILD wxToolBar, deliberately not wxFrame::CreateToolBar(): that one
 	// docks itself to a frame and would be invisible to the engine, and it
@@ -940,15 +819,13 @@ void ColorPickerWrapper::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = picker;
 
+	picker->Bind(wxEVT_COLOURPICKER_CHANGED, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxColourPickerEvent& evt) {
+		const wxColour& c = evt.GetColour();
+		commit(Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f });
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxColourPickerEvent& evt) {
-			const wxColour& c = evt.GetColour();
-			value = Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f };
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		// Compare as wxColour: Color is float 0..1 but the control quantises to 0..255,
 		// so the byte domain is the only one where round-tripping is stable.
 		bindExternalRefSync(picker,
@@ -961,16 +838,6 @@ void ColorPickerWrapper::realize(void* parentWindow)
 			},
 			[picker](const wxColour& c) { picker->SetColour(c); });
 	}
-	else if (m_onChange)
-		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [cb = std::move(m_onChange)](wxColourPickerEvent& evt) {
-			const wxColour& c = evt.GetColour();
-			cb(Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f });
-		});
-	else if (m_onChangeWithWidget)
-		picker->Bind(wxEVT_COLOURPICKER_CHANGED, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxColourPickerEvent& evt) {
-			const wxColour& c = evt.GetColour();
-			cbw(Color{ c.Red() / 255.0f, c.Green() / 255.0f, c.Blue() / 255.0f, c.Alpha() / 255.0f }, nw);
-		});
 
 }
 
@@ -1022,15 +889,12 @@ void FilePickerWrapper::realize(void* parentWindow)
 			[h = std::move(handler)](wxFileDirPickerEvent& evt) { h(evt.GetPath()); });
 	};
 
+	bindChanged([commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const wxString& path) {
+		commit(std::string(path.ToUTF8()));
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindChanged([&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
-			nw = m_nativeWidget](const wxString& path) {
-			value = std::string(path.ToUTF8());
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		// SetPath does not raise the CHANGED event, so mirroring an external
 		// write never re-enters the handler above.
 		bindExternalRefSync(picker,
@@ -1038,14 +902,6 @@ void FilePickerWrapper::realize(void* parentWindow)
 			[&value] { return value; },
 			[picker](const std::string& v) { picker->SetPath(wxString::FromUTF8(v)); });
 	}
-	else if (m_onChange)
-		bindChanged([cb = std::move(m_onChange)](const wxString& path) {
-			cb(std::string(path.ToUTF8()));
-		});
-	else if (m_onChangeWithWidget)
-		bindChanged([cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](const wxString& path) {
-			cbw(std::string(path.ToUTF8()), nw);
-		});
 
 }
 
@@ -1250,21 +1106,13 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 		combo->SetSelection(selected);
 	m_nativeWidget = combo;
 
+	if constexpr (std::is_same_v<T, std::string>)
+		combo->Bind(wxEVT_COMBOBOX, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
+	else
+		combo->Bind(wxEVT_COMBOBOX, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(static_cast<T>(evt.GetSelection())); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		if constexpr (std::is_same_v<T, std::string>)
-			combo->Bind(wxEVT_COMBOBOX, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-				value = evt.GetString().ToStdString();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
-		else
-			combo->Bind(wxEVT_COMBOBOX, [&value, cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) {
-				value = evt.GetSelection();
-				if (cb) cb(value);
-				else if (cbw) cbw(value, nw);
-			});
 		if constexpr (std::is_same_v<T, std::string>)
 			bindExternalRefSync(combo,
 				[combo] { return std::string(combo->GetStringSelection().ToUTF8()); },
@@ -1275,20 +1123,6 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 				[combo] { return combo->GetSelection(); },
 				[&value] { return static_cast<int>(value); },
 				[combo](int i) { combo->SetSelection(i); });
-	}
-	else if (m_onChange)
-	{
-		if constexpr (std::is_same_v<T, std::string>)
-			combo->Bind(wxEVT_COMBOBOX, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(evt.GetString().ToStdString()); });
-		else
-			combo->Bind(wxEVT_COMBOBOX, [cb = std::move(m_onChange)](wxCommandEvent& evt) { cb(static_cast<T>(evt.GetSelection())); });
-	}
-	else if (m_onChangeWithWidget)
-	{
-		if constexpr (std::is_same_v<T, std::string>)
-			combo->Bind(wxEVT_COMBOBOX, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(evt.GetString().ToStdString(), nw); });
-		else
-			combo->Bind(wxEVT_COMBOBOX, [cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent& evt) { cbw(static_cast<T>(evt.GetSelection()), nw); });
 	}
 
 }
@@ -1371,32 +1205,16 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	const int rowHeight = list->GetCharHeight() + 2;
 	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
 
+	list->Bind(wxEVT_LISTBOX, [list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
+		commit(valueFor(items, listBoxSelection(list, kMultiSelect)));
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		list->Bind(wxEVT_LISTBOX, [&value, list, items = m_items, cb = std::move(m_onChange),
-			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
-			value = valueFor(items, listBoxSelection(list, kMultiSelect));
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(list,
 			[list] { return listBoxSelection(list, kMultiSelect); },
 			[&value, items = m_items] { return indicesFor(items, value); },
 			[list](const std::vector<int>& indices) { setListBoxSelection(list, indices, kMultiSelect); });
-	}
-	else if (m_onChange)
-	{
-		list->Bind(wxEVT_LISTBOX, [list, items = m_items, cb = std::move(m_onChange)](wxCommandEvent&) {
-			cb(valueFor(items, listBoxSelection(list, kMultiSelect)));
-		});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		list->Bind(wxEVT_LISTBOX, [list, items = m_items, cbw = std::move(m_onChangeWithWidget),
-			nw = m_nativeWidget](wxCommandEvent&) {
-			cbw(valueFor(items, listBoxSelection(list, kMultiSelect)), nw);
-		});
 	}
 }
 
@@ -1459,32 +1277,16 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	const int rowHeight = list->GetCharHeight() + 2;
 	list->CacheBestSize(wxSize(best.x, rowHeight * m_visibleRows + kListBoxFrame));
 
+	list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent&) {
+		commit(valueFor(items, checkListChecked(list)));
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		list->Bind(wxEVT_CHECKLISTBOX, [&value, list, items = m_items, cb = std::move(m_onChange),
-			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxCommandEvent&) {
-			value = valueFor(items, checkListChecked(list));
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(list,
 			[list] { return checkListChecked(list); },
 			[&value, items = m_items] { return indicesFor(items, value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
-	}
-	else if (m_onChange)
-	{
-		list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, cb = std::move(m_onChange)](wxCommandEvent&) {
-			cb(valueFor(items, checkListChecked(list)));
-		});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		list->Bind(wxEVT_CHECKLISTBOX, [list, items = m_items, cbw = std::move(m_onChangeWithWidget),
-			nw = m_nativeWidget](wxCommandEvent&) {
-			cbw(valueFor(items, checkListChecked(list)), nw);
-		});
 	}
 }
 
@@ -1630,23 +1432,19 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 
 	setTreeSelection(tree, pathsFor(boundValue()), m_multiSelect);
 
+	// SelectItem notifies, so mirroring the ref into the control would re-enter
+	// this handler and echo the value straight back out. The guard is shared by
+	// both lambdas and lives as long as they do.
+	auto syncing = std::make_shared<bool>(false);
+	tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, syncing, multi = m_multiSelect,
+		commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxTreeEvent& evt) {
+		evt.Skip();
+		if (!*syncing)
+			commit(valueFor(treeSelection(tree, multi)));
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		// SelectItem notifies, so mirroring the ref into the control would
-		// re-enter this handler and echo the value straight back out. The guard
-		// is shared by both lambdas and lives as long as they do.
-		auto syncing = std::make_shared<bool>(false);
-		tree->Bind(wxEVT_TREE_SEL_CHANGED, [&value, tree, syncing, multi = m_multiSelect,
-			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
-			nw = m_nativeWidget](wxTreeEvent& evt) {
-			evt.Skip();
-			if (*syncing)
-				return;
-			value = valueFor(treeSelection(tree, multi));
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(tree,
 			[tree, multi = m_multiSelect] { return treeSelection(tree, multi); },
 			[&value] { return pathsFor(value); },
@@ -1655,22 +1453,6 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 				setTreeSelection(tree, paths, multi);
 				*syncing = false;
 			});
-	}
-	else if (m_onChange)
-	{
-		tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, multi = m_multiSelect,
-			cb = std::move(m_onChange)](wxTreeEvent& evt) {
-			evt.Skip();
-			cb(valueFor(treeSelection(tree, multi)));
-		});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, multi = m_multiSelect,
-			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxTreeEvent& evt) {
-			evt.Skip();
-			cbw(valueFor(treeSelection(tree, multi)), nw);
-		});
 	}
 }
 
@@ -1843,23 +1625,19 @@ void TableWrapper<T>::realize(void* parentWindow)
 		});
 	}
 
+	// The selection setters notify, so mirroring the ref into the control would
+	// re-enter this handler and echo the value straight back out. The guard is
+	// shared by both lambdas and lives as long as they do.
+	auto syncing = std::make_shared<bool>(false);
+	view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, syncing, liveRows,
+		commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxDataViewEvent& evt) {
+		evt.Skip();
+		if (!*syncing)
+			commit(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)));
+	});
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		// The selection setters notify, so mirroring the ref into the control
-		// would re-enter this handler and echo the value straight back out. The
-		// guard is shared by both lambdas and lives as long as they do.
-		auto syncing = std::make_shared<bool>(false);
-		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [&value, view, syncing, liveRows,
-			cb = std::move(m_onChange), cbw = std::move(m_onChangeWithWidget),
-			nw = m_nativeWidget](wxDataViewEvent& evt) {
-			evt.Skip();
-			if (*syncing)
-				return;
-			value = valueFor(liveRows(), dataViewSelection(view, kMultiSelect));
-			if (cb) cb(value);
-			else if (cbw) cbw(value, nw);
-		});
 		bindExternalRefSync(view,
 			[view] { return dataViewSelection(view, kMultiSelect); },
 			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
@@ -1868,22 +1646,6 @@ void TableWrapper<T>::realize(void* parentWindow)
 				setDataViewSelection(view, indices, kMultiSelect);
 				*syncing = false;
 			});
-	}
-	else if (m_onChange)
-	{
-		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, liveRows,
-			cb = std::move(m_onChange)](wxDataViewEvent& evt) {
-			evt.Skip();
-			cb(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)));
-		});
-	}
-	else if (m_onChangeWithWidget)
-	{
-		view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, liveRows,
-			cbw = std::move(m_onChangeWithWidget), nw = m_nativeWidget](wxDataViewEvent& evt) {
-			evt.Skip();
-			cbw(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)), nw);
-		});
 	}
 }
 
