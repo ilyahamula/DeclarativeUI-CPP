@@ -59,7 +59,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine->render(*session->root, content);
 
 	// invalidation wiring -------------------------------------------------
-	session->bindInvalidation(*session->root);
+	session->watch();
 	session->bindOpenFlag();
 
 	// user resize (Resizable only): arrange-only within the new client area

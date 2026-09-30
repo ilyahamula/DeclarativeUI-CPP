@@ -2,6 +2,8 @@
 
 #include "widgets.hpp"
 #include "stacks.hpp"
+#include "foreach.hpp"
+#include "radiogroup.hpp"
 #include "grid.hpp"
 #include "scrollpanel.hpp"
 #include "splitter.hpp"
@@ -188,6 +190,22 @@ static_assert(Hideable<HSplitter<VStack<Button>, VStack<Button>>>);
 static_assert(Hideable<Expander<VStack<Button>>>);
 static_assert(Hideable<TabPanel<Tab<VStack<Button>>>>);
 static_assert(!Hideable<Tab<VStack<Button>>>);
+
+// VForEach / HForEach are containers like a stack, built from a vector.
+namespace foreach_check
+{
+inline auto row = [](const std::string& s) { return StaticText{s}; };
+inline auto rowWithIndex = [](const std::string& s, std::size_t) { return StaticText{s}; };
+}
+static_assert(NodeBuildable<VForEach<std::string, decltype(foreach_check::row)>>);
+static_assert(NodeBuildable<HForEach<std::string, decltype(foreach_check::rowWithIndex)>>);
+static_assert(Hideable<VForEach<std::string, decltype(foreach_check::row)>>);
+
+// RadioGroup: a stack of RadioButton<int>s, so its index must be bound too.
+static_assert(NodeBuildable<RadioGroup>);
+static_assert(Hideable<RadioGroup>);
+static_assert(std::is_constructible_v<RadioGroup, int&, std::vector<std::string>>);
+static_assert(!std::is_constructible_v<RadioGroup, const int&, std::vector<std::string>>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

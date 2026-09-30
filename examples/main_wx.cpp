@@ -2,34 +2,28 @@
 #include <wx/wx.h>
 
 #include <string>
+#include <vector>
 
 class DeclarativeApp : public wxApp
 {
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // Background work & stable ids: a worker thread fills the progress bar
-    // through postToUi(), and an Expander above two unbound check boxes shows
-    // what withId() keeps on ImGui.
-    float m_workProgress = 0.0f;
-    std::string m_workStatus = "Idle";
-    bool m_workBusy = false;
-    bool m_workDetailsOpen = false;
-    bool m_workHideStatusBar = false;
-    // The radio/combo binding: three radios and a combo on one int. Each radio
-    // names its own value, so the group is the shared int -- not declaration
-    // order -- and `choiceLocked` disables the lot.
-    int m_choice = 1;
-    bool m_choiceLocked = false;
-    // The combo's choices, bound: "Add a colour" appends here.
-    ItemList m_colours { "Red", "Green", "Blue" };
+    // The todo list (VForEach): rows follow this vector -- add and remove
+    // rows, tick them, and only the changed rows are rebuilt.
+    std::vector<DemoTodo> m_todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
+    std::string m_newTodo;
+    // RadioGroup sharing its index with a slider and a spin box.
+    int m_level = 2;
+    bool m_levelDisabled = false;
+    std::string m_lastPick = "Nothing picked yet";
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawWorkerAndIdentityUI(m_workProgress, m_workStatus, m_workBusy, m_workDetailsOpen, m_workHideStatusBar).show();
-        drawChoiceMirror(m_choice, m_choiceLocked, m_colours).show();
+        drawTodoListUI(m_todos, m_newTodo).show();
+        drawRadioGroupMirror(m_level, m_levelDisabled, m_lastPick).show();
         return true;
     }
 };

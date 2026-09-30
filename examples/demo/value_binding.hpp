@@ -129,6 +129,36 @@ inline auto drawChoiceMirror(int& choice, bool& disabled, ItemList& colours)
     };
 }
 
+// RadioGroup + Slider + SpinBox over one int, with a bool disabling all three.
+// The group writes the index of the option picked; the slider and the spin box
+// write the same number -- so dragging the slider moves the radio, and picking
+// a radio moves the slider. onChange reports after the int has been written.
+inline auto drawRadioGroupMirror(int& level, bool& disabled, std::string& lastPick)
+{
+    return Dialog {
+        "RadioGroup + Slider (shared index)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            RadioGroup{level, {"Off", "Low", "Medium", "High"}}
+                .withOrientation(Orientation::Horizontal)
+                .isDisabled(disabled)
+                .onChange([&lastPick](int i) { lastPick = "Picked option " + std::to_string(i); }),
+            Slider { Range<int>{ .min = 0, .max = 3 }, level }
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10))
+                .isDisabled(disabled),
+            SpinBox { Range<int>{ .min = 0, .max = 3 }, level }
+                .withSize({120, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(disabled),
+            StaticText{lastPick}
+                .withSize({260, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 8)),
+            CheckBox{disabled, "Disable all three"}
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
 // CheckBox + ToggleButton over one bool, with a second bool disabling them.
 // Two independent bindings in one dialog: the shared value and the disable flag.
 inline auto drawToggleMirror(bool& flag, bool& disabled)
@@ -1429,6 +1459,61 @@ inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& 
                     .withId("worker-demo-named")
                     .withFlags(LayoutFlags().Border(Side::Top, 8)),
                 CheckBox{false, "Unnamed: may lose it on ImGui"}
+            }
+        }
+    };
+}
+
+// VForEach: a list whose ROWS come from a vector. Each row is a function of
+// its item and reports changes through callbacks by index; the vector is
+// bound, so adding, ticking and removing all show up at once -- on ImGui by
+// the per-frame rebuild, on wx and Qt by rebuilding just the rows that
+// changed (every row when the count did). The dialog grows and shrinks with
+// the list.
+//
+// The new-task field keeps its text OUTSIDE the vector on purpose: a field
+// that wrote its own row's item on every keystroke would be rebuilt as you
+// type on wx and Qt.
+struct DemoTodo
+{
+    std::string title;
+    bool done = false;
+
+    bool operator==(const DemoTodo&) const = default;
+};
+
+inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle)
+{
+    return Dialog {
+        "Todo list (VForEach)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                TextCtrl{newTitle}
+                    .withPlaceholder("New task")
+                    .withFlags(LayoutFlags().Proportion(1)),
+                Button{"Add"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 8))
+                    .onClick([&todos, &newTitle] {
+                        if (newTitle.empty())
+                            return;
+                        todos.push_back({ newTitle, false });
+                        newTitle.clear();
+                    })
+            },
+            VForEach {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                todos,
+                [&todos](const DemoTodo& todo, std::size_t i) {
+                    return HStack {
+                        LayoutFlags().Expand(),
+                        CheckBox{todo.done, todo.title}
+                            .onChange([&todos, i](bool on) { todos[i].done = on; }),
+                        Spacer{},
+                        Button{"Remove"}
+                            .onClick([&todos, i] { todos.erase(todos.begin() + static_cast<long>(i)); })
+                    };
+                }
             }
         }
     };

@@ -81,3 +81,53 @@ inline auto drawSelectionUI(
         }
     };
 }
+
+// RadioGroup: one exclusive choice among labelled options, bound to the index
+// of the chosen one. It is a stack of RadioButtons, so it looks exactly like
+// the hand-written radios on every backend; what it saves is the bookkeeping.
+// Shown here as a column, as a row (withOrientation), and live-hidden
+// (isHidden), next to a ComboBox and a label reading the same indices.
+inline auto drawRadioGroupUI(int& shipping, int& size, int& wrap, bool& hideWrap, bool& groupsDisabled)
+{
+    constexpr int kBoxW = 260;
+    constexpr int kRowH = 26;
+    constexpr int kLabelH = 20;
+
+    return Dialog {
+        "Radio Groups",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 10),
+            HStack {
+                VGroupBox { "Shipping (column)",
+                    LayoutFlags().MinSize({kBoxW, 150}),
+                    RadioGroup{shipping, {"Standard", "Express", "Overnight", "Pick up in store"}}
+                        .isDisabled(groupsDisabled)
+                },
+                VGroupBox { "Size (row)",
+                    LayoutFlags().MinSize({kBoxW, 150}).Border(Side::Left, 12),
+                    RadioGroup{size, {"S", "M", "L", "XL"}}
+                        .withOrientation(Orientation::Horizontal)
+                        .isDisabled(groupsDisabled),
+                    // the same index, from a combo: either one moves the other
+                    ComboBox{ {"S", "M", "L", "XL"}, size }
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 10))
+                        .isDisabled(groupsDisabled),
+                    CheckBox{hideWrap, "Hide the wrapping options"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Border(Side::Top, 8)),
+                    // bound isHidden: the group box shrinks around it live
+                    RadioGroup{LayoutFlags().Border(Side::Top, 4), wrap, {"Plain paper", "Ribbon"}}
+                        .withOrientation(Orientation::Horizontal)
+                        .isHidden(hideWrap)
+                        .isDisabled(groupsDisabled)
+                }
+            },
+            StaticText{"Pick a group, then disable them all:"}
+                .withSize({-1, kLabelH})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            CheckBox{groupsDisabled, "Disable the groups"}
+                .withSize({-1, kRowH})
+        }
+    };
+}

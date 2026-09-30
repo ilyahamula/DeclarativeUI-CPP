@@ -2,6 +2,7 @@
 
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
+#include "frameworks_core/NodeSource.hpp"
 #include "frameworks_core/qt/LayoutBackend.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <vector>
 
 // Retained engine state for one shown top-level window; freed when the window
 // is destroyed (QObject::destroyed). The Qt twin of
@@ -146,67 +148,49 @@ struct EngineSession
 
 	// Arms a re-measure for every source of engine-visible change in the tree.
 	//
-	// Today that is AutoGrow text fields, whose live content the measure pass
-	// reads, Splitter sash positions, and Expander open states.
-	void bindInvalidation(LayoutNode& node)
+	// AutoGrow fields are event-driven: their live text is what measure reads,
+	// so an edit re-measures. Everything else -- sash positions, Expander open
+	// states, isHidden() flags, ForEach data -- is one poll over the tree
+	// (refreshTree, NodeSource.hpp) rather than a poll per node: rows can now
+	// be destroyed and rebuilt, and a poll holding a pointer into a node would
+	// outlive it. Walking the live tree each time holds none.
+	void watch()
 	{
-		// A sash drag (or anything else writing the bound int) changes a value
-		// the engine reads, and Qt has no notification for that -- so it is
-		// polled like any other external ref. `resolved` is what the layout
-		// currently shows and `position` what it should show, which makes this
-		// the ordinary RefSync shape rather than a special case: a full
-		// re-measure, because the pane widths decide table columns and text
-		// wrapping, not just where the rectangles land.
-		if (node.kind == NodeKind::Splitter)
+		bindAutoGrow(*root);
+		refsync_detail::hubFor(window)->add(window, [this] { poll(); });
+	}
+
+	void poll()
+	{
+		if (busy)
+			return;
+		std::vector<LayoutNode*> fresh;
+		if (!refreshTree(*root, *backend, fresh))
+			return;
+		relayout(); // realizes the fresh rows
+		for (LayoutNode* row : fresh)
+			bindAutoGrow(*row);
+	}
+
+	void bindAutoGrow(LayoutNode& node)
+	{
+		if (!node.isLeaf())
 		{
-			SplitterState* split = &node.split;
-			bindExternalRefSync(window,
-				[split] { return split->resolved; },
-				[split] { return split->position.get(); },
-				[this](int) { relayout(); });
-		}
-		// Clicking a header (or anything else writing the bound bool) changes
-		// what the measure pass will find, and Qt has no notification for that
-		// either. Same RefSync shape as the sash above: `applied` is what the
-		// layout currently shows and `expanded` what it should show. It has to
-		// be a full re-measure rather than a re-arrange -- a section opening
-		// changes what there is to lay out, not merely where it lands.
-		if (node.kind == NodeKind::Expander)
-		{
-			ExpanderState* expander = &node.expander;
-			bindExternalRefSync(window,
-				[expander] { return expander->applied; },
-				[expander] { return expander->expanded.get(); },
-				[this](bool) { relayout(); });
-		}
-		// isHidden() bound to a caller's flag: showing or hiding a node changes
-		// what there is to lay out, so -- like an Expander -- a full re-measure.
-		// `hiddenApplied` is what the layout shows, `hidden` what it should.
-		if (node.hidden.isBound())
-		{
-			LayoutNode* shown = &node;
-			bindExternalRefSync(window,
-				[shown] { return shown->hiddenApplied; },
-				[shown] { return shown->hidden.get(); },
-				[this](bool) { relayout(); });
-		}
-		if (node.isLeaf())
-		{
-			if (!node.flags.autoGrow() || node.widget == nullptr)
-				return;
-			auto* control = static_cast<QWidget*>(node.widget->nativeHandle());
-			auto queueRelayout = [this] {
-				// after the control has applied the edit
-				QTimer::singleShot(0, window, [this] { relayout(); });
-			};
-			if (auto* line = qobject_cast<QLineEdit*>(control))
-				QObject::connect(line, &QLineEdit::textChanged, window,
-					[queueRelayout](const QString&) { queueRelayout(); });
-			else if (auto* edit = qobject_cast<QPlainTextEdit*>(control))
-				QObject::connect(edit, &QPlainTextEdit::textChanged, window, queueRelayout);
+			for (auto& child : node.children)
+				bindAutoGrow(*child);
 			return;
 		}
-		for (auto& child : node.children)
-			bindInvalidation(*child);
+		if (!node.flags.autoGrow() || node.widget == nullptr)
+			return;
+		auto* control = static_cast<QWidget*>(node.widget->nativeHandle());
+		auto queueRelayout = [this] {
+			// after the control has applied the edit
+			QTimer::singleShot(0, window, [this] { relayout(); });
+		};
+		if (auto* line = qobject_cast<QLineEdit*>(control))
+			QObject::connect(line, &QLineEdit::textChanged, window,
+				[queueRelayout](const QString&) { queueRelayout(); });
+		else if (auto* edit = qobject_cast<QPlainTextEdit*>(control))
+			QObject::connect(edit, &QPlainTextEdit::textChanged, window, queueRelayout);
 	}
 };

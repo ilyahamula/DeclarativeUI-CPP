@@ -964,7 +964,7 @@ void ExpanderHeaderWrapper::realize(void* parentWindow)
 	// A bound flag can be written from anywhere, and the button applies its own
 	// state only when clicked -- so it is mirrored like any other external ref.
 	// The relayout that follows is armed separately, by the session's
-	// bindInvalidation: this only keeps the header itself honest.
+	// poll: this only keeps the header itself honest.
 	//
 	// The arrow is set HERE as well as in the toggled handler above, and has to
 	// be: every RefSync push runs under a QSignalBlocker, so a programmatic

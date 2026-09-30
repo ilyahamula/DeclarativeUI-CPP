@@ -43,4 +43,12 @@ public:
 	{
 		(void)node;
 	}
+
+	// The subtree is about to be destroyed -- a ForEach row replaced. Retained
+	// backends destroy every native window it realized and drop whatever they
+	// cached per node; the nodes (and the wrappers they own) go right after.
+	virtual void forget(const LayoutNode& node)
+	{
+		(void)node;
+	}
 };

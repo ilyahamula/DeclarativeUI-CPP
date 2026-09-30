@@ -1055,7 +1055,7 @@ void ExpanderHeaderWrapper::realize(void* parentWindow)
 	// A bound flag can be written from anywhere, and the header control applies
 	// its own state only when clicked -- so the arrow is mirrored like any other
 	// external ref. The relayout that follows is armed separately, by the
-	// session's bindInvalidation: this only keeps the header itself honest.
+	// session's poll: this only keeps the header itself honest.
 	if (m_state->expanded.isBound())
 	{
 		bindExternalRefSync(header,

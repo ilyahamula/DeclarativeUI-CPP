@@ -28,6 +28,7 @@ public:
 	bool beginContainer(const LayoutNode& node, const Rect& frame) override;
 	void endContainer(const LayoutNode& node) override;
 	void hide(const LayoutNode& node) override;
+	void forget(const LayoutNode& node) override;
 
 private:
 	struct Scope

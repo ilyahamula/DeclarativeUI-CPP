@@ -53,6 +53,7 @@ return Dialog {
 - **Background threads** — bound values belong to the UI thread; a worker hands its results over with `postToUi([&] { progress = 50; })`, which runs the task on the UI thread on every backend
 - **Hide anything** — `.isHidden(flag)` on any widget or container takes it out of the layout entirely (no space, no gap) and, bound to a `bool&`, shows and hides it live
 - **Live display content** — `StaticText{status}` and `ReadonlyTextCtrl{status}` on a `std::string&`, and `ComboBox`/`ListBox`/`CheckListBox` on a `std::vector<std::string>&` of items, follow the caller's data live; they keep the size of their first content, so new text never resizes an auto-fit window
+- **Runtime-sized content** — `VForEach{todos, [&](const Todo& t, std::size_t i) { return HStack{…}; }}` builds one row per item; bound to a `std::vector&`, rows follow the data live (only changed rows are rebuilt when the count stays the same)
 - **Stable ids** — `.withId("volume")` names a control: on ImGui its state is keyed by the name rather than its position in the tree (so an unbound value survives an `Expander` folding above it), and on wx/Qt it becomes the native window / object name
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
@@ -63,14 +64,14 @@ return Dialog {
 |-------------------|---------|
 | Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
-| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
+| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
-| Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
+| Containers        | `VStack` / `HStack`, `VForEach` / `HForEach`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
 | Feedback          | `Toast` (timed, non-blocking, stacks) |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
@@ -109,6 +110,13 @@ RadioButton{ colour, 0, "Red" },     // picking it writes 0 into colour
 RadioButton{ colour, 1, "Green" },
 RadioButton{ size,   0, "Small" },   // a second group, same box
 RadioButton{ enabled, "Enabled" }    // bool: a lone radio
+```
+
+`RadioGroup` writes the same thing once: one radio per option, option `i` naming `i`.
+
+```cpp
+RadioGroup{ shipping, {"Standard", "Express", "Overnight"} }
+RadioGroup{ size, {"S", "M", "L"} }.withOrientation(Orientation::Horizontal)
 ```
 
 An `int` radio must be bound: a snapshot would give each radio a private copy of the

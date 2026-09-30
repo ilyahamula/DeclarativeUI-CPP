@@ -401,6 +401,71 @@ TEST(imgui_bound_list_items_follow_the_vector)
 	frames(2);
 }
 
+// VForEach: rows follow a bound vector -- the window grows with an added row
+// and a row's own Remove button removes it.
+TEST(imgui_foreach_rows_follow_the_vector)
+{
+	std::vector<std::string> todos { "one", "two" };
+	g_ui = [&] {
+		Dialog { "Todos",
+			VForEach { todos, [&todos](const std::string& todo, std::size_t i) {
+				return HStack {
+					StaticText{todo}.withSize({60, -1}),
+					Button{"Remove"}.onClick([&todos, i] { todos.erase(todos.begin() + (long)i); })
+				};
+			} }
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Todos");
+	const float twoRows = w->Size.y;
+	const float rowStep = ImGui::GetFrameHeight() + LayoutEngine::kDefaultGap;
+
+	todos.push_back("three");
+	frames(3);
+	CHECK(std::fabs(w->Size.y - (twoRows + rowStep)) < 1.0f);
+
+	// Remove the first row with its own button.
+	const ImGuiStyle& st = ImGui::GetStyle();
+	click(w->Pos.x + st.WindowPadding.x + 60.0f + LayoutEngine::kDefaultGap + 10.0f,
+		w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y + ImGui::GetFrameHeight() * 0.5f);
+	frames(3);
+	CHECK_EQ(todos.size(), static_cast<std::size_t>(2));
+	CHECK_EQ(todos.front(), std::string("two"));
+	CHECK(std::fabs(w->Size.y - twoRows) < 1.0f);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// RadioGroup: one radio per option, bound to the index; a write from outside
+// moves the selection, and onChange reports after the int is written.
+TEST(imgui_radio_group_binds_an_index)
+{
+	int choice = 0;
+	int reported = -1;
+	int seen = -1;
+	g_ui = [&] {
+		Dialog { "Group",
+			RadioGroup{choice, {"Red", "Green", "Blue"}}
+				.onChange([&](int i) { reported = i; seen = choice; })
+		}.setPosition({0, 0}).show();
+	};
+	frames(10);
+
+	const ImVec2 blue = rowCentre("Group", 2);
+	click(blue.x, blue.y);
+	CHECK_EQ(choice, 2);
+	CHECK_EQ(reported, 2);
+	CHECK_EQ(seen, 2);
+
+	choice = 1;
+	frames(2);
+	const ImVec2 red = rowCentre("Group", 0);
+	click(red.x, red.y);
+	CHECK_EQ(choice, 0);
+	g_ui = nullptr;
+}
+
 int main()
 {
 	ImGui::CreateContext();

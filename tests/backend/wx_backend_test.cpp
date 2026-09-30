@@ -389,6 +389,55 @@ TEST(wx_bound_item_lists_repopulate_and_keep_the_selection)
 	pump();
 }
 
+// VForEach: rows follow a bound vector. Adding one builds its widgets; a row's
+// own Remove button removes that row, and its widgets are destroyed, not left
+// behind in the window.
+TEST(wx_foreach_rows_follow_the_vector)
+{
+	std::vector<std::string> todos { "one", "two" };
+	Dialog { "Todos",
+		VForEach { todos, [&todos](const std::string& todo, std::size_t i) {
+			return HStack {
+				StaticText{todo},
+				Button{"Remove " + todo}.onClick([&todos, i] { todos.erase(todos.begin() + (long)i); })
+			};
+		} }
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Todos");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	const auto countButtons = [w] {
+		int n = 0;
+		find<wxButton>(w, [&n](wxButton*) { ++n; return false; });
+		return n;
+	};
+	const int twoRows = w->GetClientSize().y;
+	CHECK_EQ(countButtons(), 2);
+
+	todos.push_back("three");
+	pump(40);
+	CHECK_EQ(countButtons(), 3);
+	CHECK(w->GetClientSize().y > twoRows);
+
+	auto* removeOne = find<wxButton>(w, [](wxButton* b) { return b->GetLabelText() == "Remove one"; });
+	CHECK(removeOne != nullptr);
+	if (removeOne != nullptr)
+	{
+		wxCommandEvent click(wxEVT_BUTTON, removeOne->GetId());
+		click.SetEventObject(removeOne);
+		removeOne->ProcessWindowEvent(click);
+	}
+	pump(40);
+	CHECK_EQ(todos.size(), static_cast<std::size_t>(2));
+	CHECK_EQ(countButtons(), 2);
+	CHECK(find<wxButton>(w, [](wxButton* b) { return b->GetLabelText() == "Remove one"; }) == nullptr);
+	CHECK_EQ(w->GetClientSize().y, twoRows);
+	w->Close();
+	pump();
+}
+
 namespace
 {
 struct TestApp : wxApp
@@ -398,6 +447,44 @@ struct TestApp : wxApp
 } // namespace
 
 wxIMPLEMENT_APP_NO_MAIN(TestApp);
+
+// RadioGroup: one radio per option, bound to the index, in a row when asked;
+// a write from outside moves the check, onChange reports after the write.
+TEST(wx_radio_group_binds_an_index)
+{
+	int choice = 0;
+	int reported = -1;
+	int seen = -1;
+	Dialog { "Group",
+		RadioGroup{choice, {"Red", "Green", "Blue"}}
+			.withOrientation(Orientation::Horizontal)
+			.onChange([&](int i) { reported = i; seen = choice; })
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Group");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+
+	CHECK(radio(w, "Red")->GetValue());
+	CHECK_EQ(radio(w, "Red")->GetPosition().y, radio(w, "Blue")->GetPosition().y);
+	CHECK(radio(w, "Red")->GetPosition().x < radio(w, "Blue")->GetPosition().x);
+
+	clickRadio(radio(w, "Blue"));
+	pump();
+	CHECK_EQ(choice, 2);
+	CHECK_EQ(reported, 2);
+	CHECK_EQ(seen, 2);
+	CHECK(!radio(w, "Red")->GetValue());
+
+	choice = 1;
+	pump();
+	CHECK(radio(w, "Green")->GetValue());
+	CHECK(!radio(w, "Blue")->GetValue());
+
+	w->Close();
+	pump();
+}
 
 int main(int argc, char** argv)
 {

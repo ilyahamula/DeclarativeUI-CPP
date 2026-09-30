@@ -423,3 +423,35 @@ void WxLayoutBackend::hide(const LayoutNode& node)
 	for (const auto& child : node.children)
 		hide(*child);
 }
+
+// A ForEach row is being replaced: destroy every native window this subtree
+// realized, deepest first, and drop what is cached per node -- the nodes are
+// freed right after, so a stale map entry would be a dangling key.
+//
+// Children go before their container: a container window may be their native
+// parent (a scroll area, an Expander panel), and destroying it first would
+// destroy them under us. A tab PAGE is the exception the other way round: its
+// window belongs to the tab widget, which removes and destroys it itself, so a
+// page is only forgotten, never destroyed on its own.
+void WxLayoutBackend::forget(const LayoutNode& node)
+{
+	for (const auto& child : node.children)
+		forget(*child);
+
+	if (node.isLeaf())
+	{
+		m_textFloorWidths.erase(&node);
+		if (auto* window = static_cast<wxWindow*>(node.widget->nativeHandle()))
+			window->Destroy();
+		return;
+	}
+
+	const auto it = m_containers.find(&node);
+	if (it == m_containers.end())
+		return;
+	wxWindow* window = it->second;
+	m_containers.erase(it);
+	const bool isTabPage = node.parent != nullptr && node.parent->kind == NodeKind::TabPanel;
+	if (window != nullptr && !isTabPage)
+		window->Destroy();
+}

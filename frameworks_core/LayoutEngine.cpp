@@ -987,6 +987,7 @@ void LayoutEngine::arrangeSplitter(LayoutNode& node)
 	const int upper = std::max(lower, panesMain - secondFloor);
 
 	int pos = node.split.position.get();
+	node.split.requested = pos;
 	if (pos < 0)
 		pos = panesMain / 2; // "half" -- resolvable only now that the area is known
 	pos = std::clamp(pos, lower, upper);

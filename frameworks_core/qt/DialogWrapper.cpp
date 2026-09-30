@@ -94,7 +94,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine->render(*session->root, content);
 
 	// invalidation wiring -------------------------------------------------
-	session->bindInvalidation(*session->root);
+	session->watch();
 	session->bindOpenFlag();
 	dialog->onResize = [session] { session->rearrange(); };
 	// The single close path: the user's close button lands here, and so does

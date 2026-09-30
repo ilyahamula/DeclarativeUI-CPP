@@ -3,6 +3,7 @@
 #include <QApplication>
 
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -11,25 +12,18 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // Background work & stable ids: a worker thread fills the progress bar
-    // through postToUi(), and an Expander above two unbound check boxes shows
-    // what withId() keeps on ImGui.
-    float workProgress = 0.0f;
-    std::string workStatus = "Idle";
-    bool workBusy = false;
-    bool workDetailsOpen = false;
-    bool workHideStatusBar = false;
-    // The radio/combo binding: three radios and a combo on one int. Each radio
-    // names its own value, so the group is the shared int -- not declaration
-    // order -- and `choiceLocked` disables the lot.
-    int choice = 1;
-    bool choiceLocked = false;
-    // The combo's choices, bound: "Add a colour" appends here.
-    ItemList colours { "Red", "Green", "Blue" };
+    // The todo list (VForEach): rows follow this vector -- add and remove
+    // rows, tick them, and only the changed rows are rebuilt.
+    std::vector<DemoTodo> todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
+    std::string newTodo;
+    // RadioGroup sharing its index with a slider and a spin box.
+    int level = 2;
+    bool levelDisabled = false;
+    std::string lastPick = "Nothing picked yet";
 
     // One show() per open on a retained backend.
-    drawWorkerAndIdentityUI(workProgress, workStatus, workBusy, workDetailsOpen, workHideStatusBar).show();
-    drawChoiceMirror(choice, choiceLocked, colours).show();
+    drawTodoListUI(todos, newTodo).show();
+    drawRadioGroupMirror(level, levelDisabled, lastPick).show();
 
     return app.exec();
 }

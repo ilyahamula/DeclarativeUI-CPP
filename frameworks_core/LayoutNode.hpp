@@ -16,6 +16,8 @@
 // engine's results (docs/specs/custom_layout_system/architecture.md).
 // Built by the Stack/GroupBox/Dialog/TabPanel templates; consumed by
 // LayoutEngine (measure fills `desired`, arrange fills `frame`).
+class NodeSource; // frameworks_core/NodeSource.hpp
+
 struct LayoutNode
 {
 	NodeKind kind = NodeKind::Box;
@@ -51,6 +53,10 @@ struct LayoutNode
 	// everything. It is also what the wx/Qt relayout poll compares against.
 	BoundValue<bool> hidden { false };
 	bool hiddenApplied = false;
+
+	// VForEach / HForEach only: where the children come from, asked by the
+	// retained backends' sessions whether the data moved (NodeSource.hpp).
+	std::shared_ptr<NodeSource> source;
 
 	ControlWrapper* widget = nullptr;                // set for Leaf nodes
 	std::unique_ptr<ControlWrapper> ownedWidget;     // set when the tree owns the wrapper

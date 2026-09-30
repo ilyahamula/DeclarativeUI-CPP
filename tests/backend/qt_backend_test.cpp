@@ -481,6 +481,92 @@ TEST(qt_bound_item_lists_repopulate_and_keep_the_selection)
 	pump();
 }
 
+// VForEach: rows follow a bound vector. Adding one builds its widgets; a row's
+// own Remove button removes that row, and its widgets are destroyed, not left
+// behind in the window.
+TEST(qt_foreach_rows_follow_the_vector)
+{
+	std::vector<std::string> todos { "one", "two" };
+	Dialog { "Todos",
+		VForEach { todos, [&todos](const std::string& todo, std::size_t i) {
+			return HStack {
+				StaticText{todo},
+				Button{"Remove " + todo}.onClick([&todos, i] { todos.erase(todos.begin() + (long)i); })
+			};
+		} }
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Todos");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	const int twoRows = w->height();
+	CHECK_EQ(w->findChildren<QPushButton*>().size(), 2);
+
+	todos.push_back("three");
+	pump(200);
+	CHECK_EQ(w->findChildren<QPushButton*>().size(), 3);
+	CHECK(w->height() > twoRows);
+
+	QPushButton* removeOne = nullptr;
+	for (auto* b : w->findChildren<QPushButton*>())
+		if (b->text() == "Remove one")
+			removeOne = b;
+	CHECK(removeOne != nullptr);
+	if (removeOne != nullptr)
+		removeOne->click();
+	pump(200);
+	CHECK_EQ(todos.size(), static_cast<std::size_t>(2));
+	const auto buttons = w->findChildren<QPushButton*>();
+	CHECK_EQ(buttons.size(), 2);
+	bool oneGone = true;
+	for (auto* b : buttons)
+		oneGone &= b->text() != "Remove one";
+	CHECK(oneGone);
+	CHECK_EQ(w->height(), twoRows);
+	w->close();
+	pump();
+}
+
+// RadioGroup: one radio per option, bound to the index, in a row when asked;
+// a write from outside moves the check, onChange reports after the write.
+TEST(qt_radio_group_binds_an_index)
+{
+	int choice = 0;
+	int reported = -1;
+	int seen = -1;
+	Dialog { "Group",
+		RadioGroup{choice, {"Red", "Green", "Blue"}}
+			.withOrientation(Orientation::Horizontal)
+			.onChange([&](int i) { reported = i; seen = choice; })
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Group");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+
+	CHECK(radio(w, "Red")->isChecked());
+	// a row: every radio on one line
+	CHECK_EQ(radio(w, "Red")->y(), radio(w, "Blue")->y());
+	CHECK(radio(w, "Red")->x() < radio(w, "Blue")->x());
+
+	radio(w, "Blue")->click();
+	pump();
+	CHECK_EQ(choice, 2);
+	CHECK_EQ(reported, 2);
+	CHECK_EQ(seen, 2);
+	CHECK(!radio(w, "Red")->isChecked());
+
+	choice = 1;
+	pump();
+	CHECK(radio(w, "Green")->isChecked());
+	CHECK(!radio(w, "Blue")->isChecked());
+
+	w->close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	// No display on CI, and none needed: every check reads widget state.
