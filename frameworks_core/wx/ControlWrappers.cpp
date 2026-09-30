@@ -1566,6 +1566,30 @@ void addTreeItems(wxTreeCtrl* tree, const wxTreeItemId& parent,
 	}
 }
 
+// Every item path in the tree, and the ones currently open -- what a refill
+// needs to keep the user's open/closed state (TreeViewWrapper::openAfterRefill).
+void treeExpansion(wxTreeCtrl* tree, std::vector<std::string>& all, std::vector<std::string>& open)
+{
+	forEachTreeItem(tree, tree->GetRootItem(), [&](const wxTreeItemId& id) {
+		const std::string path = treeItemPath(tree, id);
+		all.push_back(path);
+		if (tree->IsExpanded(id))
+			open.push_back(path);
+	});
+}
+
+void applyTreeExpansion(wxTreeCtrl* tree, const std::vector<std::string>& open)
+{
+	forEachTreeItem(tree, tree->GetRootItem(), [&](const wxTreeItemId& id) {
+		if (!tree->ItemHasChildren(id))
+			return;
+		if (std::find(open.begin(), open.end(), treeItemPath(tree, id)) != open.end())
+			tree->Expand(id);
+		else
+			tree->Collapse(id);
+	});
+}
+
 } // unnamed namespace
 
 template <TreeViewValue T>
@@ -1581,7 +1605,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
 		m_style | selectionStyle | wxTR_HIDE_ROOT | wxTR_HAS_BUTTONS | wxTR_NO_LINES);
 	tree->AddRoot("");
-	addTreeItems(tree, tree->GetRootItem(), m_items, std::string {}, kPathSeparator);
+	addTreeItems(tree, tree->GetRootItem(), m_items.get(), std::string {}, kPathSeparator);
 	m_nativeWidget = tree;
 
 	// wxTreeCtrl's best size is its client area, not its content, so it would
@@ -1591,7 +1615,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	constexpr int kTreeFrame = 6;      // border the native control draws
 	constexpr int kScrollbarSlack = 20; // room for the vertical scrollbar
 	int widest = 0;
-	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+	forEachItem(m_items.get(), [&](const TreeItem& item, const std::string&, int depth) {
 		widest = std::max(widest,
 			static_cast<int>(tree->GetIndent()) * (depth + 1)
 				+ tree->GetTextExtent(item.label).GetWidth());
@@ -1599,6 +1623,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	const int rowHeight = tree->GetCharHeight() + 4;
 	tree->CacheBestSize(wxSize(widest + kTreeFrame + kScrollbarSlack,
 		rowHeight * m_visibleRows + kTreeFrame));
+	m_initialSize = Size { widest + kTreeFrame + kScrollbarSlack, rowHeight * m_visibleRows + kTreeFrame };
 
 	setTreeSelection(tree, pathsFor(boundValue()), m_multiSelect);
 
@@ -1612,6 +1637,34 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 		if (!*syncing)
 			commit(valueFor(treeSelection(tree, multi)));
 	});
+
+	// Bound items: refill when the caller's tree changes, registered BEFORE the
+	// selection sync. The selection is kept by path (the bound one, else what
+	// was picked) and every item that is still there keeps the open/closed
+	// state the user left it at. The tree keeps its first size (measuresItself).
+	if (const std::vector<TreeItem>* boundItems = m_items.boundValue())
+	{
+		auto shown = std::make_shared<std::vector<TreeItem>>(*boundItems);
+		const T* boundSelection = m_value.boundValue();
+		bindExternalRefSync(tree,
+			[shown] { return *shown; },
+			[boundItems] { return *boundItems; },
+			[tree, shown, syncing, boundSelection, multi = m_multiSelect](const std::vector<TreeItem>& next) {
+				const std::vector<std::string> keep = boundSelection != nullptr
+					? pathsFor(*boundSelection)
+					: treeSelection(tree, multi);
+				std::vector<std::string> before;
+				std::vector<std::string> openBefore;
+				treeExpansion(tree, before, openBefore);
+				*syncing = true;
+				tree->DeleteChildren(tree->GetRootItem());
+				addTreeItems(tree, tree->GetRootItem(), next, std::string {}, kPathSeparator);
+				applyTreeExpansion(tree, openAfterRefill(next, before, openBefore));
+				setTreeSelection(tree, keep, multi);
+				*syncing = false;
+				*shown = next;
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
@@ -1624,6 +1677,12 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 				*syncing = false;
 			});
 	}
+}
+
+template <TreeViewValue T>
+Size TreeViewWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class TreeViewWrapper<std::string>;
@@ -1673,6 +1732,37 @@ std::vector<int> dataViewSelection(wxDataViewListCtrl* view, bool multiSelect)
 	// backends however the view is currently sorted.
 	std::sort(indices.begin(), indices.end());
 	return indices;
+}
+
+// The rows the control holds, by ORIGINAL index -- whatever order a sort put
+// them in on screen.
+TableRows dataViewRows(wxDataViewListCtrl* view, int columnCount)
+{
+	const int count = static_cast<int>(view->GetItemCount());
+	TableRows rows(static_cast<std::size_t>(count), TableRow(static_cast<std::size_t>(columnCount)));
+	for (int viewRow = 0; viewRow < count; ++viewRow)
+	{
+		const int row = dataViewRowIndex(view, view->RowToItem(viewRow));
+		if (row < 0 || row >= count)
+			continue;
+		for (int column = 0; column < columnCount; ++column)
+			rows[row][column] = view->GetTextValue(viewRow, column).ToStdString();
+	}
+	return rows;
+}
+
+// Replace every row, each carrying its original index as item data.
+void fillDataView(wxDataViewListCtrl* view, const TableRows& rows, int columnCount)
+{
+	view->DeleteAllItems();
+	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+	{
+		wxVector<wxVariant> values;
+		values.reserve(static_cast<std::size_t>(columnCount));
+		for (int column = 0; column < columnCount; ++column)
+			values.push_back(wxVariant(wxString(TableWrapper<int>::cellText(rows, row, column))));
+		view->AppendItem(values, static_cast<wxUIntPtr>(row));
+	}
 }
 
 // Programmatic selection. wx sends wxEVT_DATAVIEW_SELECTION_CHANGED for these
@@ -1743,15 +1833,9 @@ void TableWrapper<T>::realize(void* parentWindow)
 			wxDATAVIEW_COL_RESIZABLE | (spec.sortable ? wxDATAVIEW_COL_SORTABLE : 0));
 	}
 
-	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
-	{
-		wxVector<wxVariant> values;
-		values.reserve(m_columns.size());
-		for (int column = 0; column < static_cast<int>(m_columns.size()); ++column)
-			values.push_back(wxVariant(wxString(cellText(rows, row, column))));
-		// The original index rides along as item data -- see dataViewRowIndex().
-		view->AppendItem(values, static_cast<wxUIntPtr>(row));
-	}
+	// The original index rides along as item data -- see dataViewRowIndex().
+	const int columnCount = static_cast<int>(m_columns.size());
+	fillDataView(view, rows, columnCount);
 
 	// wxDataViewListCtrl's best size is its client area rather than its content,
 	// so it would ask the engine for whatever it happens to have been given.
@@ -1805,6 +1889,31 @@ void TableWrapper<T>::realize(void* parentWindow)
 		if (!*syncing)
 			commit(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)));
 	});
+
+	// Bound rows: refill when the caller's data changes -- registered BEFORE the
+	// selection sync, which then reads indices against the new rows. Compared in
+	// the control's own shape, so a cell edit (already written through above,
+	// and already on screen) is no change. The columns keep the widths the
+	// first rows gave them, as a bound list keeps its first width, the sort is
+	// re-applied, and the selection is kept by value.
+	if (editTarget != nullptr)
+	{
+		const T* boundSelection = m_value.boundValue();
+		bindExternalRefSync(view,
+			[view, columnCount] { return dataViewRows(view, columnCount); },
+			[editTarget, columnCount] { return normalizedRows(*editTarget, columnCount); },
+			[view, syncing, boundSelection, columnCount](const TableRows& next) {
+				const T keep = boundSelection != nullptr
+					? *boundSelection
+					: valueFor(dataViewRows(view, columnCount), dataViewSelection(view, kMultiSelect));
+				*syncing = true;
+				fillDataView(view, next, columnCount);
+				if (wxDataViewModel* model = view->GetModel())
+					model->Resort();
+				setDataViewSelection(view, rowIndicesFor(next, keep), kMultiSelect);
+				*syncing = false;
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();

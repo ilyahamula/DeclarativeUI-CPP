@@ -1121,7 +1121,7 @@ public:
 
 	static constexpr bool kVectorBinding = MultiSelectTreeViewValue<T>;
 
-	TreeViewWrapper(std::vector<TreeItem> items,
+	TreeViewWrapper(BoundValue<std::vector<TreeItem>> items,
 		BoundValue<T> selected, int visibleRows, bool multiSelect,
 		const Position& pos, const Size& size, long style,
 		EventCallback<const T&> onChange = {})
@@ -1135,6 +1135,9 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize(), as a bound
+	// ListBox is -- a refilled tree must not resize an auto-fit window.
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	static std::string joinPath(const std::string& parentPath, const std::string& label)
 	{
@@ -1204,12 +1207,34 @@ public:
 
 	const T& boundValue() const { return m_value.get(); }
 
+	// Paths a refill should show open: an item that was already in the tree
+	// keeps what the user left it at (`openBefore` holds the paths that were
+	// open, `before` every path that existed), and a new item takes its own
+	// `expanded` flag. Shared by wx and Qt; ImGui's own open state behaves
+	// this way by itself, keyed by label.
+	static std::vector<std::string> openAfterRefill(const std::vector<TreeItem>& next,
+		const std::vector<std::string>& before, const std::vector<std::string>& openBefore)
+	{
+		const auto contains = [](const std::vector<std::string>& paths, const std::string& path) {
+			return std::find(paths.begin(), paths.end(), path) != paths.end();
+		};
+		std::vector<std::string> open;
+		forEachItem(next, [&](const TreeItem& item, const std::string& path, int) {
+			if (item.children.empty())
+				return;
+			if (contains(before, path) ? contains(openBefore, path) : item.expanded)
+				open.push_back(path);
+		});
+		return open;
+	}
+
 private:
-	std::vector<TreeItem> m_items;
+	BoundValue<std::vector<TreeItem>> m_items;
 	int m_visibleRows = 1;
 	bool m_multiSelect = false;
 	BoundValue<T> m_value;
 	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first tree's size
 };
 
 extern template class TreeViewWrapper<std::string>;
@@ -1279,6 +1304,21 @@ public:
 		if (column < 0 || column >= static_cast<int>(cells.size()))
 			return kEmpty;
 		return cells[column];
+	}
+
+	// `rows` cut or padded to exactly `columnCount` cells each -- what a native
+	// table actually holds, since cellText() reads a ragged row as trailing
+	// empty cells. The retained backends compare the caller's rows with the
+	// control's in this shape, so a short row is not a perpetual difference.
+	static TableRows normalizedRows(const TableRows& rows, int columnCount)
+	{
+		TableRows out(rows.size(), TableRow(static_cast<std::size_t>(columnCount)));
+		for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+		{
+			for (int column = 0; column < columnCount; ++column)
+				out[row][column] = cellText(rows, row, column);
+		}
+		return out;
 	}
 
 	// Original row indices the control should show selected. Out-of-range

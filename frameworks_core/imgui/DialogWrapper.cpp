@@ -182,7 +182,10 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		}
 		engine.render(root, renderContent);
 		// Enter / Escape, now that every button has offered (DialogKeys.hpp).
-		dialogKeys.dispatch();
+		// Escape with no cancel button closes the dialog, as it does on wx and
+		// Qt: clearing the flag is the ordinary close path below.
+		if (dialogKeys.dispatch())
+			*flag = false;
 
 		// The file browser is drawn HERE, not in the wrapper that asked for it:
 		// ImGuiLayoutBackend::place() wraps every render() in BeginGroup() +

@@ -157,7 +157,7 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 		}
 		engine.render(root, renderContent);
 		// Enter / Escape, now that every button has offered (DialogKeys.hpp).
-		dialogKeys.dispatch();
+		(void)dialogKeys.dispatch(); // a Window ignores a bare Escape, like wxFrame / QMainWindow
 
 		// The file browser is drawn HERE, not in the wrapper that asked for it:
 		// ImGuiLayoutBackend::place() wraps every render() in BeginGroup() +

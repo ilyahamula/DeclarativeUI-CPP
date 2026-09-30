@@ -156,7 +156,13 @@ struct TreeItem
 {
 	std::string label;
 	std::vector<TreeItem> children;
+	// The item's INITIAL state. Once shown, open/closed is the user's: a bound
+	// tree that is refilled keeps what the user left each existing item at,
+	// and only a new item takes this flag -- on all three backends.
 	bool expanded = false;
+
+	// A bound tree compares its items to tell whether to refill.
+	bool operator==(const TreeItem&) const = default;
 };
 
 // One column of a Table. Framework-independent by design, exactly as TreeItem

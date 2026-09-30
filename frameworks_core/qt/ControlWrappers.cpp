@@ -1435,6 +1435,28 @@ void addTreeItems(QTreeWidget* tree, QTreeWidgetItem* parent,
 	}
 }
 
+// Every item path in the tree, and the ones currently open -- what a refill
+// needs to keep the user's open/closed state (TreeViewWrapper::openAfterRefill).
+void treeExpansion(QTreeWidget* tree, std::vector<std::string>& all, std::vector<std::string>& open)
+{
+	for (QTreeWidgetItemIterator it(tree); *it; ++it)
+	{
+		const std::string path = treeItemPath(*it);
+		all.push_back(path);
+		if ((*it)->isExpanded())
+			open.push_back(path);
+	}
+}
+
+void applyTreeExpansion(QTreeWidget* tree, const std::vector<std::string>& open)
+{
+	for (QTreeWidgetItemIterator it(tree); *it; ++it)
+	{
+		if ((*it)->childCount() > 0)
+			(*it)->setExpanded(std::find(open.begin(), open.end(), treeItemPath(*it)) != open.end());
+	}
+}
+
 } // unnamed namespace
 
 template <TreeViewValue T>
@@ -1446,7 +1468,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	// Single unnamed column: a TreeItem carries one label, and a header would
 	// eat a row of height the engine has not budgeted for.
 	tree->setHeaderHidden(true);
-	addTreeItems(tree, nullptr, m_items, std::string {}, kPathSeparator);
+	addTreeItems(tree, nullptr, m_items.get(), std::string {}, kPathSeparator);
 
 	// ExtendedSelection is Qt's ctrl/shift-click mode; MultiSelection would
 	// toggle on a plain click, which is not what a desktop tree does.
@@ -1458,11 +1480,13 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	// only the item tree knows each item's depth.
 	int widest = 0;
 	const QFontMetrics metrics = tree->fontMetrics();
-	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+	forEachItem(m_items.get(), [&](const TreeItem& item, const std::string&, int depth) {
 		widest = std::max(widest,
 			tree->indentation() * (depth + 1) + metrics.horizontalAdvance(qstr(item.label)));
 	});
 	tree->contentWidth = widest;
+	const QSize hint = tree->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
 
 	setTreeSelection(tree, pathsFor(boundValue()));
 	m_nativeWidget = tree;
@@ -1471,6 +1495,33 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 		[tree, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)]() {
 			commit(valueFor(treeSelection(tree)));
 		});
+
+	// Bound items: refill when the caller's tree changes, registered BEFORE the
+	// selection sync. The selection is kept by path (the bound one, else what
+	// was picked) and every item that is still there keeps the open/closed
+	// state the user left it at. The push runs under RefSync's QSignalBlocker,
+	// so the refill reports no selection change. The tree keeps its first size.
+	if (const std::vector<TreeItem>* boundItems = m_items.boundValue())
+	{
+		auto shown = std::make_shared<std::vector<TreeItem>>(*boundItems);
+		const T* boundSelection = m_value.boundValue();
+		bindExternalRefSync(tree,
+			[shown] { return *shown; },
+			[boundItems] { return *boundItems; },
+			[tree, shown, boundSelection](const std::vector<TreeItem>& next) {
+				const std::vector<std::string> keep = boundSelection != nullptr
+					? pathsFor(*boundSelection)
+					: treeSelection(tree);
+				std::vector<std::string> before;
+				std::vector<std::string> openBefore;
+				treeExpansion(tree, before, openBefore);
+				tree->clear();
+				addTreeItems(tree, nullptr, next, std::string {}, kPathSeparator);
+				applyTreeExpansion(tree, openAfterRefill(next, before, openBefore));
+				setTreeSelection(tree, keep);
+				*shown = next;
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
@@ -1482,6 +1533,12 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 			[&value] { return pathsFor(value); },
 			[tree](const std::vector<std::string>& paths) { setTreeSelection(tree, paths); });
 	}
+}
+
+template <TreeViewValue T>
+Size TreeViewWrapper<T>::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
 }
 
 template class TreeViewWrapper<std::string>;
@@ -1546,6 +1603,56 @@ std::vector<int> tableSelection(const QTableWidget* table)
 	return indices;
 }
 
+// The rows the table holds, by ORIGINAL index -- whatever order a sort put
+// them in on screen.
+TableRows tableRows(const QTableWidget* table, int columnCount)
+{
+	const int count = table->rowCount();
+	TableRows rows(static_cast<std::size_t>(count), TableRow(static_cast<std::size_t>(columnCount)));
+	for (int viewRow = 0; viewRow < count; ++viewRow)
+	{
+		const int row = tableRowIndex(table, viewRow);
+		if (row < 0 || row >= count)
+			continue;
+		for (int column = 0; column < columnCount; ++column)
+		{
+			if (const QTableWidgetItem* item = table->item(viewRow, column))
+				rows[row][column] = item->text().toStdString();
+		}
+	}
+	return rows;
+}
+
+// Replace every cell. Column 0 carries the original index (kTableRowRole);
+// editability is per column, through each item's flags. The caller holds the
+// syncing guard: setItem() emits itemChanged.
+void fillTable(QTableWidget* table, const TableRows& rows, const std::vector<TableColumn>& columns)
+{
+	const int columnCount = static_cast<int>(columns.size());
+	table->setRowCount(static_cast<int>(rows.size()));
+	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+	{
+		for (int column = 0; column < columnCount; ++column)
+		{
+			auto* cell = new QTableWidgetItem(qstr(TableWrapper<int>::cellText(rows, row, column)));
+			Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+			if (columns[column].editable)
+				flags |= Qt::ItemIsEditable;
+			cell->setFlags(flags);
+			if (column == 0)
+				cell->setData(kTableRowRole, row);
+			table->setItem(row, column, cell);
+		}
+	}
+}
+
+// The sort the user last clicked, if any -- re-applied after a refill.
+struct TableSort
+{
+	int column = -1;
+	Qt::SortOrder order = Qt::AscendingOrder;
+};
+
 void setTableSelection(QTableWidget* table, const std::vector<int>& indices)
 {
 	QItemSelection selection;
@@ -1574,7 +1681,6 @@ void TableWrapper<T>::realize(void* parentWindow)
 	const int columnCount = static_cast<int>(m_columns.size());
 	table->visibleRows = m_visibleRows;
 	table->setColumnCount(columnCount);
-	table->setRowCount(static_cast<int>(rows.size()));
 
 	// A table's rows are its identity, so the row header would only ever show a
 	// position the bindings deliberately do not use.
@@ -1616,20 +1722,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 		? (QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed)
 		: QAbstractItemView::NoEditTriggers);
 
-	for (int row = 0; row < static_cast<int>(rows.size()); ++row)
-	{
-		for (int column = 0; column < columnCount; ++column)
-		{
-			auto* cell = new QTableWidgetItem(qstr(cellText(rows, row, column)));
-			Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-			if (m_columns[column].editable)
-				flags |= Qt::ItemIsEditable;
-			cell->setFlags(flags);
-			if (column == 0)
-				cell->setData(kTableRowRole, row);
-			table->setItem(row, column, cell);
-		}
-	}
+	fillTable(table, rows, m_columns);
 
 	setTableSelection(table, rowIndicesFor(rows, boundValue()));
 
@@ -1645,6 +1738,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 	// Held across a programmatic sort, which moves items and reselects rows.
 	// Without it the sort would look like a user edit and a user selection.
 	auto syncing = std::make_shared<bool>(false);
+	auto sort = std::make_shared<TableSort>();
 
 	// Sorting is driven by hand rather than through setSortingEnabled(), which
 	// is all-or-nothing: every header would sort, and TableColumn::sortable is
@@ -1657,7 +1751,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 		header->setSectionsClickable(true);
 		header->setSortIndicatorShown(true);
 		QObject::connect(header, &QHeaderView::sectionClicked, table,
-			[table, header, syncing, columns = m_columns](int section) {
+			[table, header, syncing, sort, columns = m_columns](int section) {
 				if (section < 0 || section >= static_cast<int>(columns.size())
 					|| !columns[section].sortable)
 					return;
@@ -1675,6 +1769,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 				setTableSelection(table, selected);
 				*syncing = false;
 				header->setSortIndicator(section, order);
+				*sort = TableSort { section, order };
 			});
 	}
 
@@ -1702,6 +1797,31 @@ void TableWrapper<T>::realize(void* parentWindow)
 			if (!*syncing)
 				commit(valueFor(liveRows(), tableSelection(table)));
 		});
+
+	// Bound rows: refill when the caller's data changes -- registered BEFORE the
+	// selection sync, which then reads indices against the new rows. Compared in
+	// the table's own shape, so a cell edit (already written through above, and
+	// already on screen) is no change. Column widths stay what the first rows
+	// made them, as a bound list keeps its first width; the sort the user chose
+	// is re-applied and the selection kept by value.
+	if (editTarget != nullptr)
+	{
+		const T* boundSelection = m_value.boundValue();
+		bindExternalRefSync(table,
+			[table, columnCount] { return tableRows(table, columnCount); },
+			[editTarget, columnCount] { return normalizedRows(*editTarget, columnCount); },
+			[table, syncing, sort, boundSelection, columns = m_columns, columnCount](const TableRows& next) {
+				const T keep = boundSelection != nullptr
+					? *boundSelection
+					: valueFor(tableRows(table, columnCount), tableSelection(table));
+				*syncing = true;
+				fillTable(table, next, columns);
+				if (sort->column >= 0)
+					table->sortItems(sort->column, sort->order);
+				setTableSelection(table, rowIndicesFor(next, keep));
+				*syncing = false;
+			});
+	}
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();

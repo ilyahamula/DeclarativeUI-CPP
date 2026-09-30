@@ -560,6 +560,78 @@ TEST(imgui_icon_button_falls_back_to_its_label)
 	g_ui = nullptr;
 }
 
+// Bound TreeView items and Table rows: the tree is rebuilt every frame, so
+// following the data is free -- what matters is that it does not RESIZE the
+// window, the parity wx and Qt keep by measuring the first content once.
+TEST(imgui_bound_tree_and_table_keep_their_first_size)
+{
+	std::vector<TreeItem> tree { { "Fruits", { { "Apple" }, { "Banana" } }, true } };
+	std::string treePick = "Fruits/Banana";
+	TableRows rows { { "a.txt", "1" }, { "b.txt", "2" } };
+	std::string rowPick = "b.txt";
+	g_ui = [&] {
+		Dialog { "Data",
+			VStack {
+				TreeView{ tree, treePick }.withVisibleRows(5),
+				Table{ { { "File", -1, true }, { "Size", -1 } }, rows, rowPick }.withVisibleRows(4)
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Data");
+	const ImVec2 size = w->Size;
+
+	tree[0].children.push_back({ "Cherry with a very long name indeed" });
+	tree.push_back({ "Nuts", { { "Almond" } }, true });
+	rows.insert(rows.begin(), { "a much longer file name than any before.txt", "3" });
+	frames(3);
+	CHECK_EQ(w->Size.x, size.x);
+	CHECK_EQ(w->Size.y, size.y);
+	CHECK_EQ(treePick, std::string("Fruits/Banana"));
+	CHECK_EQ(rowPick, std::string("b.txt"));
+
+	rows.clear();
+	tree.clear();
+	frames(3); // an emptied table and tree draw nothing and do not crash
+	CHECK_EQ(w->Size.x, size.x);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// Escape with no cancel button closes a Dialog -- as a wxDialog and a QDialog
+// do -- and leaves a Window alone, as a wxFrame and a QMainWindow do.
+TEST(imgui_escape_closes_a_dialog_without_a_cancel_button)
+{
+	bool dialogOpen = true;
+	bool windowOpen = true;
+	int closed = 0;
+	g_ui = [&] {
+		Window { "EscWindow", VStack { Button{"Nothing"} } }.show(windowOpen);
+		Dialog { "EscDialog", VStack { Button{"Nothing either"} } }
+			.onClose([&] { ++closed; })
+			.setPosition({0, 0})
+			.show(dialogOpen);
+	};
+	frames(5);
+	const ImVec2 inside = rowCentre("EscDialog", 0);
+	click(inside.x, inside.y); // focus the dialog
+	key(ImGuiKey_Escape);
+	CHECK(!dialogOpen);
+	CHECK_EQ(closed, 1);
+
+	// the Window, focused, ignores it
+	const ImGuiWindow* w = ImGui::FindWindowByName("EscWindow");
+	CHECK(w != nullptr);
+	if (w != nullptr)
+	{
+		click(w->Pos.x + 20.0f, w->Pos.y + ImGui::GetFrameHeight() + 20.0f);
+		key(ImGuiKey_Escape);
+	}
+	CHECK(windowOpen);
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

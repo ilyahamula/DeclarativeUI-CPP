@@ -10,7 +10,9 @@
 #include <wx/combobox.h>
 #include <wx/listbox.h>
 #include <wx/statline.h>
+#include <wx/dataview.h>
 #include <wx/statusbr.h>
+#include <wx/treectrl.h>
 #include <wx/wx.h>
 
 #include <functional>
@@ -620,6 +622,76 @@ TEST(wx_icon_button_carries_its_icon)
 	CHECK(icon->GetBitmap().GetWidth() == 20 || icon->GetBitmap().GetLogicalWidth() == 20);
 	CHECK(icon->GetBestSize().GetWidth() > plain->GetBestSize().GetWidth());
 	CHECK(!broken->GetBitmap().IsOk());
+	w->Close();
+	pump();
+}
+
+// Bound TreeView items and Table rows follow the caller's data: refilled,
+// selection kept by path / key, the user's open state kept for items that are
+// still there and a new item's own flag honoured, the window not resized.
+TEST(wx_bound_tree_and_table_follow_their_data)
+{
+	std::vector<TreeItem> tree {
+		{ "Fruits", { { "Apple" }, { "Banana" } }, false },
+		{ "Veg", { { "Leek" } }, false } };
+	std::string treePick = "Fruits/Banana";
+	TableRows rows { { "a.txt", "1" }, { "b.txt", "2" } };
+	std::string rowPick = "b.txt";
+	Dialog { "Data",
+		VStack {
+			TreeView{ tree, treePick }.withVisibleRows(5),
+			Table{ { { "File", -1, true }, { "Size", -1 } }, rows, rowPick }.withVisibleRows(4)
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Data");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* tc = find<wxTreeCtrl>(w, [](wxTreeCtrl*) { return true; });
+	auto* view = find<wxDataViewListCtrl>(w, [](wxDataViewListCtrl*) { return true; });
+	CHECK(tc != nullptr && view != nullptr);
+	if (tc == nullptr || view == nullptr)
+		return;
+	auto topLevel = [tc](int n) {
+		wxTreeItemIdValue cookie;
+		wxTreeItemId id = tc->GetFirstChild(tc->GetRootItem(), cookie);
+		for (int i = 0; i < n && id.IsOk(); ++i)
+			id = tc->GetNextChild(tc->GetRootItem(), cookie);
+		return id;
+	};
+	const wxSize size = w->GetSize();
+	// wxTreeCtrl opens a collapsed parent when it selects a child in it, so
+	// "Fruits" may already be open because "Fruits/Banana" is selected; either
+	// way the refill keeps it as it was.
+	const bool fruitsOpen = tc->IsExpanded(topLevel(0));
+	tc->Expand(topLevel(1)); // the user opens "Veg"
+
+	tree[0].children.push_back({ "Cherry with a very long name indeed" });
+	tree.push_back({ "Nuts", { { "Almond" } }, true });
+	rows.insert(rows.begin(), { "a much longer file name than any before.txt", "3" });
+	pump();
+
+	CHECK_EQ(static_cast<int>(tc->GetChildrenCount(tc->GetRootItem(), false)), 3);
+	CHECK_EQ(static_cast<int>(tc->GetChildrenCount(topLevel(0), false)), 3);
+	CHECK_EQ(tc->IsExpanded(topLevel(0)), fruitsOpen); // as the user left it
+	CHECK(tc->IsExpanded(topLevel(1)));  // opened by the user: kept
+	CHECK(tc->IsExpanded(topLevel(2)));  // new: its own flag
+	CHECK(tc->GetSelection().IsOk() && tc->GetItemText(tc->GetSelection()) == "Banana");
+	CHECK_EQ(treePick, std::string("Fruits/Banana"));
+
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 3);
+	const int selectedRow = view->ItemToRow(view->GetSelection());
+	CHECK(selectedRow >= 0 && view->GetTextValue(selectedRow, 0) == "b.txt");
+	CHECK_EQ(rowPick, std::string("b.txt"));
+	CHECK(w->GetSize() == size);
+
+	rows[1][1] = "42"; // a cell written from outside
+	pump();
+	bool found = false;
+	for (int row = 0; row < static_cast<int>(view->GetItemCount()); ++row)
+		found = found || view->GetTextValue(row, 1) == "42";
+	CHECK(found);
 	w->Close();
 	pump();
 }

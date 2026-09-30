@@ -17,14 +17,16 @@ int main(int argc, char** argv)
     std::vector<DemoTodo> todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
     std::string newTodo;
     std::string todoKeys = "Enter adds, Escape clears";
-    // RadioGroup sharing its index with a slider and a spin box.
-    int level = 2;
-    bool levelDisabled = false;
-    std::string lastPick = "Nothing picked yet";
+    // Bound TreeView items and Table rows: the buttons change these, and
+    // both controls follow while keeping the selection.
+    std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
+    TableRows files { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } };
+    std::string folderPick = "Documents/Letters";
+    std::string filePick = "budget.csv";
 
     // One show() per open on a retained backend.
     drawTodoListUI(todos, newTodo, todoKeys).show();
-    drawRadioGroupMirror(level, levelDisabled, lastPick).show();
+    drawTreeTableBindingUI(folders, files, folderPick, filePick).show();
 
     return app.exec();
 }

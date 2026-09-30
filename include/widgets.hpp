@@ -1226,25 +1226,49 @@ struct TreeView : Widget<TreeView<T>>
 	// than ListBox's default because a tree spends rows on its categories.
 	static constexpr int kDefaultVisibleRows = 8;
 
-	explicit TreeView(std::vector<TreeItem> items)
+	// The items follow the usual binding contract: a non-const lvalue vector
+	// BINDS, and the tree is refilled when it changes (keeping the selection by
+	// path and the user's open/closed state of every item that is still
+	// there); a literal, temporary or const vector is a snapshot.
+	explicit TreeView(const std::vector<TreeItem>& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
 	{
 		// No default selection, unlike ListBox: a tree's first item is usually a
 		// category rather than a choice, so "nothing selected" is the honest
 		// starting state.
 	}
 
-	TreeView(std::vector<TreeItem> items, const T& selected)
+	explicit TreeView(std::vector<TreeItem>& items)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+	{
+	}
+
+	TreeView(const std::vector<TreeItem>& items, const T& selected)
+		: super()
+		, m_items(items)
 		, m_value(selected)
 	{
 	}
 
-	TreeView(std::vector<TreeItem> items, T& selected)
+	TreeView(const std::vector<TreeItem>& items, T& selected)
 		: super()
-		, m_items(std::move(items))
+		, m_items(items)
+		, m_value(selected)
+	{
+	}
+
+	TreeView(std::vector<TreeItem>& items, const T& selected)
+		: super()
+		, m_items(items)
+		, m_value(selected)
+	{
+	}
+
+	TreeView(std::vector<TreeItem>& items, T& selected)
+		: super()
+		, m_items(items)
 		, m_value(selected)
 	{
 	}
@@ -1287,7 +1311,7 @@ private:
 	}
 
 private:
-	std::vector<TreeItem> m_items;
+	BoundValue<std::vector<TreeItem>> m_items;
 	int m_visibleRows = kDefaultVisibleRows;
 	bool m_multiSelect = false;
 	BoundValue<T> m_value;

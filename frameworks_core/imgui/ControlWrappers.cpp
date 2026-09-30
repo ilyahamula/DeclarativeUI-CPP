@@ -374,14 +374,18 @@ namespace
 // position: a measure-phase key, since measure runs before ImGui::Begin -- or
 // the control's withId() when it has one. What arrives later never moves it,
 // so a new message or a longer item cannot resize an auto-fit window.
-Size firstMeasured(const std::string& stableId, const Size& now)
+//
+// A template because a Table keeps more than a Size: its column widths, which
+// wx and Qt fix at realize() and never recompute.
+template <typename Measured>
+Measured firstMeasured(const std::string& stableId, const Measured& now)
 {
-	static std::unordered_map<std::uint64_t, Size> sizes;
+	static std::unordered_map<std::uint64_t, Measured> values;
 	const int measureId = WidgetIdManager::nextMeasureId();
 	const std::uint64_t key = stableId.empty()
 		? WidgetIdManager::stateKey(measureId, WidgetIdManager::kMeasureSlot)
 		: WidgetIdManager::stableStateKey(stableId, WidgetIdManager::kMeasureSlot);
-	return sizes.try_emplace(key, now).first->second;
+	return values.try_emplace(key, now).first->second;
 }
 
 float widestItem(const ItemList& items)
@@ -1116,14 +1120,16 @@ Size TreeViewWrapper<T>::measureIntrinsic(const Constraints&)
 	const ImGuiStyle& style = ImGui::GetStyle();
 	const float indent = ImGui::GetTreeNodeToLabelSpacing();
 	float widest = 0.0f;
-	forEachItem(m_items, [&](const TreeItem& item, const std::string&, int depth) {
+	forEachItem(m_items.get(), [&](const TreeItem& item, const std::string&, int depth) {
 		widest = std::max(widest,
 			indent * (float)(depth + 1) + ImGui::CalcTextSize(item.label.c_str()).x);
 	});
 	const float w = widest + style.FramePadding.x * 2.0f + style.ScrollbarSize;
 	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
 		+ style.FramePadding.y * 2.0f;
-	return Size { ceilInt(w), ceilInt(h) };
+	const Size size { ceilInt(w), ceilInt(h) };
+	// Bound items keep the size of the first tree (see firstMeasured).
+	return m_items.isBound() ? firstMeasured(m_stableId, size) : size;
 }
 
 template <TreeViewValue T>
@@ -1207,7 +1213,7 @@ void TreeViewWrapper<T>::render(const Rect& frame)
 			ImGui::PopID();
 		}
 	};
-	draw(draw, m_items, std::string {});
+	draw(draw, m_items.get(), std::string {});
 
 	ImGui::EndChild();
 	ImGui::PopID();
@@ -1275,10 +1281,13 @@ Size TableWrapper<T>::measureIntrinsic(const Constraints&)
 	int width = ceilInt(style.ScrollbarSize);
 	m_columnWidths.clear();
 	for (int column = 0; column < (int)m_columns.size(); ++column)
-	{
 		m_columnWidths.push_back(columnWidth(m_columns, rows, column, measureText));
-		width += m_columnWidths.back() + ceilInt(style.CellPadding.x * 2.0f);
-	}
+	// Bound rows keep the column widths of the first rows -- what wx and Qt do,
+	// and what stops new data resizing an auto-fit window (see firstMeasured).
+	if (m_rows.isBound())
+		m_columnWidths = firstMeasured(m_stableId, m_columnWidths);
+	for (const int columnWidthPx : m_columnWidths)
+		width += columnWidthPx + ceilInt(style.CellPadding.x * 2.0f);
 
 	// visibleRows + 1: the header row is always drawn, so it is always measured.
 	// The sort arrow rides inside the header cell's own padding.

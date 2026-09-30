@@ -14,17 +14,19 @@ class DeclarativeApp : public wxApp
     std::vector<DemoTodo> m_todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
     std::string m_newTodo;
     std::string m_todoKeys = "Enter adds, Escape clears";
-    // RadioGroup sharing its index with a slider and a spin box.
-    int m_level = 2;
-    bool m_levelDisabled = false;
-    std::string m_lastPick = "Nothing picked yet";
+    // Bound TreeView items and Table rows: the buttons change these, and
+    // both controls follow while keeping the selection.
+    std::vector<TreeItem> m_folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
+    TableRows m_files { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } };
+    std::string m_folderPick = "Documents/Letters";
+    std::string m_filePick = "budget.csv";
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
         drawTodoListUI(m_todos, m_newTodo, m_todoKeys).show();
-        drawRadioGroupMirror(m_level, m_levelDisabled, m_lastPick).show();
+        drawTreeTableBindingUI(m_folders, m_files, m_folderPick, m_filePick).show();
         return true;
     }
 };

@@ -50,16 +50,21 @@ public:
 	WindowScope(const WindowScope&) = delete;
 	WindowScope& operator=(const WindowScope&) = delete;
 
-	// Inside the window, after its tree has been drawn.
-	void dispatch()
+	// Inside the window, after its tree has been drawn. Returns true when
+	// Escape was pressed here and no cancel button took it -- a Dialog then
+	// closes, as a wxDialog and a QDialog do on Escape; a Window does not,
+	// like a wxFrame and a QMainWindow.
+	bool dispatch()
 	{
 		if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || ImGui::IsAnyItemActive())
-			return;
+			return false;
 		if (ImGui::GetIO().KeyMods != ImGuiMod_None)
-			return;
-		// copied out: a handler may show() a window that opens a scope of its own
-		if (m_offers.cancelPress && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+			return false;
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
 		{
+			if (!m_offers.cancelPress)
+				return true;
+			// copied out: a handler may show() a window that opens a scope of its own
 			const auto press = m_offers.cancelPress;
 			press();
 		}
@@ -68,6 +73,7 @@ public:
 			const auto press = m_offers.defaultPress;
 			press();
 		}
+		return false;
 	}
 
 	static bool enterPressed()

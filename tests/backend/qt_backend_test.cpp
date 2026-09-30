@@ -25,7 +25,9 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QPlainTextEdit>
+#include <QTableWidget>
 #include <QTimer>
+#include <QTreeWidget>
 
 namespace
 {
@@ -683,6 +685,62 @@ TEST(qt_icon_button_carries_its_icon)
 	CHECK(icon->iconSize() == QSize(20, 20));
 	CHECK(icon->sizeHint().width() > plain->sizeHint().width());
 	CHECK(broken->icon().isNull());
+	w->close();
+	pump();
+}
+
+// Bound TreeView items and Table rows follow the caller's data: refilled,
+// selection kept by path / key, the user's open state kept for items that are
+// still there and a new item's own flag honoured, the window not resized.
+TEST(qt_bound_tree_and_table_follow_their_data)
+{
+	std::vector<TreeItem> tree {
+		{ "Fruits", { { "Apple" }, { "Banana" } }, false },
+		{ "Veg", { { "Leek" } }, false } };
+	std::string treePick = "Fruits/Banana";
+	TableRows rows { { "a.txt", "1" }, { "b.txt", "2" } };
+	std::string rowPick = "b.txt";
+	Dialog { "Data",
+		VStack {
+			TreeView{ tree, treePick }.withVisibleRows(5),
+			Table{ { { "File", -1, true }, { "Size", -1 } }, rows, rowPick }.withVisibleRows(4)
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Data");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* tw = w->findChild<QTreeWidget*>();
+	auto* table = w->findChild<QTableWidget*>();
+	CHECK(tw != nullptr && table != nullptr);
+	if (tw == nullptr || table == nullptr)
+		return;
+	const QSize size = w->size();
+	tw->topLevelItem(1)->setExpanded(true); // the user opens "Veg"
+
+	tree[0].children.push_back({ "Cherry with a very long name indeed" });
+	tree.push_back({ "Nuts", { { "Almond" } }, true });
+	rows.insert(rows.begin(), { "a much longer file name than any before.txt", "3" });
+	pump(200);
+
+	CHECK_EQ(tw->topLevelItemCount(), 3);
+	CHECK_EQ(tw->topLevelItem(0)->childCount(), 3);
+	CHECK(!tw->topLevelItem(0)->isExpanded()); // left closed by the user
+	CHECK(tw->topLevelItem(1)->isExpanded());  // opened by the user: kept
+	CHECK(tw->topLevelItem(2)->isExpanded());  // new: its own flag
+	CHECK(tw->selectedItems().size() == 1 && tw->selectedItems().front()->text(0) == "Banana");
+	CHECK_EQ(treePick, std::string("Fruits/Banana"));
+
+	CHECK_EQ(table->rowCount(), 3);
+	const auto picked = table->selectedItems();
+	CHECK(!picked.isEmpty() && table->item(picked.front()->row(), 0)->text() == "b.txt");
+	CHECK_EQ(rowPick, std::string("b.txt"));
+	CHECK(w->size() == size);
+
+	rows[1][1] = "42"; // a cell written from outside
+	pump(200);
+	CHECK(!table->findItems("42", Qt::MatchExactly).isEmpty());
 	w->close();
 	pump();
 }

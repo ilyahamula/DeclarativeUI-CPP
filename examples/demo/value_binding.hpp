@@ -1539,3 +1539,63 @@ inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, 
         }
     };
 }
+
+// TreeView items + Table rows, both BOUND: the buttons change the caller's
+// vectors and nothing else, and both controls follow on every backend. The
+// selection is kept by path / key across a refill, a folder the user opened
+// stays open, and neither control resizes the window -- they keep the size of
+// their first content, as a bound ListBox does. `filePick` is shown by a
+// bound label, so the key binding is visible as it follows the rows.
+inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, TableRows& files,
+    std::string& folderPick, std::string& filePick)
+{
+    return Dialog {
+        "Bound tree + table",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                TreeView{ folders, folderPick }
+                    .withVisibleRows(8)
+                    .withSize({180, -1}),
+                Table{ { { "File", 180, true }, { "Size", 60, true } }, files, filePick }
+                    .withVisibleRows(7)
+                    .withFlags(LayoutFlags().Border(Side::Left, 10))
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
+                Button{"Add folder"}
+                    .onClick([&folders] {
+                        folders.push_back({ "Folder " + std::to_string(folders.size() + 1),
+                            { { "notes" }, { "drafts" } }, true });
+                    }),
+                Button{"Add file"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files] {
+                        files.push_back({ "file-" + std::to_string(files.size() + 1) + ".txt",
+                            std::to_string(files.size() * 7 + 3) });
+                    }),
+                Button{"Grow selected"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files, &filePick] {
+                        for (auto& row : files)
+                        {
+                            if (!row.empty() && row[0] == filePick && row.size() > 1)
+                                row[1] = std::to_string(std::stoi(row[1]) * 2);
+                        }
+                    }),
+                Button{"Remove selected"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files, &filePick] {
+                        std::erase_if(files, [&](const TableRow& row) { return !row.empty() && row[0] == filePick; });
+                    })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                StaticText{"Selected file:"}
+                    .withSize({110, 20}),
+                StaticText{filePick}
+                    .withSize({260, 20})
+            }
+        }
+    };
+}
