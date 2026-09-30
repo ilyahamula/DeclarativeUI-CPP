@@ -2,6 +2,7 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/DialogKeys.hpp"
 #include "frameworks_core/CoreTypes/EventCallback.hpp"
 #include "frameworks_core/CoreTypes/StatusField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
@@ -91,10 +92,11 @@ class ButtonWrapper : public ControlWrapper
 public:
 	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		EventCallback<> onClick = {})
+		EventCallback<> onClick = {}, unsigned dialogKeys = kNoDialogKey)
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_onClick(std::move(onClick))
+		, m_dialogKeys(dialogKeys)
 	{
 	}
 
@@ -103,6 +105,7 @@ public:
 private:
 	std::string m_label;
 	EventCallback<> m_onClick;
+	unsigned m_dialogKeys; // DialogKeyRole bits
 };
 
 // TextCtrlWrapper -----------------------------------------------------------
@@ -117,11 +120,13 @@ class TextCtrlWrapper : public ControlWrapper
 public:
 	TextCtrlWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		EventCallback<const std::string&> onChange = {})
+		EventCallback<const std::string&> onChange = {},
+		EventCallback<const std::string&> onEnter = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
+		, m_onEnter(std::move(onEnter))
 	{
 	}
 
@@ -131,6 +136,9 @@ private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
+	// Enter in the field, after the text is committed. The window's default
+	// button (if any) is pressed right after it, as a native dialog would.
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -139,11 +147,13 @@ class PasswordInputWrapper : public ControlWrapper
 public:
 	PasswordInputWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		EventCallback<const std::string&> onChange = {})
+		EventCallback<const std::string&> onChange = {},
+		EventCallback<const std::string&> onEnter = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
+		, m_onEnter(std::move(onEnter))
 	{
 	}
 
@@ -153,6 +163,9 @@ private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
+	// Enter in the field, after the text is committed. The window's default
+	// button (if any) is pressed right after it, as a native dialog would.
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------

@@ -1482,25 +1482,43 @@ struct DemoTodo
     bool operator==(const DemoTodo&) const = default;
 };
 
-inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle)
+inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, std::string& keyStatus)
 {
+    // Keyboard: "Add" is the default button (Enter anywhere adds) and "Clear"
+    // the cancel button (Escape clears the field). The field's onEnter runs
+    // FIRST, on all three -- here it only reports, into a bound label, so
+    // the order is visible: the label names the text, then the row appears.
     return Dialog {
         "Todo list (VForEach)",
         VStack {
             LayoutFlags().Expand().Border(Side::All, 12),
             HStack {
                 TextCtrl{newTitle}
-                    .withPlaceholder("New task")
-                    .withFlags(LayoutFlags().Proportion(1)),
+                    .withPlaceholder("New task, then Enter")
+                    .withFlags(LayoutFlags().Proportion(1))
+                    .onEnter([&keyStatus](const std::string& text) {
+                        keyStatus = text.empty() ? "Enter: nothing to add" : "Enter: adding \"" + text + "\"";
+                    }),
                 Button{"Add"}
+                    .isDefault()
                     .withFlags(LayoutFlags().Border(Side::Left, 8))
                     .onClick([&todos, &newTitle] {
                         if (newTitle.empty())
                             return;
                         todos.push_back({ newTitle, false });
                         newTitle.clear();
+                    }),
+                Button{"Clear"}
+                    .isCancel()
+                    .withFlags(LayoutFlags().Border(Side::Left, 4))
+                    .onClick([&newTitle, &keyStatus] {
+                        newTitle.clear();
+                        keyStatus = "Escape / Clear: field cleared";
                     })
             },
+            StaticText{keyStatus}
+                .withSize({300, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
             VForEach {
                 LayoutFlags().Expand().Border(Side::Top, 10),
                 todos,

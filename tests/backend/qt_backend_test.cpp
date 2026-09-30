@@ -9,6 +9,7 @@
 #include <QApplication>
 
 #include <thread>
+#include <vector>
 #include <QElapsedTimer>
 #include <QCheckBox>
 #include <QComboBox>
@@ -23,6 +24,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QPlainTextEdit>
 #include <QTimer>
 
 namespace
@@ -563,6 +565,84 @@ TEST(qt_radio_group_binds_an_index)
 	CHECK(radio(w, "Green")->isChecked());
 	CHECK(!radio(w, "Blue")->isChecked());
 
+	w->close();
+	pump();
+}
+
+// Default / cancel buttons: Enter in a single-line field reports onEnter and
+// then presses the default button; Escape presses cancel instead of closing
+// the dialog; Enter in a multi-line field or on a plain button behaves as
+// described in DialogKeys.hpp; a disabled default button is skipped.
+TEST(qt_default_and_cancel_buttons_answer_enter_and_escape)
+{
+	std::vector<std::string> log;
+	std::string query = "cats";
+	std::string notes;
+	bool okDisabled = false;
+	Dialog { "Keys",
+		VStack {
+			TextCtrl{query}.onEnter([&](const std::string& t) { log.push_back("enter:" + t); }),
+			Button{"OK"}.isDefault().isDisabled(okDisabled).onClick([&] { log.push_back("ok"); }),
+			Button{"Cancel"}.isCancel().onClick([&] { log.push_back("cancel"); }),
+			Button{"Other"}.onClick([&] { log.push_back("other"); }),
+			MultiLineTextCtrl{notes}
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Keys");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto send = [](QWidget* target, int k) {
+		QKeyEvent press(QEvent::KeyPress, k, Qt::NoModifier);
+		QApplication::sendEvent(target, &press);
+	};
+	auto* edit = w->findChild<QLineEdit*>();
+	auto* multi = w->findChild<QPlainTextEdit*>();
+	QPushButton* other = nullptr;
+	QPushButton* ok = nullptr;
+	for (auto* b : w->findChildren<QPushButton*>())
+	{
+		if (b->text() == "Other")
+			other = b;
+		if (b->text() == "OK")
+			ok = b;
+	}
+	CHECK(edit != nullptr && multi != nullptr && other != nullptr && ok != nullptr);
+	if (edit == nullptr || multi == nullptr || other == nullptr || ok == nullptr)
+		return;
+	CHECK(ok->isDefault()); // the native look
+
+	send(edit, Qt::Key_Return);
+	CHECK_EQ(log.size(), std::size_t(2));
+	if (log.size() == 2)
+	{
+		CHECK(log[0] == "enter:cats");
+		CHECK(log[1] == "ok");
+	}
+
+	log.clear();
+	send(edit, Qt::Key_Escape);
+	pump();
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "cancel");
+	CHECK(windowTitled("Keys") == w); // pressed Cancel, did not reject()
+
+	// a focused plain button passes Enter on to the default button
+	log.clear();
+	send(other, Qt::Key_Return);
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "ok");
+
+	log.clear();
+	send(multi, Qt::Key_Return);
+	CHECK(log.empty());
+
+	okDisabled = true;
+	pump();
+	log.clear();
+	send(edit, Qt::Key_Return);
+	CHECK_EQ(log.size(), std::size_t(1)); // onEnter only
 	w->close();
 	pump();
 }

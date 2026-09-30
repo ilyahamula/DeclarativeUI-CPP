@@ -1,4 +1,5 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/qt/DialogKeys.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
@@ -198,8 +199,13 @@ void ButtonWrapper::realize(void* parentWindow)
 	auto* button = new QPushButton(qtLabelText(m_label), static_cast<QWidget*>(parentWindow));
 	// QPushButton is autoDefault inside a QDialog, so the first one built would come
 	// up drawn as the dialog's default button (blue on macOS) and keep that highlight
-	// for the life of the dialog. wx and ImGui highlight nothing, so neither do we.
+	// for the life of the dialog -- and a focused autoDefault button clicks ITSELF on
+	// Enter. Off, Enter always reaches the window's filter, which presses the button
+	// that asked to be the default (DialogKeys.hpp); setDefault() is then only its look.
 	button->setAutoDefault(false);
+	qt_dialog_keys::markButton(button, m_dialogKeys);
+	if ((m_dialogKeys & kDefaultButton) != 0)
+		button->setDefault(true);
 	m_nativeWidget = button;
 
 	if (m_onClick)
@@ -221,6 +227,11 @@ void TextCtrlWrapper::realize(void* parentWindow)
 
 	QObject::connect(edit, &QLineEdit::textChanged,
 		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
+	// QLineEdit emits returnPressed and then IGNORES the key, so it travels on
+	// to the window's filter and the default button is pressed after this.
+	if (m_onEnter)
+		QObject::connect(edit, &QLineEdit::returnPressed,
+			[edit, cb = std::move(m_onEnter)] { cb(edit->text().toStdString(), edit); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
@@ -245,6 +256,11 @@ void PasswordInputWrapper::realize(void* parentWindow)
 
 	QObject::connect(edit, &QLineEdit::textChanged,
 		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
+	// QLineEdit emits returnPressed and then IGNORES the key, so it travels on
+	// to the window's filter and the default button is pressed after this.
+	if (m_onEnter)
+		QObject::connect(edit, &QLineEdit::returnPressed,
+			[edit, cb = std::move(m_onEnter)] { cb(edit->text().toStdString(), edit); });
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();

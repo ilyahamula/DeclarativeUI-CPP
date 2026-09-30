@@ -15,6 +15,7 @@
 
 #include <functional>
 #include <thread>
+#include <vector>
 
 #ifdef __WXOSX__
 // A real Cocoa click (performClick), so native radio grouping, if any, happens
@@ -483,6 +484,109 @@ TEST(wx_radio_group_binds_an_index)
 	CHECK(!radio(w, "Blue")->GetValue());
 
 	w->Close();
+	pump();
+}
+
+// Default / cancel buttons. Keys are delivered the way wx delivers them first --
+// a wxEVT_CHAR_HOOK on the top-level window -- and a single-line field's Enter
+// as its wxEVT_TEXT_ENTER; native key synthesis needs OS permissions here.
+TEST(wx_default_and_cancel_buttons_answer_enter_and_escape)
+{
+	std::vector<std::string> log;
+	std::string query = "cats";
+	std::string notes;
+	bool okDisabled = false;
+	Dialog { "Keys",
+		VStack {
+			TextCtrl{query}.onEnter([&](const std::string& t) { log.push_back("enter:" + t); }),
+			Button{"OK"}.isDefault().isDisabled(okDisabled).onClick([&] { log.push_back("ok"); }),
+			Button{"Cancel"}.isCancel().onClick([&] { log.push_back("cancel"); }),
+			MultiLineTextCtrl{notes}
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Keys");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto hook = [w](int code) {
+		wxKeyEvent event(wxEVT_CHAR_HOOK);
+		event.m_keyCode = code;
+		event.SetEventObject(w);
+		w->ProcessWindowEvent(event);
+		return event.GetSkipped();
+	};
+	auto* edit = find<wxTextCtrl>(w, [](wxTextCtrl* t) { return !t->IsMultiLine(); });
+	auto* ok = find<wxButton>(w, [](wxButton* b) { return b->GetLabelText() == "OK"; });
+	CHECK(edit != nullptr && ok != nullptr);
+	if (edit == nullptr || ok == nullptr)
+		return;
+	CHECK(edit->HasFlag(wxTE_PROCESS_ENTER)); // only because it has an onEnter
+
+	wxCommandEvent enter(wxEVT_TEXT_ENTER, edit->GetId());
+	enter.SetEventObject(edit);
+	edit->ProcessWindowEvent(enter);
+	CHECK_EQ(log.size(), std::size_t(2));
+	if (log.size() == 2)
+	{
+		CHECK(log[0] == "enter:cats");
+		CHECK(log[1] == "ok");
+	}
+
+	log.clear();
+	CHECK(!hook(WXK_ESCAPE)); // handled: Cancel pressed, the dialog stays
+	pump();
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "cancel");
+	CHECK(windowTitled("Keys") == w);
+
+	// Enter while the onEnter field has focus is left to that field
+	if (wxWindow::FindFocus() == edit)
+	{
+		log.clear();
+		CHECK(hook(WXK_RETURN));
+		CHECK(log.empty());
+	}
+	w->Close();
+	pump();
+
+	// A field WITHOUT onEnter does not consume Enter: the hook presses the
+	// default button whatever has focus, and skips a disabled one.
+	std::string plain;
+	Dialog { "Keys2",
+		VStack {
+			TextCtrl{plain},
+			Button{"OK"}.isDefault().isDisabled(okDisabled).onClick([&] { log.push_back("ok"); })
+		}
+	}.show();
+	pump();
+	wxWindow* w2 = windowTitled("Keys2");
+	CHECK(w2 != nullptr);
+	if (w2 == nullptr)
+		return;
+	auto hook2 = [w2](int code) {
+		wxKeyEvent event(wxEVT_CHAR_HOOK);
+		event.m_keyCode = code;
+		event.SetEventObject(w2);
+		w2->ProcessWindowEvent(event);
+		return event.GetSkipped();
+	};
+	auto* plainEdit = find<wxTextCtrl>(w2, [](wxTextCtrl*) { return true; });
+	CHECK(plainEdit != nullptr && !plainEdit->HasFlag(wxTE_PROCESS_ENTER));
+	log.clear();
+	CHECK(!hook2(WXK_RETURN));
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "ok");
+
+	okDisabled = true;
+	pump();
+	log.clear();
+	CHECK(hook2(WXK_RETURN)); // no enabled default button: skipped on
+	CHECK(log.empty());
+	CHECK(hook2(WXK_ESCAPE)); // no cancel button: the dialog's own Escape
+	pump();
+	if (wxWindow* still = windowTitled("Keys2"))
+		still->Close();
 	pump();
 }
 

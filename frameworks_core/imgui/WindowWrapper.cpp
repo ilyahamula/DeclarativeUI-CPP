@@ -3,6 +3,7 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/imgui/AdoptedTopLevels.hpp"
+#include "frameworks_core/imgui/DialogKeys.hpp"
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 #include "frameworks_core/imgui/ToastQueue.hpp"
@@ -53,6 +54,8 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// window's frame, so a show() issued in it is a handler's and is adopted
 	// (TopLevelShow.hpp) rather than drawn as if it were the caller's frame.
 	AdoptedTopLevels::FrameScope frameScope(title);
+	// Default/cancel buttons offer their press into this while the tree draws.
+	imgui_dialog_keys::WindowScope dialogKeys;
 
 	// Toasts ride on whichever framework window the frame draws first, so an
 	// app never has to call anything for them (ToastQueue.hpp). Here, before
@@ -153,6 +156,8 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 			renderContent.height = std::max(content.height, (int)actual.y - chromeH);
 		}
 		engine.render(root, renderContent);
+		// Enter / Escape, now that every button has offered (DialogKeys.hpp).
+		dialogKeys.dispatch();
 
 		// The file browser is drawn HERE, not in the wrapper that asked for it:
 		// ImGuiLayoutBackend::place() wraps every render() in BeginGroup() +

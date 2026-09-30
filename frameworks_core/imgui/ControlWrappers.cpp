@@ -1,4 +1,5 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/imgui/DialogKeys.hpp"
 #include <algorithm>
 #include <array>
 #include <cfloat>
@@ -127,6 +128,17 @@ void ButtonWrapper::render(const Rect& frame)
 		? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
 		: ImGui::Button(label);
 	ImGui::PopID();
+	if (m_dialogKeys != kNoDialogKey)
+	{
+		// wx and Qt draw a default button natively; ImGui has no such look, so
+		// it gets an accent outline inside its own item rect.
+		if ((m_dialogKeys & kDefaultButton) != 0)
+		{
+			ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+				ImGui::GetColorU32(ImGuiCol_CheckMark), ImGui::GetStyle().FrameRounding, 0, 1.5f);
+		}
+		imgui_dialog_keys::offer(m_dialogKeys, [cb = m_onClick, nw = m_nativeWidget] { cb(nw); });
+	}
 	if (clicked)
 	{
 		m_onClick(m_nativeWidget);
@@ -160,6 +172,11 @@ void TextCtrlWrapper::render(const Rect& frame)
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
+	// Enter deactivates a single-line field in the frame it is pressed, so this
+	// is "the user pressed Enter in it"; the window's default button is pressed
+	// after the tree is drawn (DialogKeys.hpp) -- the order Qt produces.
+	if (m_onEnter && ImGui::IsItemDeactivated() && imgui_dialog_keys::WindowScope::enterPressed())
+		m_onEnter(m_value.get(), m_nativeWidget);
 	ImGui::PopID();
 }
 
@@ -185,6 +202,11 @@ void PasswordInputWrapper::render(const Rect& frame)
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
+	// Enter deactivates a single-line field in the frame it is pressed, so this
+	// is "the user pressed Enter in it"; the window's default button is pressed
+	// after the tree is drawn (DialogKeys.hpp) -- the order Qt produces.
+	if (m_onEnter && ImGui::IsItemDeactivated() && imgui_dialog_keys::WindowScope::enterPressed())
+		m_onEnter(m_value.get(), m_nativeWidget);
 	ImGui::PopID();
 }
 

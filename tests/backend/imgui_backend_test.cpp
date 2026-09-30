@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <functional>
 #include <thread>
+#include <vector>
 #include <string>
 
 namespace
@@ -463,6 +464,74 @@ TEST(imgui_radio_group_binds_an_index)
 	const ImVec2 red = rowCentre("Group", 0);
 	click(red.x, red.y);
 	CHECK_EQ(choice, 0);
+	g_ui = nullptr;
+}
+
+// Default / cancel buttons: Enter in a single-line field reports onEnter and
+// then presses the default button; Escape presses cancel; Enter inside a
+// multi-line field is a newline; a disabled default button is skipped.
+namespace
+{
+void key(ImGuiKey k)
+{
+	ImGui::GetIO().AddKeyEvent(k, true);
+	frame();
+	ImGui::GetIO().AddKeyEvent(k, false);
+	frame();
+}
+} // namespace
+
+TEST(imgui_default_and_cancel_buttons_answer_enter_and_escape)
+{
+	std::vector<std::string> log;
+	std::string query = "cats";
+	std::string notes;
+	bool okDisabled = false;
+	g_ui = [&] {
+		Dialog { "Keys",
+			VStack {
+				TextCtrl{query}.withSize({200, -1})
+					.onEnter([&](const std::string& t) { log.push_back("enter:" + t); }),
+				Button{"OK"}.isDefault().isDisabled(okDisabled)
+					.onClick([&] { log.push_back("ok"); }),
+				Button{"Cancel"}.isCancel()
+					.onClick([&] { log.push_back("cancel"); }),
+				MultiLineTextCtrl{notes}.withSize({200, 60})
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(10);
+
+	const ImVec2 field = rowCentre("Keys", 0);
+	click(field.x, field.y); // focuses the window and activates the field
+	key(ImGuiKey_Enter);
+	CHECK_EQ(log.size(), std::size_t(2));
+	if (log.size() == 2)
+	{
+		CHECK(log[0] == "enter:cats"); // onEnter first ...
+		CHECK(log[1] == "ok");         // ... then the default button
+	}
+
+	log.clear();
+	key(ImGuiKey_Escape);
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "cancel");
+
+	// Enter while the multi-line field is active is its newline
+	log.clear();
+	const ImVec2 multi = rowCentre("Keys", 3);
+	click(multi.x, multi.y + 10);
+	key(ImGuiKey_Enter);
+	CHECK(log.empty());
+	CHECK(notes.find('\n') != std::string::npos);
+
+	// a disabled default button does not answer
+	const ImVec2 cancel = rowCentre("Keys", 2);
+	okDisabled = true;
+	click(cancel.x + 200, cancel.y); // empty space: deactivates the field, keeps focus
+	log.clear();
+	key(ImGuiKey_Enter);
+	CHECK(log.empty());
 	g_ui = nullptr;
 }
 

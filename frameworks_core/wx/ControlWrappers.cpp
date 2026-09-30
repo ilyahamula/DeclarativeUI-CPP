@@ -1,4 +1,5 @@
 #include "frameworks_core/ControlWrappers.hpp"
+#include "frameworks_core/wx/DialogKeys.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
@@ -67,6 +68,11 @@ void ButtonWrapper::realize(void* parentWindow)
 	auto* btn = new wxButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
 	m_nativeWidget = btn;
+	// Enter/Escape find the button through its mark; SetDefault() is only the
+	// native look -- the window's char hook presses it before any port could.
+	wx_dialog_keys::markButton(btn, m_dialogKeys);
+	if ((m_dialogKeys & kDefaultButton) != 0)
+		btn->SetDefault();
 
 	if (m_onClick)
 		btn->Bind(wxEVT_BUTTON, [cb = std::move(m_onClick), nw = m_nativeWidget](wxCommandEvent&) { cb(nw); });
@@ -92,6 +98,21 @@ void applyHint(wxTextCtrl* txt, const std::string& hint)
 	txt->CacheBestSize(best);
 }
 
+// onEnter: the field was created with wxTE_PROCESS_ENTER, so the window's char
+// hook leaves Enter to it (DialogKeys.hpp) and this handler owns the whole
+// sequence -- report, then press the default button, the order Qt's
+// QLineEdit and ImGui produce. Not Skip()ped: what a skipped TEXT_ENTER does
+// next differs by port.
+void bindEnter(wxTextCtrl* txt, EventCallback<const std::string&> onEnter)
+{
+	if (!onEnter)
+		return;
+	txt->Bind(wxEVT_TEXT_ENTER, [txt, cb = std::move(onEnter)](wxCommandEvent&) {
+		cb(txt->GetValue().ToStdString(), txt);
+		wx_dialog_keys::press(txt, kDefaultButton);
+	});
+}
+
 } // unnamed namespace
 
 void TextCtrlWrapper::realize(void* parentWindow)
@@ -101,11 +122,13 @@ void TextCtrlWrapper::realize(void* parentWindow)
 #endif
 	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		m_style | (m_onEnter ? wxTE_PROCESS_ENTER : 0));
 	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
 	txt->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
+	bindEnter(txt, std::move(m_onEnter));
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
@@ -126,11 +149,13 @@ void PasswordInputWrapper::realize(void* parentWindow)
 #endif
 	const std::string& initial = m_value.get();
 	auto* txt = new wxTextCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, initial,
-		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_PASSWORD);
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		m_style | wxTE_PASSWORD | (m_onEnter ? wxTE_PROCESS_ENTER : 0));
 	applyHint(txt, m_placeholder);
 	m_nativeWidget = txt;
 
 	txt->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) { commit(evt.GetString().ToStdString()); });
+	bindEnter(txt, std::move(m_onEnter));
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();

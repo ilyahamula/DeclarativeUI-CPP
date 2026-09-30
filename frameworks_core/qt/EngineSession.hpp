@@ -3,6 +3,7 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/NodeSource.hpp"
+#include "frameworks_core/qt/DialogKeys.hpp"
 #include "frameworks_core/qt/LayoutBackend.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 
@@ -158,6 +159,8 @@ struct EngineSession
 	{
 		bindAutoGrow(*root);
 		refsync_detail::hubFor(window)->add(window, [this] { poll(); });
+		// Enter / Escape for default and cancel buttons (DialogKeys.hpp).
+		qt_dialog_keys::install(window);
 	}
 
 	void poll()

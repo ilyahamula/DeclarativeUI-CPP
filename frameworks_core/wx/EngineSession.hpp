@@ -3,6 +3,7 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/NodeSource.hpp"
+#include "frameworks_core/wx/DialogKeys.hpp"
 #include "frameworks_core/wx/LayoutBackend.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
 
@@ -152,6 +153,10 @@ struct EngineSession
 		window->Bind(wxEVT_IDLE, [this](wxIdleEvent& event) {
 			poll();
 			event.Skip();
+		});
+		// Enter / Escape for default and cancel buttons (DialogKeys.hpp).
+		window->Bind(wxEVT_CHAR_HOOK, [w = window](wxKeyEvent& event) {
+			wx_dialog_keys::onCharHook(w, event);
 		});
 	}
 

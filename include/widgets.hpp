@@ -301,19 +301,37 @@ struct TextCtrl : Widget<TextCtrl>
 		return *this;
 	}
 
+	// Enter pressed in the field, with its text (already written to a bound
+	// value). The window's default button (Button::isDefault()) is pressed
+	// right after, on all three -- so a search box can act on Enter and a
+	// login form can still submit. Single-line only, like the placeholder:
+	// Enter in a MultiLineTextCtrl is a newline.
+	TextCtrl& onEnter(std::function<void(const std::string&)> callback)
+	{
+		m_onEnter.set(std::move(callback));
+		return *this;
+	}
+
+	TextCtrl& onEnter(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onEnter.set(std::move(callback));
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange);
+		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
 	}
 
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // PasswordInput -----------------------------------------------------------
@@ -359,19 +377,37 @@ struct PasswordInput : Widget<PasswordInput>
 		return *this;
 	}
 
+	// Enter pressed in the field, with its text (already written to a bound
+	// value). The window's default button (Button::isDefault()) is pressed
+	// right after, on all three -- so a search box can act on Enter and a
+	// login form can still submit. Single-line only, like the placeholder:
+	// Enter in a MultiLineTextCtrl is a newline.
+	PasswordInput& onEnter(std::function<void(const std::string&)> callback)
+	{
+		m_onEnter.set(std::move(callback));
+		return *this;
+	}
+
+	PasswordInput& onEnter(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onEnter.set(std::move(callback));
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange);
+		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
 	}
 
 private:
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // MultiLineTextCtrl -----------------------------------------------------------
@@ -628,6 +664,27 @@ struct Button : Widget<Button>
 		return *this;
 	}
 
+	// Enter anywhere in the window presses this button -- the "OK" of a form.
+	// Enter in a multi-line field stays a newline; a TextCtrl's onEnter runs
+	// first. wx and Qt also draw it as the native default button; ImGui
+	// outlines it. A disabled or hidden button is skipped, and with several
+	// the first in the tree wins.
+	Button& isDefault(bool on = true)
+	{
+		m_dialogKeys = on ? (m_dialogKeys | kDefaultButton) : (m_dialogKeys & ~unsigned(kDefaultButton));
+		return *this;
+	}
+
+	// Escape anywhere in the window presses this button. It runs the button's
+	// handlers and nothing else -- close the window from onClick, as the
+	// button itself would. A window with no cancel button keeps its own
+	// Escape behaviour.
+	Button& isCancel(bool on = true)
+	{
+		m_dialogKeys = on ? (m_dialogKeys | kCancelButton) : (m_dialogKeys & ~unsigned(kCancelButton));
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
@@ -645,13 +702,14 @@ private:
 				show();
 			}));
 		}
-		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, std::move(onClick));
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, std::move(onClick), m_dialogKeys);
 	}
 
 private:
 	EventCallback<> m_onClick;
 	std::function<void()> m_onClickShow;
 	std::string m_btnTitle;
+	unsigned m_dialogKeys = kNoDialogKey;
 };
 
 // RadioButton -----------------------------------------------------------

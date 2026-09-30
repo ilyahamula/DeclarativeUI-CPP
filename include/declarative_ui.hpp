@@ -150,6 +150,12 @@ static_assert(PlaceholderHost<TextCtrl>);
 static_assert(PlaceholderHost<PasswordInput>);
 static_assert(!PlaceholderHost<MultiLineTextCtrl>);
 static_assert(!PlaceholderHost<ReadonlyTextCtrl>);
+// Enter: single-line fields report it, and one Button per window answers it.
+static_assert(EnterHost<TextCtrl>);
+static_assert(EnterHost<PasswordInput>);
+static_assert(!EnterHost<MultiLineTextCtrl>);
+static_assert(DialogKeyButton<Button>);
+static_assert(!DialogKeyButton<ToggleButton>);
 // withScaleMode() belongs to the one widget that owns pixels of its own, and
 // withAlign() to the one that is nothing but text in a frame -- asking any
 // other leaf for either must not compile.

@@ -82,6 +82,20 @@ concept PlaceholderHost = requires(T element, std::string hint) {
 	{ element.withPlaceholder(std::move(hint)) } -> std::same_as<T&>;
 };
 
+// Elements that report Enter (onEnter) and hand it on to the window's default
+// button. Single-line fields only: Enter in a multi-line field is a newline.
+template<typename T>
+concept EnterHost = requires(T element) {
+	element.onEnter(std::function<void(const std::string&)>{});
+};
+
+// Elements that can be a window's default / cancel button.
+template<typename T>
+concept DialogKeyButton = requires(T element) {
+	element.isDefault();
+	element.isCancel();
+};
+
 // A picture that can say what happens to its pixels inside the frame the
 // engine gave it. Image alone: every other leaf either has no pixels of its
 // own to scale (a label, a field) or hands them to a native control that
