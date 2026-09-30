@@ -52,6 +52,9 @@ if(BUILD_BACKEND_TESTS)
 
     add_executable(backend_tests ${BACKEND_TEST_SOURCES})
     target_link_libraries(backend_tests PRIVATE DeclarativeUI)
+    # An icon file the tests can load whatever the working directory.
+    target_compile_definitions(backend_tests PRIVATE
+        DUI_TEST_ICON="${CMAKE_SOURCE_DIR}/images/icon_add.png")
     if(UI_FRAMEWORK STREQUAL "WX" AND APPLE)
         target_link_libraries(backend_tests PRIVATE "-framework AppKit")
     endif()

@@ -590,6 +590,40 @@ TEST(wx_default_and_cancel_buttons_answer_enter_and_escape)
 	pump();
 }
 
+// withIcon: the bitmap is set at the asked size and widens the button (a long
+// label, since macOS pads a short one to a minimum width anyway); a path
+// that fails to load leaves a plain text button.
+TEST(wx_icon_button_carries_its_icon)
+{
+	Dialog { "Icons",
+		VStack {
+			Button{"Save the whole document"},
+			Button{"Save the whole document "}.withIcon(DUI_TEST_ICON, { 20, 20 }),
+			Button{"Save the whole document  "}.withIcon("/no/such/icon.png")
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Icons");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto byLabel = [w](const char* text) {
+		return find<wxButton>(w, [text](wxButton* b) { return b->GetLabel() == text; });
+	};
+	wxButton* plain = byLabel("Save the whole document");
+	wxButton* icon = byLabel("Save the whole document ");
+	wxButton* broken = byLabel("Save the whole document  ");
+	CHECK(plain != nullptr && icon != nullptr && broken != nullptr);
+	if (plain == nullptr || icon == nullptr || broken == nullptr)
+		return;
+	CHECK(icon->GetBitmap().IsOk());
+	CHECK(icon->GetBitmap().GetWidth() == 20 || icon->GetBitmap().GetLogicalWidth() == 20);
+	CHECK(icon->GetBestSize().GetWidth() > plain->GetBestSize().GetWidth());
+	CHECK(!broken->GetBitmap().IsOk());
+	w->Close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	if (!wxEntryStart(argc, argv))

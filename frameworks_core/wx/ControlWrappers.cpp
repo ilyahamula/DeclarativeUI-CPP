@@ -71,6 +71,25 @@ void ButtonWrapper::realize(void* parentWindow)
 	// Enter/Escape find the button through its mark; SetDefault() is only the
 	// native look -- the window's char hook presses it before any port could.
 	wx_dialog_keys::markButton(btn, m_dialogKeys);
+	if (!m_iconPath.empty())
+	{
+		// Before the engine measures: the bitmap is part of the best size.
+		ensureImageHandlers();
+		wxImage image(m_iconPath, wxBITMAP_TYPE_ANY);
+		if (image.IsOk())
+		{
+			image = image.Scale(std::max(1, m_iconSize.width), std::max(1, m_iconSize.height), wxIMAGE_QUALITY_HIGH);
+			btn->SetBitmap(wxBitmap(image));
+			btn->SetBitmapPosition(wxLEFT);
+		}
+#ifdef USE_LOGGER
+		else
+		{
+			Logger::instance().log("ButtonWrapper::realize()\t-> icon \""
+				+ m_iconPath + "\" failed to load; text only\n");
+		}
+#endif
+	}
 	if ((m_dialogKeys & kDefaultButton) != 0)
 		btn->SetDefault();
 

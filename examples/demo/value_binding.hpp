@@ -1484,6 +1484,7 @@ struct DemoTodo
 
 inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, std::string& keyStatus)
 {
+    // Both buttons carry an icon (withIcon, 16x16 left of the label).
     // Keyboard: "Add" is the default button (Enter anywhere adds) and "Clear"
     // the cancel button (Escape clears the field). The field's onEnter runs
     // FIRST, on all three -- here it only reports, into a bound label, so
@@ -1500,6 +1501,7 @@ inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, 
                         keyStatus = text.empty() ? "Enter: nothing to add" : "Enter: adding \"" + text + "\"";
                     }),
                 Button{"Add"}
+                    .withIcon("images/icon_add.png")
                     .isDefault()
                     .withFlags(LayoutFlags().Border(Side::Left, 8))
                     .onClick([&todos, &newTitle] {
@@ -1509,6 +1511,7 @@ inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, 
                         newTitle.clear();
                     }),
                 Button{"Clear"}
+                    .withIcon("images/icon_clear.png")
                     .isCancel()
                     .withFlags(LayoutFlags().Border(Side::Left, 4))
                     .onClick([&newTitle, &keyStatus] {

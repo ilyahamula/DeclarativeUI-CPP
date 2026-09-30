@@ -535,6 +535,31 @@ TEST(imgui_default_and_cancel_buttons_answer_enter_and_escape)
 	g_ui = nullptr;
 }
 
+// withIcon: headless there is no GL context to upload a texture into, so this
+// covers the fallback half -- a path that fails to load is exactly a text
+// button: same size, still clickable. The icon itself is covered on wx/Qt.
+TEST(imgui_icon_button_falls_back_to_its_label)
+{
+	ButtonWrapper plain("Save", {}, {}, 0);
+	ButtonWrapper broken("Save", {}, {}, 0, {}, kNoDialogKey, "/no/such/icon.png", { 16, 16 });
+	CHECK_EQ(plain.measureIntrinsic({}).width, broken.measureIntrinsic({}).width);
+	CHECK_EQ(plain.measureIntrinsic({}).height, broken.measureIntrinsic({}).height);
+
+	int clicks = 0;
+	g_ui = [&] {
+		Dialog { "Icons",
+			VStack {
+				Button{"Save"}.withIcon("/no/such/icon.png").onClick([&] { ++clicks; })
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(10);
+	const ImVec2 save = rowCentre("Icons", 0);
+	click(save.x, save.y);
+	CHECK_EQ(clicks, 1);
+	g_ui = nullptr;
+}
+
 int main()
 {
 	ImGui::CreateContext();

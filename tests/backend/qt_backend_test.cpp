@@ -647,6 +647,46 @@ TEST(qt_default_and_cancel_buttons_answer_enter_and_escape)
 	pump();
 }
 
+// withIcon: the icon is set at the asked size and widens the button (a long
+// label, since macOS pads a short one to a minimum width anyway); a path
+// that fails to load leaves a plain text button.
+TEST(qt_icon_button_carries_its_icon)
+{
+	Dialog { "Icons",
+		VStack {
+			Button{"Save the whole document"},
+			Button{"Save the whole document "}.withIcon(DUI_TEST_ICON, { 20, 20 }),
+			Button{"Save the whole document  "}.withIcon("/no/such/icon.png")
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Icons");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	QPushButton* plain = nullptr;
+	QPushButton* icon = nullptr;
+	QPushButton* broken = nullptr;
+	for (auto* b : w->findChildren<QPushButton*>())
+	{
+		if (b->text() == "Save the whole document")
+			plain = b;
+		else if (b->text() == "Save the whole document ")
+			icon = b;
+		else if (b->text() == "Save the whole document  ")
+			broken = b;
+	}
+	CHECK(plain != nullptr && icon != nullptr && broken != nullptr);
+	if (plain == nullptr || icon == nullptr || broken == nullptr)
+		return;
+	CHECK(!icon->icon().isNull());
+	CHECK(icon->iconSize() == QSize(20, 20));
+	CHECK(icon->sizeHint().width() > plain->sizeHint().width());
+	CHECK(broken->icon().isNull());
+	w->close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	// No display on CI, and none needed: every check reads widget state.

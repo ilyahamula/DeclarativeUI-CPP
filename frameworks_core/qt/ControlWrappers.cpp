@@ -204,6 +204,22 @@ void ButtonWrapper::realize(void* parentWindow)
 	// that asked to be the default (DialogKeys.hpp); setDefault() is then only its look.
 	button->setAutoDefault(false);
 	qt_dialog_keys::markButton(button, m_dialogKeys);
+	if (!m_iconPath.empty())
+	{
+		const QPixmap pixmap(qstr(m_iconPath));
+		if (!pixmap.isNull())
+		{
+			button->setIcon(QIcon(pixmap));
+			button->setIconSize(QSize(m_iconSize.width, m_iconSize.height));
+		}
+#ifdef USE_LOGGER
+		else
+		{
+			Logger::instance().log("ButtonWrapper::realize()\t-> icon \""
+				+ m_iconPath + "\" failed to load; text only\n");
+		}
+#endif
+	}
 	if ((m_dialogKeys & kDefaultButton) != 0)
 		button->setDefault(true);
 	m_nativeWidget = button;

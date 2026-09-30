@@ -115,18 +115,75 @@ constexpr int kDefaultControlWidth = 200;
 
 // ButtonWrapper -----------------------------------------------------------
 
+namespace
+{
+
+// A withIcon() button's content: the icon, then (when there is a label)
+// ItemInnerSpacing and the text -- the same arrangement ToolBarWrapper draws.
+// One helper for measure and render, so the two agree to the pixel.
+ImVec2 iconButtonContent(const std::string& label, const Size& iconSize)
+{
+	float width = (float)iconSize.width;
+	float height = (float)iconSize.height;
+	if (!label.empty())
+	{
+		const ImVec2 text = ImGui::CalcTextSize(label.c_str());
+		width += ImGui::GetStyle().ItemInnerSpacing.x + text.x;
+		height = std::max(height, text.y);
+	}
+	return ImVec2(width, height);
+}
+
+} // unnamed namespace
+
 Size ButtonWrapper::measureIntrinsic(const Constraints&)
 {
+	if (!m_iconPath.empty() && textureFor(m_iconPath).valid())
+	{
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const ImVec2 content = iconButtonContent(m_label, m_iconSize);
+		return Size { ceilInt(content.x + style.FramePadding.x * 2.0f),
+			std::max(frameHeight(), ceilInt(content.y + style.FramePadding.y * 2.0f)) };
+	}
 	return framedTextSize(m_label);
 }
 
 void ButtonWrapper::render(const Rect& frame)
 {
 	const char* label = m_label.empty() ? "##button" : m_label.c_str();
+	const CachedTexture& icon = m_iconPath.empty() ? CachedTexture {} : textureFor(m_iconPath);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	const bool clicked = sized(frame)
-		? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
-		: ImGui::Button(label);
+	bool clicked = false;
+	if (icon.valid())
+	{
+		// ImGui::Button has no image slot, so the button is drawn unlabelled at
+		// the engine's size and the icon + label go on top, centred as a
+		// labelled button centres its text. Colours through GetColorU32, so a
+		// disabled scope dims both.
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+		const Size natural = sized(frame) ? Size { frame.width, frame.height } : measureIntrinsic({});
+		const ImVec2 box((float)natural.width, (float)natural.height);
+		clicked = ImGui::Button("##button", box);
+		const ImVec2 content = iconButtonContent(m_label, m_iconSize);
+		const float x = origin.x + std::max(ImGui::GetStyle().FramePadding.x, (box.x - content.x) * 0.5f);
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		const float iconY = origin.y + (box.y - (float)m_iconSize.height) * 0.5f;
+		draw->AddImage((ImTextureID)(std::uintptr_t)icon.id,
+			ImVec2(x, iconY), ImVec2(x + (float)m_iconSize.width, iconY + (float)m_iconSize.height),
+			ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(ImVec4(1, 1, 1, 1)));
+		if (!m_label.empty())
+		{
+			const float textY = origin.y + (box.y - ImGui::GetTextLineHeight()) * 0.5f;
+			draw->AddText(ImVec2(x + (float)m_iconSize.width + ImGui::GetStyle().ItemInnerSpacing.x, textY),
+				ImGui::GetColorU32(ImGuiCol_Text), m_label.c_str());
+		}
+	}
+	else
+	{
+		clicked = sized(frame)
+			? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
+			: ImGui::Button(label);
+	}
 	ImGui::PopID();
 	if (m_dialogKeys != kNoDialogKey)
 	{

@@ -664,6 +664,17 @@ struct Button : Widget<Button>
 		return *this;
 	}
 
+	// An image left of the label, drawn at `iconSize` (16x16 by default, the
+	// ToolBar's default too) whatever the file's own size. An empty label
+	// makes an icon-only button -- give it a withTooltip(). A path that fails
+	// to load leaves a plain text button and logs, on all three.
+	Button& withIcon(std::string path, Size iconSize = { 16, 16 })
+	{
+		m_iconPath = std::move(path);
+		m_iconSize = iconSize;
+		return *this;
+	}
+
 	// Enter anywhere in the window presses this button -- the "OK" of a form.
 	// Enter in a multi-line field stays a newline; a TextCtrl's onEnter runs
 	// first. wx and Qt also draw it as the native default button; ImGui
@@ -702,7 +713,8 @@ private:
 				show();
 			}));
 		}
-		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, std::move(onClick), m_dialogKeys);
+		return std::make_unique<ButtonWrapper>(m_btnTitle, pos, size, style, std::move(onClick), m_dialogKeys,
+			m_iconPath, m_iconSize);
 	}
 
 private:
@@ -710,6 +722,8 @@ private:
 	std::function<void()> m_onClickShow;
 	std::string m_btnTitle;
 	unsigned m_dialogKeys = kNoDialogKey;
+	std::string m_iconPath;
+	Size m_iconSize { 16, 16 };
 };
 
 // RadioButton -----------------------------------------------------------

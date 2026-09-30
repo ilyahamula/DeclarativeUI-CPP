@@ -92,11 +92,14 @@ class ButtonWrapper : public ControlWrapper
 public:
 	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		EventCallback<> onClick = {}, unsigned dialogKeys = kNoDialogKey)
+		EventCallback<> onClick = {}, unsigned dialogKeys = kNoDialogKey,
+		std::string iconPath = {}, Size iconSize = { 16, 16 })
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_onClick(std::move(onClick))
 		, m_dialogKeys(dialogKeys)
+		, m_iconPath(std::move(iconPath))
+		, m_iconSize(iconSize)
 	{
 	}
 
@@ -106,6 +109,11 @@ private:
 	std::string m_label;
 	EventCallback<> m_onClick;
 	unsigned m_dialogKeys; // DialogKeyRole bits
+	// An image left of the label (Button::withIcon). Empty, or a path that
+	// fails to load, is a plain text button -- logged, never fatal, as a
+	// ToolItem's icon is.
+	std::string m_iconPath;
+	Size m_iconSize;
 };
 
 // TextCtrlWrapper -----------------------------------------------------------

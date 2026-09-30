@@ -156,6 +156,7 @@ static_assert(EnterHost<PasswordInput>);
 static_assert(!EnterHost<MultiLineTextCtrl>);
 static_assert(DialogKeyButton<Button>);
 static_assert(!DialogKeyButton<ToggleButton>);
+static_assert(requires(Button b) { { b.withIcon(std::string{}) } -> std::same_as<Button&>; });
 // withScaleMode() belongs to the one widget that owns pixels of its own, and
 // withAlign() to the one that is nothing but text in a frame -- asking any
 // other leaf for either must not compile.
