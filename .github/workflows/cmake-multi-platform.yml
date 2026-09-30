@@ -34,7 +34,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # ── Linux dependencies ────────────────────────────────────────────────
       - name: Install dependencies (Linux)
@@ -74,7 +74,7 @@ jobs:
       # ── wxWidgets on Windows via vcpkg (cached; first run takes a while) ──
       - name: Restore vcpkg binary cache
         if: matrix.backend == 'WX' && runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-wxwidgets-${{ matrix.os }}-v1
