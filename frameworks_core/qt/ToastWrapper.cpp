@@ -1,4 +1,5 @@
 #include "frameworks_core/ToastWrapper.hpp"
+#include "frameworks_core/qt/Labels.hpp"
 #include "frameworks_core/qt/ToastWindow.hpp"
 
 #include <QApplication>
@@ -83,7 +84,8 @@ ToastWindow::ToastWindow(const std::string& message, MessageBoxStyle style, int 
 		"background: %1; border: none; border-top-left-radius: %2px;"
 		" border-bottom-left-radius: %2px;").arg(accentColor(style)).arg(kRounding));
 
-	auto* label = new QLabel(QString::fromStdString(message), frame);
+	auto* label = new QLabel(frame);
+	qtSetPlainText(label, message);
 	label->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
 	label->setContentsMargins(kPadX, kPadY, kPadX, kPadY);
 	// A word-wrapped QLabel picks its own width heuristically, so it only wraps

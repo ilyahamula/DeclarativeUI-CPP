@@ -1,10 +1,15 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QSignalBlocker>
 #include <QTimer>
 #include <QWidget>
 
+#include "frameworks_core/RefWatch.hpp"
+
+#include <deque>
+#include <functional>
 #include <utility>
 
 // Mirrors an externally-owned value back into a native widget -- the Qt twin of
@@ -33,18 +38,108 @@
 //
 // Capture the bound value by reference, never the wrapper: the ref belongs to the
 // caller and outlives everything here, whereas wrapper and widget teardown order is
-// not fixed. The timer is parented to the widget and the connection carries it as
-// context, so both die with it.
+// not fixed.
+//
+// One clock per WINDOW, not per binding. Every sync registered under a top-level
+// window rides a single timer owned by that window, which walks the entries in
+// registration order; an entry whose widget has been destroyed is skipped and
+// dropped. A dialog full of bound controls is therefore one timer rather than one
+// per property, and nothing outlives the window.
 
 // Poll interval. Fast enough that an externally driven value looks immediate,
 // slow enough that a dialog full of bound widgets stays cheap.
 inline constexpr int kRefSyncIntervalMs = 16;
 
+namespace refsync_detail
+{
+
+// The per-window clock. A plain QObject subclass, no Q_OBJECT: it declares no
+// signals or slots, and is found again by object name rather than by
+// qobject_cast (which needs a meta-object of its own).
+class Hub : public QObject
+{
+public:
+	static constexpr const char* kName = "dui_refsync_hub";
+
+	explicit Hub(QWidget* window)
+		: QObject(window)
+	{
+		setObjectName(QLatin1String(kName));
+		// A child, so it dies with the hub and shows up as the window's one
+		// timer to anyone who looks.
+		auto* timer = new QTimer(this);
+		QObject::connect(timer, &QTimer::timeout, this, [this] { tick(); });
+		timer->start(kRefSyncIntervalMs);
+	}
+
+	void add(QWidget* control, std::function<void()> sync)
+	{
+		m_entries.push_back(Entry { control, std::move(sync) });
+	}
+
+private:
+	struct Entry
+	{
+		QPointer<QWidget> control;
+		std::function<void()> sync;
+	};
+
+	void tick()
+	{
+		// Dead entries are dropped BEFORE the walk, never during it: a push can
+		// relayout the window, which realizes new controls and registers more
+		// entries here. A deque keeps the running entry where it is while the
+		// walk appends, and re-reading size() picks the newcomers up.
+		std::erase_if(m_entries, [](const Entry& e) { return e.control.isNull(); });
+		for (std::size_t i = 0; i < m_entries.size(); ++i)
+		{
+			if (!m_entries[i].control.isNull())
+				m_entries[i].sync();
+		}
+	}
+
+	std::deque<Entry> m_entries;
+};
+
+inline Hub* hubFor(QWidget* control)
+{
+	QWidget* window = control->window();
+	if (QObject* found = window->findChild<QObject*>(QLatin1String(Hub::kName), Qt::FindDirectChildrenOnly))
+		return static_cast<Hub*>(found);
+	return new Hub(window);
+}
+
+} // namespace refsync_detail
+
+// As bindExternalRefSync, for a binding whose `want()` is expensive -- an item
+// list, a table, a decoded selection. `watch` (a RefWatch over the caller's
+// variables `want` reads) is asked first, and `want()` runs only after it
+// reports a change; the push rule is unchanged.
+template <typename Watch, typename Pull, typename Want, typename Push>
+void bindWatchedRefSync(QWidget* control, Watch watch, Pull pull, Want want, Push push)
+{
+	refsync_detail::hubFor(control)->add(control,
+		[control, watch = std::move(watch), pull = std::move(pull), want = std::move(want),
+			push = std::move(push), last = want()]() mutable {
+			if (!watch.changed())
+				return;
+			auto target = want();
+			if (target != last)
+			{
+				if (pull() != target)
+				{
+					const QSignalBlocker block(control);
+					push(target);
+				}
+				last = std::move(target);
+			}
+		});
+}
+
 template <typename Pull, typename Want, typename Push>
 void bindExternalRefSync(QWidget* control, Pull pull, Want want, Push push)
 {
-	auto* timer = new QTimer(control);
-	QObject::connect(timer, &QTimer::timeout, control,
+	refsync_detail::hubFor(control)->add(control,
 		[control, pull = std::move(pull), want = std::move(want), push = std::move(push),
 			last = want()]() mutable {
 			const auto target = want();
@@ -58,5 +153,4 @@ void bindExternalRefSync(QWidget* control, Pull pull, Want want, Push push)
 				}
 			}
 		});
-	timer->start(kRefSyncIntervalMs);
 }

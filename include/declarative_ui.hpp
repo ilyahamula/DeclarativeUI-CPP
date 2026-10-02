@@ -2,6 +2,9 @@
 
 #include "widgets.hpp"
 #include "stacks.hpp"
+#include "foreach.hpp"
+#include "radiogroup.hpp"
+#include "observable.hpp"
 #include "grid.hpp"
 #include "scrollpanel.hpp"
 #include "splitter.hpp"
@@ -15,6 +18,7 @@
 #include "filedialog.hpp"
 #include "toast.hpp"
 #include "show_action.hpp"
+#include "ui_thread.hpp"
 
 #include <type_traits>
 
@@ -27,6 +31,22 @@ static_assert(NodeBuildable<Separator>);
 static_assert(NodeBuildable<ToolBar>);
 static_assert(NodeBuildable<StatusBar>);
 static_assert(NodeBuildable<ReadonlyTextCtrl>);
+// Display content binds like any value: a non-const lvalue follows the caller.
+static_assert(std::is_constructible_v<StaticText, std::string&>);
+static_assert(std::is_constructible_v<ReadonlyTextCtrl, std::string&>);
+static_assert(std::is_constructible_v<ListBox<std::string>, ItemList&, std::string&>);
+static_assert(std::is_constructible_v<ComboBox<int>, ItemList&, int&>);
+static_assert(std::is_constructible_v<CheckListBox<std::vector<int>>, ItemList&, std::vector<int>&>);
+static_assert(NodeBuildable<RadioButton<bool>>);
+static_assert(NodeBuildable<RadioButton<int>>);
+// An int radio names its own value and must be bound: the radios sharing one
+// int are the group. The old order-based spelling, and a snapshot int that
+// could never know about its siblings, must not compile.
+static_assert(std::is_constructible_v<RadioButton<int>, int&, int, const char*>);
+static_assert(!std::is_constructible_v<RadioButton<int>, int&, const char*>);
+static_assert(!std::is_constructible_v<RadioButton<int>, const int&, int, const char*>);
+static_assert(std::is_constructible_v<RadioButton<bool>, bool&, const char*>);
+static_assert(std::is_constructible_v<RadioButton<bool>, const bool&, const char*>);
 static_assert(NodeBuildable<ProgressBar>);
 // Indeterminate() needs the valueless spelling: a busy bar has no number to show.
 static_assert(std::is_default_constructible_v<ProgressBar>);
@@ -131,6 +151,19 @@ static_assert(PlaceholderHost<TextCtrl>);
 static_assert(PlaceholderHost<PasswordInput>);
 static_assert(!PlaceholderHost<MultiLineTextCtrl>);
 static_assert(!PlaceholderHost<ReadonlyTextCtrl>);
+// Enter: single-line fields report it, and one Button per window answers it.
+static_assert(EnterHost<TextCtrl>);
+static_assert(EnterHost<PasswordInput>);
+static_assert(!EnterHost<MultiLineTextCtrl>);
+static_assert(DialogKeyButton<Button>);
+// Focus and validity: the three text fields only.
+static_assert(FocusHost<TextCtrl>);
+static_assert(FocusHost<PasswordInput>);
+static_assert(FocusHost<MultiLineTextCtrl>);
+static_assert(!FocusHost<Button>);
+static_assert(!FocusHost<ReadonlyTextCtrl>);
+static_assert(!DialogKeyButton<ToggleButton>);
+static_assert(requires(Button b) { { b.withIcon(std::string{}) } -> std::same_as<Button&>; });
 // withScaleMode() belongs to the one widget that owns pixels of its own, and
 // withAlign() to the one that is nothing but text in a frame -- asking any
 // other leaf for either must not compile.
@@ -147,6 +180,53 @@ static_assert(TimedNotice<Toast>);
 static_assert(!FlagShowable<Toast>);
 static_assert(!ClickShowHost<Button, Toast>);
 static_assert(!TimedNotice<MessageBox>);
+
+// postToUi() takes a plain command, like ShowAction(): anything a click handler
+// could be, including a ShowAction itself.
+static_assert(std::is_invocable_v<decltype(&postToUi), std::function<void()>>);
+
+// isHidden() is everywhere a node is: on every widget and every container --
+// except a single Tab, since wxNotebook cannot hide a page without removing it
+// (hide the whole TabPanel instead).
+template <typename T>
+concept Hideable = requires(T element, bool& flag) {
+	{ element.isHidden(flag) } -> std::same_as<T&>;
+	{ element.isHidden(true) } -> std::same_as<T&>;
+};
+static_assert(Hideable<Button>);
+static_assert(Hideable<StaticText>);
+static_assert(Hideable<VStack<Button>>);
+static_assert(Hideable<HStack<Button>>);
+static_assert(Hideable<VGroupBox<Button>>);
+static_assert(Hideable<Grid<Button>>);
+static_assert(Hideable<ScrollPanel<VStack<Button>>>);
+static_assert(Hideable<HSplitter<VStack<Button>, VStack<Button>>>);
+static_assert(Hideable<Expander<VStack<Button>>>);
+static_assert(Hideable<TabPanel<Tab<VStack<Button>>>>);
+static_assert(!Hideable<Tab<VStack<Button>>>);
+
+// VForEach / HForEach are containers like a stack, built from a vector.
+namespace foreach_check
+{
+inline auto row = [](const std::string& s) { return StaticText{s}; };
+inline auto rowWithIndex = [](const std::string& s, std::size_t) { return StaticText{s}; };
+}
+static_assert(NodeBuildable<VForEach<std::string, decltype(foreach_check::row)>>);
+static_assert(NodeBuildable<HForEach<std::string, decltype(foreach_check::rowWithIndex)>>);
+static_assert(Hideable<VForEach<std::string, decltype(foreach_check::row)>>);
+
+// RadioGroup: a stack of RadioButton<int>s, so its index must be bound too.
+static_assert(NodeBuildable<RadioGroup>);
+static_assert(Hideable<RadioGroup>);
+static_assert(std::is_constructible_v<RadioGroup, int&, std::vector<std::string>>);
+static_assert(!std::is_constructible_v<RadioGroup, const int&, std::vector<std::string>>);
+
+// Observable<T> binds wherever T& does -- and only as a binding: a const one
+// has no T& to hand out, so it can never be mistaken for a snapshot.
+static_assert(std::is_convertible_v<Observable<ItemList>&, ItemList&>);
+static_assert(std::is_convertible_v<Observable<TableRows>&, TableRows&>);
+static_assert(!std::is_convertible_v<const Observable<TableRows>&, TableRows&>);
+static_assert(std::is_constructible_v<ListBox<std::string>, Observable<ItemList>&, std::string&>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

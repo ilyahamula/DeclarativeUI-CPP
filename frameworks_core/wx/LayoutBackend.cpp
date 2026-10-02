@@ -1,5 +1,6 @@
 #include "frameworks_core/wx/LayoutBackend.hpp"
 #include "frameworks_core/wx/MenuBuilder.hpp"
+#include "frameworks_core/wx/Labels.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
@@ -22,14 +23,6 @@ namespace
 constexpr int kTextFloorChars = 10;
 // Allowance for the text frame's own padding around the text extent.
 constexpr int kTextFramePadding = 16;
-
-// wx treats '&' as a mnemonic marker in labels; user text must escape it.
-wxString labelText(const std::string& label)
-{
-	wxString text = wxString::FromUTF8(label);
-	text.Replace(wxT("&"), wxT("&&"));
-	return text;
-}
 
 // Applies a node's effective disabled state to the window that was just
 // created for it (leaf control, group-box chrome, notebook or page), and keeps
@@ -64,8 +57,13 @@ void applyDisabled(wxWindow* window, const LayoutNode& node)
 void applyTooltip(wxWindow* window, const ControlWrapper& widget)
 {
 	auto push = [window](const std::string& text) {
+		// Nothing to remove is nothing to do: a wxStatusBar with
+		// wxSTB_SHOW_TIPS asserts on ANY tooltip call, an unset included.
 		if (text.empty())
-			window->UnsetToolTip();
+		{
+			if (window->GetToolTip() != nullptr)
+				window->UnsetToolTip();
+		}
 		else
 			window->SetToolTip(wxString::FromUTF8(text));
 	};
@@ -171,6 +169,8 @@ Size WxLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
 			applyContextMenu(created, *widget);
+			if (!widget->stableId().empty())
+				created->SetName(wxString::FromUTF8(widget->stableId()));
 		}
 	}
 
@@ -225,6 +225,8 @@ void WxLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 		return;
 	if (window->GetParent() != currentParent())
 		window->Reparent(currentParent());
+	if (!window->IsShown())
+		window->Show(); // back from isHidden()
 	const Rect local = toLocal(frame);
 #ifdef __WXOSX__
 	// The rounded Cocoa bezel cannot grow in height; switch before SetSize,
@@ -247,7 +249,7 @@ wxWindow* WxLayoutBackend::ensureContainer(const LayoutNode& node)
 	// created against the host first; beginContainer reparents as needed
 	wxWindow* window = nullptr;
 	if (node.kind == NodeKind::GroupBox)
-		window = new wxStaticBox(m_host, wxID_ANY, labelText(node.label));
+		window = new wxStaticBox(m_host, wxID_ANY, wxLabelText(node.label));
 	else if (node.kind == NodeKind::TabPanel)
 		window = new wxNotebook(m_host, wxID_ANY);
 	else if (node.kind == NodeKind::ScrollPanel)
@@ -346,6 +348,8 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		wxWindow* window = ensureContainer(node);
 		if (window->GetParent() != scope.parent)
 			window->Reparent(scope.parent);
+		if (!window->IsShown())
+			window->Show(); // back from isHidden()
 		const Rect local = toLocal(frame);
 		window->SetSize(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
@@ -382,7 +386,7 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		else
 		{
 			page = new wxPanel(notebook);
-			notebook->AddPage(page, labelText(node.label));
+			notebook->AddPage(page, wxLabelText(node.label));
 			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}
@@ -398,4 +402,61 @@ bool WxLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 void WxLayoutBackend::endContainer(const LayoutNode&)
 {
 	m_stack.pop_back();
+}
+
+// isHidden(): take everything this subtree ever realized out of view. Where a
+// container's window is the native PARENT of its subtree -- a tab widget, a
+// scroll area, an Expander's content panel -- hiding it takes the subtree with
+// it, and the walk stops there; its pages keep whatever visibility their owner
+// gave them, ready for the container to come back. A group box's frame is a
+// SIBLING of its content, so there the walk goes on. place() and
+// beginContainer() show the windows again when the node is laid out once more.
+void WxLayoutBackend::hide(const LayoutNode& node)
+{
+	if (node.isLeaf())
+	{
+		if (auto* window = static_cast<wxWindow*>(node.widget->nativeHandle()))
+			window->Hide();
+		return;
+	}
+	if (const auto it = m_containers.find(&node); it != m_containers.end() && it->second != nullptr)
+	{
+		it->second->Hide();
+		if (node.kind != NodeKind::GroupBox)
+			return;
+	}
+	for (const auto& child : node.children)
+		hide(*child);
+}
+
+// A ForEach row is being replaced: destroy every native window this subtree
+// realized, deepest first, and drop what is cached per node -- the nodes are
+// freed right after, so a stale map entry would be a dangling key.
+//
+// Children go before their container: a container window may be their native
+// parent (a scroll area, an Expander panel), and destroying it first would
+// destroy them under us. A tab PAGE is the exception the other way round: its
+// window belongs to the tab widget, which removes and destroys it itself, so a
+// page is only forgotten, never destroyed on its own.
+void WxLayoutBackend::forget(const LayoutNode& node)
+{
+	for (const auto& child : node.children)
+		forget(*child);
+
+	if (node.isLeaf())
+	{
+		m_textFloorWidths.erase(&node);
+		if (auto* window = static_cast<wxWindow*>(node.widget->nativeHandle()))
+			window->Destroy();
+		return;
+	}
+
+	const auto it = m_containers.find(&node);
+	if (it == m_containers.end())
+		return;
+	wxWindow* window = it->second;
+	m_containers.erase(it);
+	const bool isTabPage = node.parent != nullptr && node.parent->kind == NodeKind::TabPanel;
+	if (window != nullptr && !isTabPage)
+		window->Destroy();
 }

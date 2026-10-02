@@ -13,11 +13,6 @@ public:
 	ControlWrapper() = default;
 	virtual ~ControlWrapper() = default;
 
-	ControlWrapper(void* nativeWidget)
-		: m_nativeWidget(nativeWidget)
-	{
-	}
-
 	ControlWrapper(const Position& pos, const Size& size, long style)
 		: m_pos(pos)
 		, m_size(size)
@@ -66,9 +61,10 @@ public:
 		return false;
 	}
 
-	// Draw/realize the widget at the frame the engine assigned (the backend
-	// adapter has already positioned the cursor/window). frame.width < 0
-	// means "natural size" (legacy path).
+	// Draw the widget at the frame the engine assigned (immediate backends;
+	// the backend adapter has already positioned the cursor). A zero-width
+	// frame is legal -- a squeezed or collapsed leaf -- and draws at the
+	// widget's own size.
 	virtual void render(const Rect& frame)
 	{
 		(void)frame;
@@ -161,6 +157,19 @@ public:
 		return m_contextMenu;
 	}
 
+	// The caller's stable identity for this control (Widget<W>::withId), or
+	// empty. ImGui keys the control's own state by it instead of by position;
+	// wx and Qt give it to the native window as its name.
+	void setStableId(std::string id)
+	{
+		m_stableId = std::move(id);
+	}
+
+	const std::string& stableId() const
+	{
+		return m_stableId;
+	}
+
 protected:
 	void* m_nativeWidget = nullptr;
 	Position m_pos { -1, -1 };
@@ -169,4 +178,5 @@ protected:
 	DisabledFlag m_disabled;
 	TooltipText m_tooltip;
 	ContextMenu m_contextMenu;
+	std::string m_stableId;
 };

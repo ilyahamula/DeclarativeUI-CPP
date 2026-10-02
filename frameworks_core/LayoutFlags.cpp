@@ -106,11 +106,3 @@ bool LayoutFlags::autoGrow() const
 {
 	return m_autoGrow;
 }
-
-bool LayoutFlags::expand() const { return m_expand; }
-bool LayoutFlags::centerVertical() const { return m_centerVertical; }
-bool LayoutFlags::centerHorizontal() const { return m_centerHorizontal; }
-int LayoutFlags::borderLeft() const { return m_border.left; }
-int LayoutFlags::borderRight() const { return m_border.right; }
-int LayoutFlags::borderTop() const { return m_border.top; }
-int LayoutFlags::borderBottom() const { return m_border.bottom; }

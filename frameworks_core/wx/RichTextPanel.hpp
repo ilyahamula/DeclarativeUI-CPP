@@ -7,6 +7,7 @@
 
 #include <array>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -88,9 +89,15 @@ public:
 		m_onLink = std::move(onLink);
 	}
 
-	RichTextLayout layoutFor(int width) const
+	// Cached by width: paint, every mouse move (the link hit test) and the
+	// measure pass all ask, and the answer only changes with the width -- the
+	// runs and fonts are fixed for the panel's life.
+	const RichTextLayout& layoutFor(int width) const
 	{
-		return layoutRichText(m_runs, width, m_lineHeight,
+		if (m_cachedWidth == width && m_cached)
+			return *m_cached;
+		m_cachedWidth = width;
+		m_cached = layoutRichText(m_runs, width, m_lineHeight,
 			[this](const TextRun& run, std::string_view text) {
 				int w = 0;
 				int h = 0;
@@ -98,6 +105,7 @@ public:
 					nullptr, nullptr, &fontFor(run));
 				return w;
 			});
+		return *m_cached;
 	}
 
 	// Text is painted grey while disabled, and wx does not repaint a window
@@ -149,7 +157,7 @@ private:
 	{
 		wxPaintDC dc(this);
 		dc.SetBackgroundMode(wxBRUSHSTYLE_TRANSPARENT);
-		const RichTextLayout layout = layoutFor(GetClientSize().x);
+		const RichTextLayout& layout = layoutFor(GetClientSize().x);
 		for (const RichTextFragment& f : layout.fragments)
 		{
 			const TextRun& run = m_runs[f.run];
@@ -164,4 +172,6 @@ private:
 	std::array<wxFont, 8> m_fonts;
 	int m_lineHeight = 0;
 	const std::string* m_pressed = nullptr;
+	mutable int m_cachedWidth = -1;
+	mutable std::optional<RichTextLayout> m_cached;
 };

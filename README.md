@@ -28,7 +28,7 @@ return Dialog {
             VStack { StaticText{"Time"}, TimePicker{time} }
         },
         HStack {
-            StaticText{""}.withFlags(LayoutFlags().Proportion(1)),
+            Spacer{},
             Button{"Check"}.withFlags(LayoutFlags().CenterVertical()).onClick(onCheck)
         }
     }
@@ -50,6 +50,15 @@ return Dialog {
 - **Selection mode from the bound type** — `ListBox<std::string>` selects one item, `ListBox<std::vector<int>>` selects many; `Table` binds either a row index or a key column. There is no mode flag to keep in step with the value
 - **Disable anything** — `.isDisabled(flag)` on any widget, or on a `VStack`/`GroupBox`/`TabPanel`/`Tab` to grey out its whole subtree. Bind it to a `bool&` and it flips live, without rebuilding the tree
 - **Tooltips** — `.withTooltip("…")` on any leaf widget, either fixed text or bound to a `std::string&` that can change at runtime
+- **Background threads** — bound values belong to the UI thread; a worker hands its results over with `postToUi([&] { progress = 50; })`, which runs the task on the UI thread on every backend
+- **Hide anything** — `.isHidden(flag)` on any widget or container takes it out of the layout entirely (no space, no gap) and, bound to a `bool&`, shows and hides it live
+- **Live display content** — `StaticText{status}` and `ReadonlyTextCtrl{status}` on a `std::string&`, `ComboBox`/`ListBox`/`CheckListBox` on a `std::vector<std::string>&` of items, `TreeView` on a `std::vector<TreeItem>&` and `Table` on its `TableRows&`, follow the caller's data live; they keep the size of their first content, so new text never resizes an auto-fit window
+- **Runtime-sized content** — `VForEach{todos, [&](const Todo& t, std::size_t i) { return HStack{…}; }}` builds one row per item; bound to a `std::vector&`, rows follow the data live (only changed rows are rebuilt when the count stays the same)
+- **Icon buttons** — `Button{"Save"}.withIcon("icons/save.png")` draws a 16×16 (or `withIcon(path, {w, h})`) image left of the label; an empty label gives an icon-only button
+- **Keyboard defaults** — `Button{"OK"}.isDefault()` answers Enter and `Button{"Cancel"}.isCancel()` answers Escape, in a `Dialog` or a `Window`; `TextCtrl{q}.onEnter(...)` reports Enter first, then the default button is pressed. Enter in a multi-line field stays a newline
+- **Large bound data, cheaply** — wrap a big list, tree or table in `Observable<T>` (`Observable<TableRows> rows; rows.edit().push_back(…)`) and pass it wherever a `T&` binds: wx and Qt then poll a change counter instead of comparing the whole value, so an idle window costs nothing however much data it shows
+- **Focus and validation** — `TextCtrl{email}.isFocused(emailFocused).isInvalid(emailBad).onBlur(validate)`: a bound focus flag follows focus and moves it when set, `isFocused()` picks the field a window opens with, `onFocus`/`onBlur` report, and `isInvalid` tints the field without resizing it (text fields only)
+- **Stable ids** — `.withId("volume")` names a control: on ImGui its state is keyed by the name rather than its position in the tree (so an unbound value survives an `Expander` folding above it), and on wx/Qt it becomes the native window / object name
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
 
@@ -59,14 +68,14 @@ return Dialog {
 |-------------------|---------|
 | Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
-| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `ComboBox<T>` |
+| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
-| Containers        | `VStack` / `HStack`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
+| Containers        | `VStack` / `HStack`, `VForEach` / `HForEach`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |
 | Top-level         | `Dialog`, `Window`, `MessageBox`, `FileDialog` |
 | Feedback          | `Toast` (timed, non-blocking, stacks) |
 | Application chrome| `MenuBar` + `Menu` + `MenuItem` (on a `Window`), `.withContextMenu()` on any leaf |
@@ -95,6 +104,27 @@ them by item *text*, so two lists holding the same items in a different order ti
 same rows; `std::vector<int>` names them by *position*, which is the right choice when
 the labels are not unique. Both decode through the same helpers `ListBox`'s multi-select
 bindings use, so what one control calls "ticked" the other calls "selected".
+
+A `RadioButton` on an `int` names the value it stands for, and its group is simply
+every radio bound to the same variable — not declaration order, not the parent box —
+so two groups can share one box and a group survives any rebuild:
+
+```cpp
+RadioButton{ colour, 0, "Red" },     // picking it writes 0 into colour
+RadioButton{ colour, 1, "Green" },
+RadioButton{ size,   0, "Small" },   // a second group, same box
+RadioButton{ enabled, "Enabled" }    // bool: a lone radio
+```
+
+`RadioGroup` writes the same thing once: one radio per option, option `i` naming `i`.
+
+```cpp
+RadioGroup{ shipping, {"Standard", "Express", "Overnight"} }
+RadioGroup{ size, {"S", "M", "L"} }.withOrientation(Orientation::Horizontal)
+```
+
+An `int` radio must be bound: a snapshot would give each radio a private copy of the
+choice, so they could never uncheck each other, and that spelling does not compile.
 
 `HSplitter` / `VSplitter` are arranged by the engine rather than by a native
 splitter — `wxSplitterWindow` and `QSplitter` own their children's geometry, which

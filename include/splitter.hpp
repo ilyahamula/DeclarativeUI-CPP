@@ -108,10 +108,24 @@ struct Splitter
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	Splitter& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	Splitter& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeSplitter(m_orient, m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		node->split.position = m_position;
 		node->split.minFirst = m_minFirst;
 		node->split.minSecond = m_minSecond;
@@ -147,6 +161,7 @@ private:
 	int m_minFirst = SplitterState::kDefaultMinPane;
 	int m_minSecond = SplitterState::kDefaultMinPane;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	A m_first;
 	B m_second;
 };
@@ -203,6 +218,19 @@ struct HSplitter : public Splitter<A, B>
 		Splitter<A, B>::isDisabled(disabled);
 		return *this;
 	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	HSplitter& isHidden(const bool& hidden = true)
+	{
+		Splitter<A, B>::isHidden(hidden);
+		return *this;
+	}
+
+	HSplitter& isHidden(bool& hidden)
+	{
+		Splitter<A, B>::isHidden(hidden);
+		return *this;
+	}
 };
 
 // Panes stacked, sash horizontal.
@@ -255,6 +283,19 @@ struct VSplitter : public Splitter<A, B>
 	VSplitter& isDisabled(bool& disabled)
 	{
 		Splitter<A, B>::isDisabled(disabled);
+		return *this;
+	}
+
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	VSplitter& isHidden(const bool& hidden = true)
+	{
+		Splitter<A, B>::isHidden(hidden);
+		return *this;
+	}
+
+	VSplitter& isHidden(bool& hidden)
+	{
+		Splitter<A, B>::isHidden(hidden);
 		return *this;
 	}
 };

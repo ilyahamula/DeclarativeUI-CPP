@@ -3,9 +3,11 @@
 #include "frameworks_core/LayoutEngine.hpp"
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/imgui/AdoptedTopLevels.hpp"
+#include "frameworks_core/imgui/DialogKeys.hpp"
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 #include "frameworks_core/imgui/LayoutBackend.hpp"
 #include "frameworks_core/imgui/ToastQueue.hpp"
+#include "frameworks_core/UiThread.hpp"
 #include "frameworks_core/imgui/MenuDraw.hpp"
 
 #include <algorithm>
@@ -52,11 +54,17 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	// window's frame, so a show() issued in it is a handler's and is adopted
 	// (TopLevelShow.hpp) rather than drawn as if it were the caller's frame.
 	AdoptedTopLevels::FrameScope frameScope(title);
+	// Default/cancel buttons offer their press into this while the tree draws.
+	imgui_dialog_keys::WindowScope dialogKeys;
 
 	// Toasts ride on whichever framework window the frame draws first, so an
 	// app never has to call anything for them (ToastQueue.hpp). Here, before
 	// anything can return early: a closed window's show() is still a frame.
 	ToastQueue::draw();
+
+	// Work a background thread posted (postToUi) runs here, inside this
+	// window's frame, so a show() it issues is a handler's and is kept up.
+	UiThreadQueue::drain();
 
 	WindowState& state = windowStates()[title];
 
@@ -148,6 +156,8 @@ void WindowWrapper::runLayoutEngine(const std::string& title, const Size& size,
 			renderContent.height = std::max(content.height, (int)actual.y - chromeH);
 		}
 		engine.render(root, renderContent);
+		// Enter / Escape, now that every button has offered (DialogKeys.hpp).
+		(void)dialogKeys.dispatch(); // a Window ignores a bare Escape, like wxFrame / QMainWindow
 
 		// The file browser is drawn HERE, not in the wrapper that asked for it:
 		// ImGuiLayoutBackend::place() wraps every render() in BeginGroup() +

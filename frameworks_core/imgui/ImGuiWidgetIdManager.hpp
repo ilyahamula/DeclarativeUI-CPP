@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
 // Per-ImGui-scope sequential ID manager (USE_IMGUI only).
@@ -16,10 +17,6 @@ class WidgetIdManager
 public:
     // Sequential integer for ImGui::PushID() — unique within the current ImGui scope.
     static int nextWidgetId()  { return next(s_widgetIds); }
-
-    // Sequential integer for naming BeginChild windows (GroupBoxes) —
-    // unique within the current parent scope (called before BeginChild).
-    static int nextGroupBoxId() { return next(s_groupBoxIds); }
 
     // Sequential integer for state a wrapper has to reach during the MEASURE
     // pass (an unbound Splitter position). It needs its own counter because the
@@ -59,6 +56,20 @@ public:
             | static_cast<std::uint32_t>(slot & 0xF);
     }
 
+    // Key for a control the caller named with withId(): the same scope seed,
+    // but the id's hash in place of the sequential number, so the key survives
+    // any change in the tree's shape. Bit 31 of the low half is always set --
+    // sequential ids never reach it -- so a named and a numbered control can
+    // never share a key.
+    static std::uint64_t stableStateKey(const std::string& id, int slot = 0)
+    {
+        const std::uint64_t scope = ImGui::GetID("__dui_scope__");
+        const std::uint32_t hash = ImGui::GetID(id.c_str());
+        return (scope << 32)
+            | ((hash | 0x80000000u) & ~0xFu)
+            | static_cast<std::uint32_t>(slot & 0xF);
+    }
+
 private:
     struct ScopeState { int counter = 0; int lastFrame = -1; };
 
@@ -72,7 +83,6 @@ private:
     }
 
     static inline std::unordered_map<ImGuiID, ScopeState> s_widgetIds;
-    static inline std::unordered_map<ImGuiID, ScopeState> s_groupBoxIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_measureIds;
     static inline std::unordered_map<ImGuiID, ScopeState> s_contextMenuIds;
 };

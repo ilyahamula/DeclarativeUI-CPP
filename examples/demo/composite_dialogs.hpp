@@ -33,8 +33,8 @@ inline auto drawUI(std::string& text,
                     .withFlags(LayoutFlags().Proportion(1).Expand().CenterVertical()),
                 VGroupBox {
                     LayoutFlags().CenterVertical().Border(Side::Left),
-                    RadioButton{radioChoice, "On"},
-                    RadioButton{radioChoice, "Off"}
+                    RadioButton{radioChoice, 0, "On"},
+                    RadioButton{radioChoice, 1, "Off"}
                 }
             },
             HStack {
@@ -57,8 +57,8 @@ inline auto drawUI(std::string& text,
                     }),
                 VGroupBox {
                     LayoutFlags().CenterVertical().Border(Side::Left),
-                    RadioButton{radioChoice1, "On"},
-                    RadioButton{radioChoice1, "Off"}
+                    RadioButton{radioChoice1, 0, "On"},
+                    RadioButton{radioChoice1, 1, "Off"}
                 }
             }
         }

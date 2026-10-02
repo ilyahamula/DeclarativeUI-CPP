@@ -9,6 +9,7 @@
 
 #include <array>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,8 +36,13 @@ public:
 		m_onLink = std::move(onLink);
 	}
 
-	RichTextLayout layoutFor(int width) const
+	// Cached by width: paint, every mouse move (the link hit test) and the
+	// measure pass all ask. The width is the key; a font or style change
+	// clears it (changeEvent below), since the metrics are the widget's own.
+	const RichTextLayout& layoutFor(int width) const
 	{
+		if (m_cachedWidth == width && m_cached)
+			return *m_cached;
 		std::array<QFontMetrics, 4> metrics {
 			QFontMetrics(fontFor(false, false, false)), QFontMetrics(fontFor(true, false, false)),
 			QFontMetrics(fontFor(false, true, false)), QFontMetrics(fontFor(true, true, false)),
@@ -45,18 +51,20 @@ public:
 		for (const QFontMetrics& m : metrics)
 			lineHeight = std::max(lineHeight, m.height());
 
-		return layoutRichText(m_runs, width, lineHeight,
+		m_cachedWidth = width;
+		m_cached = layoutRichText(m_runs, width, lineHeight,
 			[this](const TextRun& run, std::string_view text) {
 				return QFontMetrics(fontFor(run)).horizontalAdvance(
 					QString::fromUtf8(text.data(), (qsizetype)text.size()));
 			});
+		return *m_cached;
 	}
 
 protected:
 	void paintEvent(QPaintEvent*) override
 	{
 		QPainter painter(this);
-		const RichTextLayout layout = layoutFor(width());
+		const RichTextLayout& layout = layoutFor(width());
 		for (const RichTextFragment& f : layout.fragments)
 		{
 			const TextRun& run = m_runs[f.run];
@@ -66,6 +74,13 @@ protected:
 			painter.drawText(QPoint(f.x, f.y + QFontMetrics(font).ascent()),
 				QString::fromUtf8(f.text.data(), (qsizetype)f.text.size()));
 		}
+	}
+
+	void changeEvent(QEvent* event) override
+	{
+		if (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange)
+			m_cached.reset();
+		QWidget::changeEvent(event);
 	}
 
 	void resizeEvent(QResizeEvent* event) override
@@ -144,4 +159,6 @@ private:
 	std::vector<TextRun> m_runs;
 	std::function<void(const std::string&)> m_onLink;
 	const std::string* m_pressed = nullptr;
+	mutable int m_cachedWidth = -1;
+	mutable std::optional<RichTextLayout> m_cached;
 };

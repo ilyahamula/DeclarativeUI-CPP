@@ -3,6 +3,7 @@
 #include <QApplication>
 
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -11,18 +12,19 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // The RichText panel: the links write these, the fields read them back,
-    // and `richLocked` disables both texts at once.
-    std::string richLastLink = "(no link clicked yet)";
-    int richLinkClicks = 0;
-    bool richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string aboutLastLink;
+    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
+    // (isInvalid) on the three text fields.
+    DemoSignUp signUp;
+    // Bound TreeView items and Table rows (an Observable, so polled by its
+    // change counter): the buttons change these, both controls follow.
+    std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
+    Observable<TableRows> files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
+    std::string folderPick = "Documents/Letters";
+    std::string filePick = "budget.csv";
 
-    // One show() per open on a retained backend. RichText is a plain QWidget
-    // that paints the shared layout -- no QLabel, no HTML.
-    drawRichTextBinding(richLastLink, richLinkClicks, richLocked).show();
-    drawAboutUI(aboutLastLink).show();
+    // One show() per open on a retained backend.
+    drawSignUpFormUI(signUp).show();
+    drawTreeTableBindingUI(folders, files, folderPick, filePick).show();
 
     return app.exec();
 }

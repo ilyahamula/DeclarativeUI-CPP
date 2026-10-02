@@ -49,3 +49,22 @@ using StatusFields = std::vector<StatusField>;
 // contract). Fixed fields contribute their width and stretch fields this, and
 // the engine's Expand() gives the bar the rest of the row at arrange time.
 inline constexpr int kDefaultStatusFieldWidth = 120;
+
+// Space between two fields, in the measure and in the ImGui row alike.
+inline constexpr int kStatusFieldGap = 8;
+
+// A status bar's measured width, on EVERY backend: fixed fields at their width,
+// stretch fields at kDefaultStatusFieldWidth, gaps between. One rule rather
+// than each native bar's own best size, which disagree (wx and Qt differed by
+// 200 px for the same fields) -- only the height is left to the native bar.
+inline int statusBarContentWidth(const StatusFields& fields)
+{
+	int width = 0;
+	for (std::size_t i = 0; i < fields.size(); ++i)
+	{
+		if (i > 0)
+			width += kStatusFieldGap;
+		width += fields[i].width > 0 ? fields[i].width : kDefaultStatusFieldWidth;
+	}
+	return width;
+}

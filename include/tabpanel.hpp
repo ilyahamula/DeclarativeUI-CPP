@@ -93,10 +93,24 @@ struct TabPanel
 		return *this;
 	}
 
+	// Take the whole subtree out of the layout -- see Widget::isHidden().
+	TabPanel& isHidden(const bool& hidden = true)
+	{
+		m_hidden.snapshot(hidden);
+		return *this;
+	}
+
+	TabPanel& isHidden(bool& hidden)
+	{
+		m_hidden.bind(hidden);
+		return *this;
+	}
+
 	std::unique_ptr<LayoutNode> buildNode()
 	{
 		auto node = makeTabPanel(m_flags.value_or(LayoutFlags{}));
 		node->disabled = m_disabled;
+		node->hidden = m_hidden;
 		std::apply([&](auto&... tab) {
 			([&] {
 				auto& page = node->add(tab.content().buildNode());
@@ -110,5 +124,6 @@ struct TabPanel
 private:
 	std::optional<LayoutFlags> m_flags;
 	DisabledFlag m_disabled;
+	BoundValue<bool> m_hidden { false };
 	std::tuple<Tabs...> m_tabs;
 };

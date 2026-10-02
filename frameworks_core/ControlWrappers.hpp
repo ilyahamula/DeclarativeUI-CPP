@@ -2,7 +2,10 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/DialogKeys.hpp"
+#include "frameworks_core/CoreTypes/EventCallback.hpp"
 #include "frameworks_core/CoreTypes/StatusField.hpp"
+#include "frameworks_core/CoreTypes/TextField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/FileFilter.hpp"
@@ -13,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <string>
@@ -21,13 +25,52 @@
 
 // Every wrapper declares the same shape of per-backend override: realize() on
 // the retained backends (wx/Qt), measureIntrinsic()/render() on ImGui (see the
-// wrapper contract below). One macro call replaces that repeated block.
+// wrapper contract below). One macro call replaces that repeated block, and
+// the few variations below get one macro each, so no wrapper spells out a
+// backend #if of its own. A macro with nothing to declare on a backend expands
+// to static_assert(true, ""), so every call site is written `MACRO();`.
+//
+//   DECLARE_CONTROL_WRAPPER_OVERRIDES()     the usual shape (see above).
+//   DECLARE_SELF_MEASURED_OVERRIDES(cond)   wx/Qt: the wrapper answers its own
+//       measure whenever `cond` holds -- a bound display frozen at its first
+//       content, or a height that follows the offered width -- instead of the
+//       native best size (ControlWrapper::measuresItself). ImGui always
+//       measures through the wrapper, so there it declares nothing.
+//   DECLARE_MEASURES_ITSELF(cond)           the same, for a wrapper whose
+//       measureIntrinsic() is one inline body shared by all three backends.
+//   DECLARE_PLACED_OVERRIDE()               wx/Qt: placed(frame), for content
+//       composed against the frame the engine assigned (ControlWrapper::placed).
+//   DECLARE_DRAW_OVERRIDES()                realize() / render() only, for a
+//       wrapper whose measure is shared inline.
+//   DECLARE_WINDOWLESS_OVERRIDES()          render() on ImGui and nothing on
+//       wx/Qt, for a leaf that creates no native window (Spacer).
 #if defined(USE_WX) || defined(USE_QT)
 #define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
 	void realize(void* parentWindow) override
+#define DECLARE_MEASURES_ITSELF(cond) \
+	bool measuresItself() const override { return (cond); }
+#define DECLARE_SELF_MEASURED_OVERRIDES(cond) \
+	Size measureIntrinsic(const Constraints& c) override; \
+	DECLARE_MEASURES_ITSELF(cond)
+#define DECLARE_PLACED_OVERRIDE() \
+	void placed(const Rect& frame) override
+#define DECLARE_DRAW_OVERRIDES() \
+	void realize(void* parentWindow) override
+#define DECLARE_WINDOWLESS_OVERRIDES() \
+	static_assert(true, "")
 #elif defined(USE_IMGUI)
 #define DECLARE_CONTROL_WRAPPER_OVERRIDES() \
 	Size measureIntrinsic(const Constraints& c) override; \
+	void render(const Rect& frame) override
+#define DECLARE_MEASURES_ITSELF(cond) \
+	static_assert(true, "")
+#define DECLARE_SELF_MEASURED_OVERRIDES(cond) \
+	static_assert(true, "")
+#define DECLARE_PLACED_OVERRIDE() \
+	static_assert(true, "")
+#define DECLARE_DRAW_OVERRIDES() \
+	void render(const Rect& frame) override
+#define DECLARE_WINDOWLESS_OVERRIDES() \
 	void render(const Rect& frame) override
 #endif
 
@@ -50,12 +93,14 @@ class ButtonWrapper : public ControlWrapper
 public:
 	ButtonWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {}, unsigned dialogKeys = kNoDialogKey,
+		std::string iconPath = {}, Size iconSize = { 16, 16 })
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
+		, m_dialogKeys(dialogKeys)
+		, m_iconPath(std::move(iconPath))
+		, m_iconSize(iconSize)
 	{
 	}
 
@@ -63,8 +108,13 @@ public:
 
 private:
 	std::string m_label;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
+	unsigned m_dialogKeys; // DialogKeyRole bits
+	// An image left of the label (Button::withIcon). Empty, or a path that
+	// fails to load, is a plain text button -- logged, never fatal, as a
+	// ToolItem's icon is.
+	std::string m_iconPath;
+	Size m_iconSize;
 };
 
 // TextCtrlWrapper -----------------------------------------------------------
@@ -79,23 +129,29 @@ class TextCtrlWrapper : public ControlWrapper
 public:
 	TextCtrlWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {},
+		EventCallback<const std::string&> onEnter = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+		, m_onEnter(std::move(onEnter))
 	{
 	}
+
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
+	TextFieldOptions m_field;
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
+	// Enter in the field, after the text is committed. The window's default
+	// button (if any) is pressed right after it, as a native dialog would.
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -104,23 +160,29 @@ class PasswordInputWrapper : public ControlWrapper
 public:
 	PasswordInputWrapper(BoundValue<std::string> value, std::string placeholder,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {},
+		EventCallback<const std::string&> onEnter = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_placeholder(std::move(placeholder))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+		, m_onEnter(std::move(onEnter))
 	{
 	}
+
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
+	TextFieldOptions m_field;
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
+	// Enter in the field, after the text is committed. The window's default
+	// button (if any) is pressed right after it, as a native dialog would.
+	EventCallback<const std::string&> m_onEnter;
 };
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -129,12 +191,32 @@ class MultiLineTextCtrlWrapper : public ControlWrapper
 public:
 	MultiLineTextCtrlWrapper(BoundValue<std::string> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
+	{
+	}
+
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	TextFieldOptions m_field;
+	BoundValue<std::string> m_value;
+	EventCallback<const std::string&> m_onChange;
+};
+
+// ReadonlyTextCtrlWrapper -----------------------------------------------------------
+class ReadonlyTextCtrlWrapper : public ControlWrapper
+{
+public:
+	ReadonlyTextCtrlWrapper(BoundValue<std::string> value,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_value(std::move(value))
 	{
 	}
 
@@ -142,25 +224,6 @@ public:
 
 private:
 	BoundValue<std::string> m_value;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
-};
-
-// ReadonlyTextCtrlWrapper -----------------------------------------------------------
-class ReadonlyTextCtrlWrapper : public ControlWrapper
-{
-public:
-	ReadonlyTextCtrlWrapper(const std::string& value,
-		const Position& pos, const Size& size, long style)
-		: ControlWrapper(pos, size, style)
-		, m_value(value)
-	{
-	}
-
-	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-
-private:
-	std::string m_value;
 };
 
 // ClickableTextWrapper -----------------------------------------------------------
@@ -169,12 +232,10 @@ class ClickableTextWrapper : public ControlWrapper
 public:
 	ClickableTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -182,8 +243,7 @@ public:
 
 private:
 	std::string m_text;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 };
 
 // LinkTextWrapper -----------------------------------------------------------
@@ -192,12 +252,10 @@ class LinkTextWrapper : public ControlWrapper
 public:
 	LinkTextWrapper(const std::string& text,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {})
+		EventCallback<> onClick = {})
 		: ControlWrapper(pos, size, style)
 		, m_text(text)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 	{
 	}
 
@@ -205,30 +263,36 @@ public:
 
 private:
 	std::string m_text;
-	std::function<void()> m_onClick;
-	std::function<void(void*)> m_onClickWithWidget;
+	EventCallback<> m_onClick;
 };
 
 // StaticTextWrapper -----------------------------------------------------------
 // The alignment is a plain TextAlign, not a BoundValue, for the same reason a
 // placeholder is a plain string: it is decided when the tree is described and
 // nothing writes it afterwards, so there is nothing for a ref sync to poll.
+//
+// A BOUND label measures its first text only (see StaticText): on wx/Qt the
+// size is captured at realize() and answered through measuresItself(), since
+// the native best size would follow every SetLabel; on ImGui it is parked
+// under a measure-phase key the first time the label is measured.
 class StaticTextWrapper : public ControlWrapper
 {
 public:
-	StaticTextWrapper(const std::string& text, TextAlign align,
+	StaticTextWrapper(BoundValue<std::string> text, TextAlign align,
 		const Position& pos, const Size& size, long style)
 		: ControlWrapper(pos, size, style)
-		, m_text(text)
+		, m_text(std::move(text))
 		, m_align(align)
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_SELF_MEASURED_OVERRIDES(m_text.isBound());
 
 private:
-	std::string m_text;
+	BoundValue<std::string> m_text;
 	TextAlign m_align = TextAlign::Left;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound only: the size of the first text
 };
 
 // RichTextWrapper -----------------------------------------------------------
@@ -247,20 +311,15 @@ class RichTextWrapper : public ControlWrapper
 public:
 	RichTextWrapper(std::string_view markup,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onLink = {},
-		std::function<void(const std::string&, void*)> onLinkWithWidget = {})
+		EventCallback<const std::string&> onLink = {})
 		: ControlWrapper(pos, size, style)
 		, m_runs(parseMarkup(markup))
 		, m_onLink(std::move(onLink))
-		, m_onLinkWithWidget(std::move(onLinkWithWidget))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-#if defined(USE_WX) || defined(USE_QT)
-	Size measureIntrinsic(const Constraints& c) override;
-	bool measuresItself() const override { return true; }
-#endif
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
 
 private:
 	int wrapWidth(const Constraints& c) const
@@ -269,8 +328,7 @@ private:
 	}
 
 	std::vector<TextRun> m_runs;
-	std::function<void(const std::string&)> m_onLink;
-	std::function<void(const std::string&, void*)> m_onLinkWithWidget;
+	EventCallback<const std::string&> m_onLink;
 };
 
 // DatePickerWrapper -----------------------------------------------------------
@@ -279,12 +337,10 @@ class DatePickerWrapper : public ControlWrapper
 public:
 	DatePickerWrapper(BoundValue<Date> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Date&)> onChange = {},
-		std::function<void(const Date&, void*)> onChangeWithWidget = {})
+		EventCallback<const Date&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -292,8 +348,7 @@ public:
 
 private:
 	BoundValue<Date> m_value;
-	std::function<void(const Date&)> m_onChange;
-	std::function<void(const Date&, void*)> m_onChangeWithWidget;
+	EventCallback<const Date&> m_onChange;
 };
 
 // TimePickerWrapper -----------------------------------------------------------
@@ -302,12 +357,10 @@ class TimePickerWrapper : public ControlWrapper
 public:
 	TimePickerWrapper(BoundValue<Time> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Time&)> onChange = {},
-		std::function<void(const Time&, void*)> onChangeWithWidget = {})
+		EventCallback<const Time&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -315,8 +368,7 @@ public:
 
 private:
 	BoundValue<Time> m_value;
-	std::function<void(const Time&)> m_onChange;
-	std::function<void(const Time&, void*)> m_onChangeWithWidget;
+	EventCallback<const Time&> m_onChange;
 };
 
 // SliderWrapper -----------------------------------------------------------
@@ -326,13 +378,11 @@ class SliderWrapper : public ControlWrapper
 public:
 	SliderWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -341,8 +391,7 @@ public:
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 extern template class SliderWrapper<int>;
@@ -355,13 +404,11 @@ class SpinBoxWrapper : public ControlWrapper
 public:
 	SpinBoxWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -370,60 +417,67 @@ public:
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
+	EventCallback<T> m_onChange;
 };
 
 extern template class SpinBoxWrapper<int>;
 extern template class SpinBoxWrapper<float>;
 
 // RadioButtonWrapper -----------------------------------------------------------
+// One radio. An int radio is checked while the bound int equals `option`, and
+// picking it writes `option`; the radios sharing that int ARE the group. That
+// is the whole grouping rule, on every backend, and it holds no state of its
+// own -- a group survives any rebuild because there is nothing to rebuild.
+//
+// No native radio group is used. Native grouping keys on creation order and on
+// the parent window (a wxRB_GROUP run, Qt's auto-exclusive siblings or a
+// QButtonGroup), neither of which is a property of the declarative tree: every
+// leaf is parented flat to its dialog or page, so two groups in one box would
+// merge natively. The retained backends therefore create each radio on its own
+// (wxRB_SINGLE / setAutoExclusive(false)) and let the bound int, mirrored by
+// the ordinary RefSync poll, uncheck the others. A bool radio ignores `option`.
 template <RadioButtonValue T>
 class RadioButtonWrapper : public ControlWrapper
 {
 public:
 	RadioButtonWrapper(const std::string& label,
-		BoundValue<T> value, const Position& pos, const Size& size, long style,
-		std::function<void(T)> onChange = {},
-		std::function<void(T, void*)> onChangeWithWidget = {})
+		BoundValue<T> value, int option, const Position& pos, const Size& size, long style,
+		EventCallback<T> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(value))
+		, m_option(option)
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
-		assignGroupIndex(&m_value.get());
 	}
 
-	static void resetGroupId() { s_radioButtonId = 0; s_lastGroup = nullptr; }
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
-private:
-	// Assigns the radio's index within its group. Consecutive radios sharing
-	// the same backing value form one group; a distinct address starts a new
-	// group (so standalone radios, each backed by their own owned value, end
-	// up as independent single-element groups).
-	void assignGroupIndex(const T* groupKey)
+	// Whether a radio standing for `option` shows checked while the bound value
+	// is `value`. Static and data-only, so an event handler can call it holding
+	// nothing but the caller's variable -- never the wrapper.
+	static bool isChecked(const T& value, int option)
 	{
-		if constexpr (std::is_same_v<T, int>)
-		{
-			if (const_cast<int*>(groupKey) != s_lastGroup)
-			{
-				s_radioButtonId = 0;
-				s_lastGroup = const_cast<int*>(groupKey);
-			}
-			m_index = s_radioButtonId++;
-		}
+		if constexpr (std::is_same_v<T, bool>)
+			return value;
+		else
+			return value == option;
 	}
 
+	// What picking a radio standing for `option` writes.
+	static T picked(int option)
+	{
+		if constexpr (std::is_same_v<T, bool>)
+			return true;
+		else
+			return option;
+	}
+
+private:
 	std::string m_label;
 	BoundValue<T> m_value;
-	std::function<void(T)> m_onChange;
-	std::function<void(T, void*)> m_onChangeWithWidget;
-	int m_index = 0;
-
-	static inline int s_radioButtonId = 0;
-	static inline int* s_lastGroup = nullptr;
+	int m_option = 0;
+	EventCallback<T> m_onChange;
 };
 
 extern template class RadioButtonWrapper<bool>;
@@ -436,13 +490,11 @@ public:
 	CheckBoxWrapper(const std::string& label,
 		const Position& pos, const Size& size, long style,
 		BoundValue<bool> checked,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
+		EventCallback<bool> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(checked))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -451,8 +503,7 @@ public:
 private:
 	std::string m_label;
 	BoundValue<bool> m_value;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ToggleButtonWrapper -----------------------------------------------------------
@@ -461,13 +512,11 @@ class ToggleButtonWrapper : public ControlWrapper
 public:
 	ToggleButtonWrapper(const std::string& label,
 		BoundValue<bool> toggled, const Position& pos, const Size& size, long style,
-		std::function<void(bool)> onChange = {},
-		std::function<void(bool, void*)> onChangeWithWidget = {})
+		EventCallback<bool> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_label(label)
 		, m_value(std::move(toggled))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -476,8 +525,7 @@ public:
 private:
 	std::string m_label;
 	BoundValue<bool> m_value;
-	std::function<void(bool)> m_onChange;
-	std::function<void(bool, void*)> m_onChangeWithWidget;
+	EventCallback<bool> m_onChange;
 };
 
 // ImageWrapper -----------------------------------------------------------
@@ -486,29 +534,23 @@ class ImageWrapper : public ControlWrapper
 public:
 	ImageWrapper(const std::string& filePath, ScaleMode scaleMode,
 		const Position& pos, const Size& size, long style,
-		std::function<void()> onClick = {},
-		std::function<void(void*)> onClickWithWidget = {},
-		std::function<void()> onHover = {},
-		std::function<void(void*)> onHoverWithWidget = {})
+		EventCallback<> onClick = {},
+		EventCallback<> onHover = {})
 		: ControlWrapper(pos, size, style)
 		, m_filePath(filePath)
 		, m_scaleMode(scaleMode)
 		, m_displayWidth(size.width)
 		, m_displayHeight(size.height)
 		, m_onClick(std::move(onClick))
-		, m_onClickWithWidget(std::move(onClickWithWidget))
 		, m_onHover(std::move(onHover))
-		, m_onHoverWithWidget(std::move(onHoverWithWidget))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
-#if defined(USE_WX) || defined(USE_QT)
 	// The one wrapper that needs the frame AFTER the engine has computed it:
 	// every mode but Stretch decides what the pixels do from the frame's shape,
 	// and neither a wxStaticBitmap nor a QLabel can work that out for itself.
-	void placed(const Rect& frame) override;
-#endif
+	DECLARE_PLACED_OVERRIDE();
 
 private:
 	std::string m_filePath;
@@ -521,10 +563,8 @@ private:
 	int m_imgHeight = 0;
 	int m_displayWidth = -1;
 	int m_displayHeight = -1;
-	std::function<void()> m_onClick;
-	std::function<void()> m_onHover;
-	std::function<void(void*)> m_onClickWithWidget;
-	std::function<void(void*)> m_onHoverWithWidget;
+	EventCallback<> m_onClick;
+	EventCallback<> m_onHover;
 };
 
 // ToolBarWrapper -----------------------------------------------------------
@@ -571,6 +611,9 @@ public:
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Width from statusBarContentWidth() on all three, height from the native
+	// bar -- never the native best width, which differs per toolkit.
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
 
 private:
 	StatusFields m_fields;
@@ -582,12 +625,10 @@ class ColorPickerWrapper : public ControlWrapper
 public:
 	ColorPickerWrapper(BoundValue<Color> value,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const Color&)> onChange = {},
-		std::function<void(const Color&, void*)> onChangeWithWidget = {})
+		EventCallback<const Color&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -595,8 +636,7 @@ public:
 
 private:
 	BoundValue<Color> m_value;
-	std::function<void(const Color&)> m_onChange;
-	std::function<void(const Color&, void*)> m_onChangeWithWidget;
+	EventCallback<const Color&> m_onChange;
 };
 
 // FilePickerWrapper -----------------------------------------------------------
@@ -616,15 +656,13 @@ public:
 	FilePickerWrapper(BoundValue<std::string> value,
 		FileMode mode, std::vector<FileFilter> filters, std::string dialogTitle,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const std::string&)> onChange = {},
-		std::function<void(const std::string&, void*)> onChangeWithWidget = {})
+		EventCallback<const std::string&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_value(std::move(value))
 		, m_mode(mode)
 		, m_filters(std::move(filters))
 		, m_dialogTitle(std::move(dialogTitle))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
@@ -635,8 +673,7 @@ private:
 	FileMode m_mode = FileMode::Open;
 	std::vector<FileFilter> m_filters;
 	std::string m_dialogTitle;
-	std::function<void(const std::string&)> m_onChange;
-	std::function<void(const std::string&, void*)> m_onChangeWithWidget;
+	EventCallback<const std::string&> m_onChange;
 };
 
 // SpacerWrapper -----------------------------------------------------------
@@ -664,15 +701,18 @@ public:
 		return m_fixedSize;
 	}
 
-#ifdef USE_IMGUI
-	void render(const Rect& frame) override;
-#endif
+	DECLARE_WINDOWLESS_OVERRIDES();
 
 private:
 	Size m_fixedSize;
 };
 
 // SeparatorWrapper -----------------------------------------------------------
+// A hairline, and the SAME hairline on every backend: one pixel on its own axis
+// and nothing on the other, measured here rather than asked of the native line
+// -- wxStaticLine reports 2 px and a sunken QFrame 3, so a native measure would
+// give one tree three different frames. The native line is simply drawn into
+// the 1 px frame. It spans its parent once the caller adds Expand().
 class SeparatorWrapper : public ControlWrapper
 {
 public:
@@ -683,7 +723,13 @@ public:
 	{
 	}
 
-	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_DRAW_OVERRIDES();
+	DECLARE_MEASURES_ITSELF(true);
+
+	Size measureIntrinsic(const Constraints&) override
+	{
+		return m_orient == Orientation::Vertical ? Size { 1, 0 } : Size { 0, 1 };
+	}
 
 private:
 	Orientation m_orient;
@@ -782,32 +828,61 @@ private:
 	bool m_indeterminate = false;
 };
 
+// Item lists -----------------------------------------------------------------
+// The choices of a ComboBox, ListBox or CheckListBox: a snapshot, or the
+// caller's vector BOUND, in which case the native control is repopulated when
+// the vector changes (see the backends' syncItems).
+using ItemList = std::vector<std::string>;
+
+// The item list an event handler or RefSync poll reads: the caller's vector
+// while bound, a shared copy of the snapshot otherwise. Holds no wrapper --
+// handlers outlive it (wx/RefSync.hpp) -- and copies cheaply.
+class ItemsView
+{
+public:
+	explicit ItemsView(const BoundValue<ItemList>& items)
+		: m_bound(items.boundValue())
+		, m_snapshot(m_bound != nullptr ? nullptr : std::make_shared<const ItemList>(items.get()))
+	{
+	}
+
+	const ItemList& operator()() const { return m_bound != nullptr ? *m_bound : *m_snapshot; }
+
+	// Non-null only while bound: what a repopulating RefSync watches.
+	const ItemList* bound() const { return m_bound; }
+
+private:
+	const ItemList* m_bound;
+	std::shared_ptr<const ItemList> m_snapshot;
+};
+
 // ComboBoxWrapper -----------------------------------------------------------
 template <ComboBoxValue T>
 class ComboBoxWrapper : public ControlWrapper
 {
 public:
-	ComboBoxWrapper(std::vector<std::string> choices,
+	ComboBoxWrapper(BoundValue<ItemList> choices,
 		BoundValue<T> selected, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_choices(std::move(choices))
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 		buildItems();
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound choices: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_choices.isBound());
 
 private:
 	// Builds the '\0'-separated item string and resolves the initial index
 	// from the selection (used by the ImGui backend).
 	void buildItems()
 	{
-		for (const auto& c : m_choices)
+		for (const auto& c : m_choices.get())
 		{
 			m_items += c;
 			m_items += '\0';
@@ -819,9 +894,10 @@ private:
 		}
 		else
 		{
-			for (int i = 0; i < static_cast<int>(m_choices.size()); ++i)
+			const ItemList& choices = m_choices.get();
+			for (int i = 0; i < static_cast<int>(choices.size()); ++i)
 			{
-				if (m_choices[i] == m_value.get())
+				if (choices[i] == m_value.get())
 				{
 					m_currentItem = i;
 					break;
@@ -831,11 +907,11 @@ private:
 	}
 
 	std::string m_items;
-	std::vector<std::string> m_choices;
+	BoundValue<ItemList> m_choices;
 	int m_currentItem = 0;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class ComboBoxWrapper<std::string>;
@@ -926,20 +1002,21 @@ class ListBoxWrapper : public ControlWrapper
 public:
 	static constexpr bool kMultiSelect = MultiSelectListBoxValue<T>;
 
-	ListBoxWrapper(std::vector<std::string> items,
+	ListBoxWrapper(BoundValue<ItemList> items,
 		BoundValue<T> selected, int visibleRows, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	// The backends reach the shared decode/encode pair through these names.
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
@@ -956,21 +1033,18 @@ public:
 	// handler reading the bound value sees the new one.
 	void commit(const std::vector<int>& indices)
 	{
-		m_value.set(valueFor(m_items, indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_value.set(valueFor(m_items.get(), indices));
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class ListBoxWrapper<int>;
@@ -989,20 +1063,21 @@ template <CheckListValue T>
 class CheckListBoxWrapper : public ControlWrapper
 {
 public:
-	CheckListBoxWrapper(std::vector<std::string> items,
+	CheckListBoxWrapper(BoundValue<ItemList> items,
 		BoundValue<T> checked, int visibleRows, const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(checked))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize() -- the native
+	// best size would follow every repopulation (see ItemList).
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	static std::vector<int> indicesFor(const std::vector<std::string>& items, const T& value)
 	{
@@ -1018,21 +1093,18 @@ public:
 	// handler reading the bound value sees the new one.
 	void commit(const std::vector<int>& indices)
 	{
-		m_value.set(valueFor(m_items, indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_value.set(valueFor(m_items.get(), indices));
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
 
 private:
-	std::vector<std::string> m_items;
+	BoundValue<ItemList> m_items;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
 extern template class CheckListBoxWrapper<std::vector<int>>;
@@ -1062,22 +1134,23 @@ public:
 
 	static constexpr bool kVectorBinding = MultiSelectTreeViewValue<T>;
 
-	TreeViewWrapper(std::vector<TreeItem> items,
+	TreeViewWrapper(BoundValue<std::vector<TreeItem>> items,
 		BoundValue<T> selected, int visibleRows, bool multiSelect,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {})
+		EventCallback<const T&> onChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_items(std::move(items))
 		, m_visibleRows(visibleRows)
 		, m_multiSelect(multiSelect)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	// Bound items: answered with the size captured at realize(), as a bound
+	// ListBox is -- a refilled tree must not resize an auto-fit window.
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
 
 	static std::string joinPath(const std::string& parentPath, const std::string& label)
 	{
@@ -1142,21 +1215,39 @@ public:
 	void commit(const std::vector<std::string>& paths)
 	{
 		m_value.set(valueFor(paths));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	const T& boundValue() const { return m_value.get(); }
 
+	// Paths a refill should show open: an item that was already in the tree
+	// keeps what the user left it at (`openBefore` holds the paths that were
+	// open, `before` every path that existed), and a new item takes its own
+	// `expanded` flag. Shared by wx and Qt; ImGui's own open state behaves
+	// this way by itself, keyed by label.
+	static std::vector<std::string> openAfterRefill(const std::vector<TreeItem>& next,
+		const std::vector<std::string>& before, const std::vector<std::string>& openBefore)
+	{
+		const auto contains = [](const std::vector<std::string>& paths, const std::string& path) {
+			return std::find(paths.begin(), paths.end(), path) != paths.end();
+		};
+		std::vector<std::string> open;
+		forEachItem(next, [&](const TreeItem& item, const std::string& path, int) {
+			if (item.children.empty())
+				return;
+			if (contains(before, path) ? contains(openBefore, path) : item.expanded)
+				open.push_back(path);
+		});
+		return open;
+	}
+
 private:
-	std::vector<TreeItem> m_items;
+	BoundValue<std::vector<TreeItem>> m_items;
 	int m_visibleRows = 1;
 	bool m_multiSelect = false;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first tree's size
 };
 
 extern template class TreeViewWrapper<std::string>;
@@ -1199,8 +1290,7 @@ public:
 		BoundValue<TableRows> rows,
 		BoundValue<T> selected, int visibleRows,
 		const Position& pos, const Size& size, long style,
-		std::function<void(const T&)> onChange = {},
-		std::function<void(const T&, void*)> onChangeWithWidget = {},
+		EventCallback<const T&> onChange = {},
 		std::function<void(int, int, const std::string&)> onCellChange = {})
 		: ControlWrapper(pos, size, style)
 		, m_columns(std::move(columns))
@@ -1208,7 +1298,6 @@ public:
 		, m_visibleRows(visibleRows)
 		, m_value(std::move(selected))
 		, m_onChange(std::move(onChange))
-		, m_onChangeWithWidget(std::move(onChangeWithWidget))
 		, m_onCellChange(std::move(onCellChange))
 	{
 	}
@@ -1228,6 +1317,21 @@ public:
 		if (column < 0 || column >= static_cast<int>(cells.size()))
 			return kEmpty;
 		return cells[column];
+	}
+
+	// `rows` cut or padded to exactly `columnCount` cells each -- what a native
+	// table actually holds, since cellText() reads a ragged row as trailing
+	// empty cells. The retained backends compare the caller's rows with the
+	// control's in this shape, so a short row is not a perpetual difference.
+	static TableRows normalizedRows(const TableRows& rows, int columnCount)
+	{
+		TableRows out(rows.size(), TableRow(static_cast<std::size_t>(columnCount)));
+		for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+		{
+			for (int column = 0; column < columnCount; ++column)
+				out[row][column] = cellText(rows, row, column);
+		}
+		return out;
 	}
 
 	// Original row indices the control should show selected. Out-of-range
@@ -1362,6 +1466,7 @@ public:
 		if (column >= static_cast<int>(cells.size()))
 			cells.resize(column + 1);
 		cells[column] = text;
+		markChanged(rows); // counted when the rows are an Observable's
 	}
 
 	// Commit a new selection: the value first, then the user callback, so a
@@ -1369,10 +1474,7 @@ public:
 	void commit(const std::vector<int>& indices)
 	{
 		m_value.set(valueFor(m_rows.get(), indices));
-		if (m_onChange)
-			m_onChange(m_value.get());
-		else if (m_onChangeWithWidget)
-			m_onChangeWithWidget(m_value.get(), m_nativeWidget);
+		m_onChange(m_value.get(), m_nativeWidget);
 	}
 
 	// Commit a cell edit, in the same order and for the same reason: the data
@@ -1396,9 +1498,13 @@ private:
 	BoundValue<TableRows> m_rows;
 	int m_visibleRows = 1;
 	BoundValue<T> m_value;
-	std::function<void(const T&)> m_onChange;
-	std::function<void(const T&, void*)> m_onChangeWithWidget;
+	EventCallback<const T&> m_onChange;
 	std::function<void(int, int, const std::string&)> m_onCellChange;
+
+	// ImGui: column widths measureIntrinsic() computed this frame, reused by
+	// render() on the same wrapper so every cell's text is measured once per
+	// frame, not twice. Empty until measured, and unused on wx/Qt.
+	std::vector<int> m_columnWidths;
 };
 
 extern template class TableWrapper<int>;

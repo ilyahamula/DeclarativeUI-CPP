@@ -1,6 +1,7 @@
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 
 #include "imgui.h"
+#include "imgui_stdlib.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -320,14 +321,12 @@ void FileBrowser::drawPending()
 	// the same split the native dialogs make.
 	if (s.mode != FileMode::Directory)
 	{
-		char buffer[512] = {};
-		std::snprintf(buffer, sizeof(buffer), "%s", s.fileName.c_str());
 		ImGui::SetNextItemWidth(-160.0f);
 		const ImGuiInputTextFlags flags = s.mode == FileMode::Save
 			? ImGuiInputTextFlags_None
 			: ImGuiInputTextFlags_ReadOnly;
-		if (ImGui::InputText("##filename", buffer, sizeof(buffer), flags))
-			s.fileName = buffer;
+		// Edited in place: a file name has no length limit worth imposing.
+		ImGui::InputText("##filename", &s.fileName, flags);
 
 		if (!s.filters.empty())
 		{

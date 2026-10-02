@@ -39,4 +39,9 @@ struct SplitterState
 	int resolved = 0;
 	int lowerBound = 0;
 	int upperBound = 0;
+
+	// The position as arrange last READ it, before clamping -- what the wx/Qt
+	// relayout poll compares `position` against. Not `resolved`: "-1 means
+	// half" would never equal the pixel it resolves to.
+	int requested = -1;
 };

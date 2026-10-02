@@ -2,27 +2,29 @@
 #include <wx/wx.h>
 
 #include <string>
+#include <vector>
 
 class DeclarativeApp : public wxApp
 {
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // The RichText panel: the links write these, the fields read them back,
-    // and `m_richLocked` disables both texts at once.
-    std::string m_richLastLink = "(no link clicked yet)";
-    int m_richLinkClicks = 0;
-    bool m_richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string m_aboutLastLink;
+    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
+    // (isInvalid) on the three text fields.
+    DemoSignUp m_signUp;
+    // Bound TreeView items and Table rows (an Observable, so polled by its
+    // change counter): the buttons change these, both controls follow.
+    std::vector<TreeItem> m_folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
+    Observable<TableRows> m_files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
+    std::string m_folderPick = "Documents/Letters";
+    std::string m_filePick = "budget.csv";
 
 public:
     bool OnInit() override
     {
-        // One show() per open on a retained backend. RichText is an owner-drawn
-        // wxPanel painting the shared layout.
-        drawRichTextBinding(m_richLastLink, m_richLinkClicks, m_richLocked).show();
-        drawAboutUI(m_aboutLastLink).show();
+        // One show() per open on a retained backend.
+        drawSignUpFormUI(m_signUp).show();
+        drawTreeTableBindingUI(m_folders, m_files, m_folderPick, m_filePick).show();
         return true;
     }
 };

@@ -21,8 +21,10 @@
 
 #include "declarative_ui.hpp"
 
+#include <chrono>
 #include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 inline auto drawProgressBarBindedToSlider(float& value, bool& checked)
@@ -91,27 +93,67 @@ inline auto drawTextMirror(std::string& text, bool& disabled)
     };
 }
 
-// ComboBox + RadioButtons over one int. Radio indices are assigned in
-// declaration order, so they line up with the combo's item indices.
-inline auto drawChoiceMirror(int& choice, bool& disabled)
+// ComboBox + RadioButtons over one int. Each radio names the index it stands
+// for, so it lines up with the combo's item of the same index -- and the three
+// radios are one group because they share `choice`, not because of where they
+// are declared.
+//
+// The combo's CHOICES are bound too: `colours` is the caller's vector, and
+// "Add a colour" appends to it -- the combo repopulates on every backend and
+// keeps its selection. The radios name the first three indices only.
+inline auto drawChoiceMirror(int& choice, bool& disabled, ItemList& colours)
 {
     return Dialog {
         "Combo + Radios (shared index)",
         VStack {
             LayoutFlags().Expand().Border(Side::All, 12),
-            ComboBox{ {"Red", "Green", "Blue"}, choice }
+            ComboBox{ colours, choice }
                 .withFlags(LayoutFlags().Expand())
                 .isDisabled(disabled),
+            Button{"Add a colour"}
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(disabled)
+                .onClick([&colours] { colours.push_back("Colour " + std::to_string(colours.size() + 1)); }),
             VGroupBox { "Same value as radios",
                 LayoutFlags().Expand().Border(Side::Top, 10),
-                RadioButton{choice, "Red"}
+                RadioButton{choice, 0, "Red"}
                     .isDisabled(disabled),
-                RadioButton{choice, "Green"}
+                RadioButton{choice, 1, "Green"}
                     .isDisabled(disabled),
-                RadioButton{choice, "Blue"}
+                RadioButton{choice, 2, "Blue"}
                     .isDisabled(disabled)
             },
             CheckBox{disabled, "Disable both"}
+                .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// RadioGroup + Slider + SpinBox over one int, with a bool disabling all three.
+// The group writes the index of the option picked; the slider and the spin box
+// write the same number -- so dragging the slider moves the radio, and picking
+// a radio moves the slider. onChange reports after the int has been written.
+inline auto drawRadioGroupMirror(int& level, bool& disabled, std::string& lastPick)
+{
+    return Dialog {
+        "RadioGroup + Slider (shared index)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            RadioGroup{level, {"Off", "Low", "Medium", "High"}}
+                .withOrientation(Orientation::Horizontal)
+                .isDisabled(disabled)
+                .onChange([&lastPick](int i) { lastPick = "Picked option " + std::to_string(i); }),
+            Slider { Range<int>{ .min = 0, .max = 3 }, level }
+                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10))
+                .isDisabled(disabled),
+            SpinBox { Range<int>{ .min = 0, .max = 3 }, level }
+                .withSize({120, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(disabled),
+            StaticText{lastPick}
+                .withSize({260, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 8)),
+            CheckBox{disabled, "Disable all three"}
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
         }
     };
@@ -1325,6 +1367,334 @@ inline auto drawRichTextBinding(std::string& lastLink, int& linkClicks, bool& lo
             CheckBox{locked, "Disable both texts"}
                 .withSize({-1, kRowH})
                 .withFlags(LayoutFlags().Border(Side::Top, 12))
+        }
+    };
+}
+
+// Two ways a value can outlive the code that set it.
+//
+// postToUi(): "Start work" runs a worker thread that must not touch the bound
+// progress or status itself -- the UI thread reads them. Each step is posted
+// to the UI thread instead, and the last one clears `busy`, which re-enables
+// the button and raises a toast. The same code runs on all three backends.
+//
+// withId(): two UNBOUND check boxes below a foldable section. On ImGui an
+// unbound value is kept by the control's position in the tree, and opening the
+// section above shifts that position -- so the unnamed box loses its tick when
+// the section folds or unfolds, while the one named with withId() keeps it. On
+// wx and Qt both keep their state natively; there the id is the native window
+// or object name, which is what tests find the control by.
+inline auto drawWorkerAndIdentityUI(float& progress, std::string& status, bool& busy, bool& detailsOpen,
+    bool& hideStatusBar)
+{
+    return Dialog {
+        "Background work & stable ids",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            VGroupBox { "postToUi -- a worker thread updates bound values",
+                LayoutFlags().Expand(),
+                ProgressBar{progress}
+                    .withSize({300, 18})
+                    .withFlags(LayoutFlags().Expand()),
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    Button{"Start work"}
+                        .isDisabled(busy)
+                        .onClick([&progress, &status, &busy] {
+                            busy = true;
+                            progress = 0.0f;
+                            status = "Working...";
+                            std::thread([&progress, &status, &busy] {
+                                for (int step = 1; step <= 20; ++step)
+                                {
+                                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                    postToUi([&progress, step] { progress = step * 5.0f; });
+                                }
+                                postToUi([&status, &busy] {
+                                    status = "Done";
+                                    busy = false;
+                                    Toast{"Background work finished"}.show();
+                                });
+                            }).detach();
+                        })
+                        .withId("worker-start"),
+                    Spacer{}
+                },
+                // isHidden(): the bar leaves the layout entirely -- the dialog
+                // shrinks by its height and its gap -- and comes back when the
+                // box is unticked. Bound, so no rebuild is involved.
+                CheckBox{hideStatusBar, "Hide the status bar"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 8)),
+                StatusBar{status}
+                    .isHidden(hideStatusBar)
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
+                // The same bound string in a label and a read-only field: both
+                // follow it live, and both keep the size they had for "Idle",
+                // so the dialog does not grow when "Working..." arrives. The
+                // label is pinned wide enough for the longest message.
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    StaticText{"Label:"}
+                        .withSize({50, -1})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    StaticText{status}
+                        .withSize({110, -1})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    StaticText{"Field:"}
+                        .withSize({50, -1})
+                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 8)),
+                    ReadonlyTextCtrl{status}
+                        .withFlags(LayoutFlags().Proportion(1))
+                }
+            },
+            VGroupBox { "withId -- unbound values that survive a fold",
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                Expander { "Details above the boxes", detailsOpen,
+                    VStack {
+                        StaticText{"Opening or folding this section shifts every control below it."},
+                        TextCtrl{std::string("filler")}
+                    }
+                },
+                CheckBox{false, "Named with withId(): keeps its tick"}
+                    .withId("worker-demo-named")
+                    .withFlags(LayoutFlags().Border(Side::Top, 8)),
+                CheckBox{false, "Unnamed: may lose it on ImGui"}
+            }
+        }
+    };
+}
+
+// VForEach: a list whose ROWS come from a vector. Each row is a function of
+// its item and reports changes through callbacks by index; the vector is
+// bound, so adding, ticking and removing all show up at once -- on ImGui by
+// the per-frame rebuild, on wx and Qt by rebuilding just the rows that
+// changed (every row when the count did). The dialog grows and shrinks with
+// the list.
+//
+// The new-task field keeps its text OUTSIDE the vector on purpose: a field
+// that wrote its own row's item on every keystroke would be rebuilt as you
+// type on wx and Qt.
+struct DemoTodo
+{
+    std::string title;
+    bool done = false;
+
+    bool operator==(const DemoTodo&) const = default;
+};
+
+inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, std::string& keyStatus)
+{
+    // Both buttons carry an icon (withIcon, 16x16 left of the label).
+    // Keyboard: "Add" is the default button (Enter anywhere adds) and "Clear"
+    // the cancel button (Escape clears the field). The field's onEnter runs
+    // FIRST, on all three -- here it only reports, into a bound label, so
+    // the order is visible: the label names the text, then the row appears.
+    return Dialog {
+        "Todo list (VForEach)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                TextCtrl{newTitle}
+                    .withPlaceholder("New task, then Enter")
+                    .withFlags(LayoutFlags().Proportion(1))
+                    .onEnter([&keyStatus](const std::string& text) {
+                        keyStatus = text.empty() ? "Enter: nothing to add" : "Enter: adding \"" + text + "\"";
+                    }),
+                Button{"Add"}
+                    .withIcon("images/icon_add.png")
+                    .isDefault()
+                    .withFlags(LayoutFlags().Border(Side::Left, 8))
+                    .onClick([&todos, &newTitle] {
+                        if (newTitle.empty())
+                            return;
+                        todos.push_back({ newTitle, false });
+                        newTitle.clear();
+                    }),
+                Button{"Clear"}
+                    .withIcon("images/icon_clear.png")
+                    .isCancel()
+                    .withFlags(LayoutFlags().Border(Side::Left, 4))
+                    .onClick([&newTitle, &keyStatus] {
+                        newTitle.clear();
+                        keyStatus = "Escape / Clear: field cleared";
+                    })
+            },
+            StaticText{keyStatus}
+                .withSize({300, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            VForEach {
+                LayoutFlags().Expand().Border(Side::Top, 10),
+                todos,
+                [&todos](const DemoTodo& todo, std::size_t i) {
+                    return HStack {
+                        LayoutFlags().Expand(),
+                        CheckBox{todo.done, todo.title}
+                            .onChange([&todos, i](bool on) { todos[i].done = on; }),
+                        Spacer{},
+                        Button{"Remove"}
+                            .onClick([&todos, i] { todos.erase(todos.begin() + static_cast<long>(i)); })
+                    };
+                }
+            }
+        }
+    };
+}
+
+// TreeView items + Table rows, both BOUND: the buttons change the caller's
+// vectors and nothing else, and both controls follow on every backend. The
+// selection is kept by path / key across a refill, a folder the user opened
+// stays open, and neither control resizes the window -- they keep the size of
+// their first content, as a bound ListBox does. `filePick` is shown by a
+// bound label, so the key binding is visible as it follows the rows.
+//
+// The rows are an Observable<TableRows>: bound exactly like a TableRows&, but
+// changed through edit(), which counts the change -- so the retained backends
+// poll one integer instead of comparing every row (review finding 7). The
+// folders stay a plain vector, which is polled by comparison.
+inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, Observable<TableRows>& files,
+    std::string& folderPick, std::string& filePick)
+{
+    return Dialog {
+        "Bound tree + table",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                TreeView{ folders, folderPick }
+                    .withVisibleRows(8)
+                    .withSize({180, -1}),
+                Table{ { { "File", 180, true }, { "Size", 60, true } }, files, filePick }
+                    .withVisibleRows(7)
+                    .withFlags(LayoutFlags().Border(Side::Left, 10))
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 10),
+                Button{"Add folder"}
+                    .onClick([&folders] {
+                        folders.push_back({ "Folder " + std::to_string(folders.size() + 1),
+                            { { "notes" }, { "drafts" } }, true });
+                    }),
+                Button{"Add file"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files] {
+                        const std::size_t count = files.get().size();
+                        files.edit().push_back({ "file-" + std::to_string(count + 1) + ".txt",
+                            std::to_string(count * 7 + 3) });
+                    }),
+                Button{"Grow selected"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files, &filePick] {
+                        for (auto& row : files.edit())
+                        {
+                            if (!row.empty() && row[0] == filePick && row.size() > 1)
+                                row[1] = std::to_string(std::stoi(row[1]) * 2);
+                        }
+                    }),
+                Button{"Remove selected"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&files, &filePick] {
+                        std::erase_if(files.edit(), [&](const TableRow& row) { return !row.empty() && row[0] == filePick; });
+                    })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                StaticText{"Selected file:"}
+                    .withSize({110, 20}),
+                StaticText{filePick}
+                    .withSize({260, 20})
+            }
+        }
+    };
+}
+
+// Focus and validity on the three text fields: the form opens with focus in
+// Name (isFocused()), Email and Password are checked as the user leaves them
+// (onBlur) and marked with isInvalid(bool&) -- the same bools that disable
+// "Sign up", the default button. "Check" moves focus to the first bad field
+// through Email's bound focus flag, and the notes field reports its focus
+// moves into the status line. A field's mark never changes its size.
+struct DemoSignUp
+{
+    std::string name;
+    std::string email;
+    std::string password;
+    std::string notes;
+    bool emailFocused = false;
+    bool emailInvalid = false;
+    bool passwordInvalid = false;
+    bool cannotSubmit = true;
+    std::string status = "Fill in the form";
+};
+
+inline auto drawSignUpFormUI(DemoSignUp& form)
+{
+    const auto validate = [&form] {
+        form.emailInvalid = !form.email.empty() && form.email.find('@') == std::string::npos;
+        form.passwordInvalid = !form.password.empty() && form.password.size() < 8;
+        form.cannotSubmit = form.name.empty() || form.email.empty() || form.password.empty()
+            || form.emailInvalid || form.passwordInvalid;
+    };
+    constexpr int kLabelW = 80;
+    constexpr int kFieldW = 220;
+    return Dialog {
+        "Sign up (focus + validation)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                StaticText{"Name"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{form.name}
+                    .withSize({kFieldW, -1})
+                    .isFocused()
+                    .onChange([validate](const std::string&) { validate(); })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"Email"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{form.email}
+                    .withSize({kFieldW, -1})
+                    .withPlaceholder("name@example.com")
+                    .isFocused(form.emailFocused)
+                    .isInvalid(form.emailInvalid)
+                    .onBlur(validate)
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"Password"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                PasswordInput{form.password}
+                    .withSize({kFieldW, -1})
+                    .withPlaceholder("8 characters or more")
+                    .isInvalid(form.passwordInvalid)
+                    .onBlur(validate)
+            },
+            MultiLineTextCtrl{form.notes}
+                .withSize({kLabelW + kFieldW + 8, 60})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .onFocus([&form] { form.status = "Writing notes..."; })
+                .onBlur([&form] { form.status = "Notes: " + std::to_string(form.notes.size()) + " characters"; }),
+            StaticText{form.status}
+                .withSize({kLabelW + kFieldW + 8, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Spacer{},
+                Button{"Check"}
+                    .onClick([&form, validate] {
+                        validate();
+                        if (form.emailInvalid || form.email.empty())
+                        {
+                            form.status = "Fix the email first";
+                            form.emailFocused = true; // moves focus there
+                        }
+                        else
+                        {
+                            form.status = form.cannotSubmit ? "Something is still missing" : "Looks good";
+                        }
+                    }),
+                Button{"Sign up"}
+                    .isDefault()
+                    .isDisabled(form.cannotSubmit)
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&form] { form.status = "Signed up as " + form.name; })
+            }
         }
     };
 }

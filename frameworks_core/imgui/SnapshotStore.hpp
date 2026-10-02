@@ -4,6 +4,7 @@
 #include "frameworks_core/imgui/ImGuiWidgetIdManager.hpp"
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
 // Persistent home for the SNAPSHOT half of a BoundValue (USE_IMGUI only).
@@ -86,19 +87,37 @@ template <typename T>
 class WidgetSnapshot
 {
 public:
-	explicit WidgetSnapshot(BoundValue<T>& value)
+	// `stableId` is the control's withId(), or empty. Named, the snapshot and
+	// the control's ImGui id are keyed by the name; unnamed, by position. The
+	// sequential id is consumed either way, so naming one control never
+	// renumbers the ones after it.
+	explicit WidgetSnapshot(BoundValue<T>& value, const std::string& stableId = {})
 		: m_id(WidgetIdManager::nextWidgetId())
-		, m_scope(WidgetIdManager::stateKey(m_id), value)
+		, m_stableId(stableId)
+		, m_scope(slotKey(0), value)
 	{
 	}
 
-	int id() const { return m_id; }
+	// The control's own ImGui id scope: PushID() by name when it has one.
+	void pushId() const
+	{
+		if (m_stableId.empty())
+			ImGui::PushID(m_id);
+		else
+			ImGui::PushID(m_stableId.c_str());
+	}
 
 	// Key for a second value on the same control (the Table's rows next to its
 	// selection), so the two never share a slot.
-	std::uint64_t slotKey(int slot) const { return WidgetIdManager::stateKey(m_id, slot); }
+	std::uint64_t slotKey(int slot) const
+	{
+		return m_stableId.empty()
+			? WidgetIdManager::stateKey(m_id, slot)
+			: WidgetIdManager::stableStateKey(m_stableId, slot);
+	}
 
 private:
 	int m_id;
+	std::string m_stableId;
 	SnapshotScope<T> m_scope;
 };

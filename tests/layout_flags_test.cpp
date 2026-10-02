@@ -76,12 +76,6 @@ TEST(border_accumulates_per_side)
 	f.Border(Side::Left, 3);
 	f.Border(Side::Right | Side::Top, 7);
 	CHECK(f.border() == (EdgeInsets { 3, 7, 7, 5 }));
-
-	// legacy accessors read the same storage
-	CHECK_EQ(f.borderLeft(), 3);
-	CHECK_EQ(f.borderRight(), 7);
-	CHECK_EQ(f.borderTop(), 7);
-	CHECK_EQ(f.borderBottom(), 5);
 }
 
 TEST(builder_setters)

@@ -12,23 +12,6 @@
 
 #include <wx/wx.h>
 
-DialogWrapper::DialogWrapper(const std::string& title, const Size& size)
-{
-#ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::DialogWrapper()\t-> new wxDialog()\n");
-#endif
-	m_nativeWidget = new wxDialog(nullptr, wxID_ANY, title,
-		wxDefaultPosition, wxSize(size.width, size.height));
-}
-
-void DialogWrapper::show()
-{
-#ifdef USE_LOGGER
-	Logger::instance().log("DialogWrapper::show()\t-> wxDialog->Show()\n");
-#endif
-	static_cast<wxDialog*>(m_nativeWidget)->Show();
-}
-
 void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	std::unique_ptr<LayoutNode> root, bool resizable, const std::optional<Position>& position,
 	bool modal, std::function<void()> onClose, bool* open)
@@ -76,7 +59,7 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	session->engine->render(*session->root, content);
 
 	// invalidation wiring -------------------------------------------------
-	session->bindInvalidation(*session->root);
+	session->watch();
 	session->bindOpenFlag();
 
 	// user resize (Resizable only): arrange-only within the new client area

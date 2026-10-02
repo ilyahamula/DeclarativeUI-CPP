@@ -1,5 +1,6 @@
 #include "frameworks_core/qt/LayoutBackend.hpp"
 #include "frameworks_core/qt/MenuBuilder.hpp"
+#include "frameworks_core/qt/Labels.hpp"
 
 #include "frameworks_core/LayoutNode.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
@@ -10,6 +11,8 @@
 #include <QPlainTextEdit>
 #include <QScrollArea>
 #include <QStyle>
+#include <QStyleOption>
+#include <QTabBar>
 #include <QTabWidget>
 
 #include <algorithm>
@@ -21,14 +24,6 @@ namespace
 constexpr int kTextFloorChars = 10;
 // Allowance for the text frame's own padding around the text extent.
 constexpr int kTextFramePadding = 16;
-
-// Qt treats '&' as a mnemonic marker in titles; user text must escape it.
-QString labelText(const std::string& label)
-{
-	QString text = QString::fromStdString(label);
-	text.replace(QLatin1String("&"), QLatin1String("&&"));
-	return text;
-}
 
 // Applies a node's effective disabled state to the widget that was just
 // created for it (leaf control, group box, tab widget or page), and keeps
@@ -136,6 +131,8 @@ Size QtLayoutBackend::measure(const LayoutNode& leaf, const Constraints& c)
 			applyDisabled(created, leaf);
 			applyTooltip(created, *widget);
 			applyContextMenu(created, *widget);
+			if (!widget->stableId().empty())
+				created->setObjectName(QString::fromStdString(widget->stableId()));
 		}
 	}
 
@@ -204,6 +201,8 @@ void QtLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 		window->setParent(currentParent()); // setParent hides the widget
 		window->show();
 	}
+	else if (window->isHidden())
+		window->show(); // back from isHidden()
 	const Rect local = toLocal(frame);
 	window->setGeometry(local.x, local.y, local.width, local.height);
 	// After the move, so a wrapper that composes its content against the frame
@@ -219,7 +218,7 @@ QWidget* QtLayoutBackend::ensureContainer(const LayoutNode& node)
 	// created against the host first; beginContainer reparents as needed
 	QWidget* window = nullptr;
 	if (node.kind == NodeKind::GroupBox)
-		window = new QGroupBox(labelText(node.label), m_host);
+		window = new QGroupBox(qtLabelText(node.label), m_host);
 	else if (node.kind == NodeKind::TabPanel)
 		window = new QTabWidget(m_host);
 	else if (isExpanderContent(node))
@@ -249,18 +248,47 @@ EdgeInsets QtLayoutBackend::containerInsets(const LayoutNode& node)
 {
 	if (node.kind == NodeKind::GroupBox)
 	{
-		auto* box = ensureContainer(node);
-		// title row on top, thin frame around; QGroupBox has no exact
-		// metrics API without a layout, so derive from the font
-		const int side = 8;
-		return { side, side, box->fontMetrics().height() + 6, side };
+		// The style's own answer: the contents rectangle QGroupBox gives a
+		// layout (SC_GroupBoxContents), probed on a fixed rect so the insets
+		// are the four differences. Guessing from the font drifted from the
+		// frame and title the style actually draws.
+		auto* box = static_cast<QGroupBox*>(ensureContainer(node));
+		QStyleOptionGroupBox option;
+		option.initFrom(box);
+		option.text = box->title();
+		option.lineWidth = 1;
+		option.midLineWidth = 0;
+		option.textAlignment = Qt::AlignLeft;
+		option.subControls = QStyle::SC_GroupBoxFrame;
+		if (!box->title().isEmpty())
+			option.subControls |= QStyle::SC_GroupBoxLabel;
+		const QRect probe(0, 0, 400, 400);
+		option.rect = probe;
+		const QRect contents = box->style()->subControlRect(QStyle::CC_GroupBox, &option,
+			QStyle::SC_GroupBoxContents, box);
+		return { contents.left() - probe.left(), probe.right() - contents.right(),
+			contents.top() - probe.top(), probe.bottom() - contents.bottom() };
 	}
 	if (node.kind == NodeKind::TabPanel)
 	{
-		auto* tabs = ensureContainer(node);
-		// tab bar on top; deterministic estimate (the real bar reports a
-		// useful height only after pages exist)
-		return { 2, 2, tabs->fontMetrics().height() + 14, 2 };
+		// The rectangle QTabWidget itself puts its pages in
+		// (SE_TabWidgetTabContents), for a tab bar as tall as one of its own
+		// tabs. The real bar is empty when this runs -- pages are added later,
+		// in beginContainer -- so a throwaway QTabBar supplies the height.
+		auto* tabs = static_cast<QTabWidget*>(ensureContainer(node));
+		QTabBar sample;
+		sample.setFont(tabs->font());
+		sample.addTab(QStringLiteral("Xg"));
+		QStyleOptionTabWidgetFrame option;
+		option.initFrom(tabs);
+		option.shape = QTabBar::RoundedNorth;
+		option.tabBarSize = sample.sizeHint();
+		option.lineWidth = tabs->style()->pixelMetric(QStyle::PM_DefaultFrameWidth, nullptr, tabs);
+		const QRect probe(0, 0, 400, 400);
+		option.rect = probe;
+		const QRect contents = tabs->style()->subElementRect(QStyle::SE_TabWidgetTabContents, &option, tabs);
+		return { contents.left() - probe.left(), probe.right() - contents.right(),
+			contents.top() - probe.top(), probe.bottom() - contents.bottom() };
 	}
 	if (node.kind == NodeKind::ScrollPanel)
 	{
@@ -317,6 +345,8 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 			window->setParent(scope.parent);
 			window->show();
 		}
+		else if (window->isHidden())
+			window->show(); // back from isHidden()
 		const Rect local = toLocal(frame);
 		window->setGeometry(local.x, local.y, local.width, local.height);
 		if (node.kind == NodeKind::GroupBox)
@@ -358,7 +388,7 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 		else
 		{
 			page = new QWidget(tabs);
-			tabs->addTab(page, labelText(node.label));
+			tabs->addTab(page, qtLabelText(node.label));
 			applyDisabled(page, node);
 			m_containers[&node] = page;
 		}
@@ -374,4 +404,61 @@ bool QtLayoutBackend::beginContainer(const LayoutNode& node, const Rect& frame)
 void QtLayoutBackend::endContainer(const LayoutNode&)
 {
 	m_stack.pop_back();
+}
+
+// isHidden(): take everything this subtree ever realized out of view. Where a
+// container's window is the native PARENT of its subtree -- a tab widget, a
+// scroll area, an Expander's content panel -- hiding it takes the subtree with
+// it, and the walk stops there; its pages keep whatever visibility their owner
+// gave them, ready for the container to come back. A group box's frame is a
+// SIBLING of its content, so there the walk goes on. place() and
+// beginContainer() show the windows again when the node is laid out once more.
+void QtLayoutBackend::hide(const LayoutNode& node)
+{
+	if (node.isLeaf())
+	{
+		if (auto* window = static_cast<QWidget*>(node.widget->nativeHandle()))
+			window->hide();
+		return;
+	}
+	if (const auto it = m_containers.find(&node); it != m_containers.end() && it->second != nullptr)
+	{
+		it->second->hide();
+		if (node.kind != NodeKind::GroupBox)
+			return;
+	}
+	for (const auto& child : node.children)
+		hide(*child);
+}
+
+// A ForEach row is being replaced: destroy every native window this subtree
+// realized, deepest first, and drop what is cached per node -- the nodes are
+// freed right after, so a stale map entry would be a dangling key.
+//
+// Children go before their container: a container window may be their native
+// parent (a scroll area, an Expander panel), and destroying it first would
+// destroy them under us. A tab PAGE is the exception the other way round: its
+// window belongs to the tab widget, which removes and destroys it itself, so a
+// page is only forgotten, never destroyed on its own.
+void QtLayoutBackend::forget(const LayoutNode& node)
+{
+	for (const auto& child : node.children)
+		forget(*child);
+
+	if (node.isLeaf())
+	{
+		m_textFloorWidths.erase(&node);
+		if (auto* window = static_cast<QWidget*>(node.widget->nativeHandle()))
+			delete window;
+		return;
+	}
+
+	const auto it = m_containers.find(&node);
+	if (it == m_containers.end())
+		return;
+	QWidget* window = it->second;
+	m_containers.erase(it);
+	const bool isTabPage = node.parent != nullptr && node.parent->kind == NodeKind::TabPanel;
+	if (window != nullptr && !isTabPage)
+		delete window;
 }

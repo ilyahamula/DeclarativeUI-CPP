@@ -33,4 +33,22 @@ public:
 	// is called only when beginContainer returned true.
 	virtual bool beginContainer(const LayoutNode& node, const Rect& frame) = 0;
 	virtual void endContainer(const LayoutNode& node) = 0;
+
+	// A node the caller hid (isHidden) is not placed, and neither is anything
+	// under it; this is called instead, once per pass, for the node itself.
+	// Retained backends take the subtree's native windows out of view here --
+	// place() and beginContainer() show them again when the node comes back.
+	// Immediate backends draw nothing and need nothing.
+	virtual void hide(const LayoutNode& node)
+	{
+		(void)node;
+	}
+
+	// The subtree is about to be destroyed -- a ForEach row replaced. Retained
+	// backends destroy every native window it realized and drop whatever they
+	// cached per node; the nodes (and the wrappers they own) go right after.
+	virtual void forget(const LayoutNode& node)
+	{
+		(void)node;
+	}
 };

@@ -5,10 +5,15 @@
 #include <wx/event.h>
 #include <wx/window.h>
 
+#include "frameworks_core/RefWatch.hpp"
+
 // Mirrors an externally-owned value back into a native control.
 //
-// A bound ref can be written from anywhere -- another widget's handler, a worker, a
-// timer -- and wx has no notification for that, so we poll on idle.
+// A bound ref can be written by anything on the UI thread -- another widget's
+// handler, a timer, a task a worker posted with postToUi() -- and wx has no
+// notification for that, so we poll on idle. Never by the worker itself: this
+// poll reads the ref on the UI thread, so a direct write from another thread
+// is a data race (frameworks_core/UiThread.hpp).
 //
 // The sync is driven by CHANGES TO THE REF, never by the control merely disagreeing
 // with it. That distinction is load-bearing. A control can legitimately display
@@ -32,6 +37,28 @@
 // Idle fires whenever the event queue drains. We deliberately do not RequestMore(),
 // which would keep the loop awake and spin the CPU; a value written while the UI is
 // completely quiet lands on the next event instead.
+// As bindExternalRefSync, for a binding whose `want()` is expensive -- an item
+// list, a table, a decoded selection. `watch` (a RefWatch over the caller's
+// variables `want` reads) is asked first, and `want()` runs only after it
+// reports a change; the push rule is unchanged.
+template <typename Watch, typename Pull, typename Want, typename Push>
+void bindWatchedRefSync(wxWindow* control, Watch watch, Pull pull, Want want, Push push)
+{
+	control->Bind(wxEVT_IDLE, [watch = std::move(watch), pull = std::move(pull), want = std::move(want),
+		push = std::move(push), last = want()](wxIdleEvent& evt) mutable {
+		evt.Skip();
+		if (!watch.changed())
+			return;
+		auto target = want();
+		if (target != last)
+		{
+			if (pull() != target)
+				push(target);
+			last = std::move(target);
+		}
+	});
+}
+
 template <typename Pull, typename Want, typename Push>
 void bindExternalRefSync(wxWindow* control, Pull pull, Want want, Push push)
 {

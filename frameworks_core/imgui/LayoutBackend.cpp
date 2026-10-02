@@ -1,4 +1,5 @@
 #include "frameworks_core/imgui/LayoutBackend.hpp"
+#include "frameworks_core/imgui/DialogKeys.hpp"
 
 #include "frameworks_core/ControlWrapper.hpp"
 #include "frameworks_core/LayoutNode.hpp"
@@ -66,7 +67,11 @@ void ImGuiLayoutBackend::place(const LayoutNode& leaf, const Rect& frame)
 	// back as one item rect
 	ImGui::BeginGroup();
 	ImGui::BeginDisabled(disabled);
-	leaf.widget->render(frame);
+	{
+		// a disabled default/cancel button must not answer Enter/Escape
+		imgui_dialog_keys::LeafScope keys(disabled);
+		leaf.widget->render(frame);
+	}
 	ImGui::EndDisabled();
 	ImGui::EndGroup();
 

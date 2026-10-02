@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ControlWrapper.hpp"
+#include "CoreTypes/GeneralTypes.hpp"
 
 #include <functional>
 #include <memory>
@@ -9,12 +9,13 @@
 
 struct LayoutNode;
 
-class DialogWrapper : public ControlWrapper
+// Backend entry point for Dialog (include/dialog.hpp). Not a ControlWrapper, for
+// the reason WindowWrapper is not one: a top-level window is what the tree is
+// laid out INTO, never a leaf in it, and everything it needs arrives as
+// arguments.
+class DialogWrapper
 {
 public:
-	DialogWrapper(const std::string& title, const Size& size);
-	void show();
-
 	// Size the window from the layout engine's result (auto-fit unless
 	// `size` is explicit) and draw the already-built node tree. Not
 	// user-resizable unless `resizable`; then the auto-fit size is the

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "frameworks_core/CoreTypes/Observable.hpp"
+
 #include <functional>
 #include <optional>
 #include <string>
@@ -63,7 +65,14 @@ public:
 	T& get() { return m_ref ? m_ref->get() : m_value; }
 	const T& get() const { return m_ref ? m_ref->get() : m_value; }
 
-	void set(const T& value) { get() = value; }
+	// A write the framework makes. Bound to an Observable, it is counted, so
+	// every other control bound to it sees the change (Observable.hpp).
+	void set(const T& value)
+	{
+		get() = value;
+		if (m_ref)
+			markChanged(&m_ref->get());
+	}
 
 	// Non-null only while bound: the caller-owned variable to watch. A snapshot
 	// reports nullptr -- there is nothing to poll, it cannot change behind us.

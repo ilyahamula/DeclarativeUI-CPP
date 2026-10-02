@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -18,20 +19,20 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // The RichText panel: the links write these, the fields read them back,
-    // and `richLocked` disables both texts at once.
-    std::string richLastLink = "(no link clicked yet)";
-    int richLinkClicks = 0;
-    bool richLocked = false;
-    // The About panel: its links report here (and raise a toast).
-    std::string aboutLastLink;
+    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
+    // (isInvalid) on the three text fields.
+    DemoSignUp signUp;
+    // Bound TreeView items and Table rows (an Observable, so polled by its
+    // change counter): the buttons change these, both controls follow.
+    std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
+    Observable<TableRows> files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
+    std::string folderPick = "Documents/Letters";
+    std::string filePick = "budget.csv";
 
     runImGuiApp([&]
     {
-        // RichText drawn on the window draw list: bold is drawn twice 1 px
-        // apart, italic slants the glyph quads, links are hit-tested on release.
-        drawRichTextBinding(richLastLink, richLinkClicks, richLocked).show();
-        drawAboutUI(aboutLastLink).show();
+        drawSignUpFormUI(signUp).show();
+        drawTreeTableBindingUI(folders, files, folderPick, filePick).show();
     });
 
     return 0;
