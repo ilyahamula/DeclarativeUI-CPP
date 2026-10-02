@@ -6,6 +6,8 @@
 #include <QTimer>
 #include <QWidget>
 
+#include "frameworks_core/RefWatch.hpp"
+
 #include <deque>
 #include <functional>
 #include <utility>
@@ -108,6 +110,31 @@ inline Hub* hubFor(QWidget* control)
 }
 
 } // namespace refsync_detail
+
+// As bindExternalRefSync, for a binding whose `want()` is expensive -- an item
+// list, a table, a decoded selection. `watch` (a RefWatch over the caller's
+// variables `want` reads) is asked first, and `want()` runs only after it
+// reports a change; the push rule is unchanged.
+template <typename Watch, typename Pull, typename Want, typename Push>
+void bindWatchedRefSync(QWidget* control, Watch watch, Pull pull, Want want, Push push)
+{
+	refsync_detail::hubFor(control)->add(control,
+		[control, watch = std::move(watch), pull = std::move(pull), want = std::move(want),
+			push = std::move(push), last = want()]() mutable {
+			if (!watch.changed())
+				return;
+			auto target = want();
+			if (target != last)
+			{
+				if (pull() != target)
+				{
+					const QSignalBlocker block(control);
+					push(target);
+				}
+				last = std::move(target);
+			}
+		});
+}
 
 template <typename Pull, typename Want, typename Push>
 void bindExternalRefSync(QWidget* control, Pull pull, Want want, Push push)

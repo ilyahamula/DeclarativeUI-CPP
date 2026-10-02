@@ -1108,7 +1108,7 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = m_choices.boundValue())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(combo,
+		bindWatchedRefSync(combo, watchRefs(boundItems),
 			[combo] { return comboItems(combo); },
 			[boundItems] { return *boundItems; },
 			[combo, select, current, boundValue](const ItemList& items) {
@@ -1221,7 +1221,7 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = items.bound())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(boundItems),
 			[list] { return listItems(list); },
 			[boundItems] { return *boundItems; },
 			[list, boundValue](const ItemList& next) {
@@ -1237,7 +1237,7 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(&value, items.bound()),
 			[list] { return listWidgetSelection(list); },
 			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setListWidgetSelection(list, indices); });
@@ -1329,7 +1329,7 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = items.bound())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(boundItems),
 			[list] { return listItems(list); },
 			[boundItems] { return *boundItems; },
 			[list, boundValue](const ItemList& next) {
@@ -1342,7 +1342,7 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(&value, items.bound()),
 			[list] { return checkListChecked(list); },
 			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
@@ -1505,7 +1505,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	{
 		auto shown = std::make_shared<std::vector<TreeItem>>(*boundItems);
 		const T* boundSelection = m_value.boundValue();
-		bindExternalRefSync(tree,
+		bindWatchedRefSync(tree, watchRefs(boundItems),
 			[shown] { return *shown; },
 			[boundItems] { return *boundItems; },
 			[tree, shown, boundSelection](const std::vector<TreeItem>& next) {
@@ -1528,7 +1528,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 		// setSelected() emits itemSelectionChanged for programmatic writes too,
 		// but the ref sync already wraps every push in a QSignalBlocker on the
 		// widget, so mirroring never re-enters the handler above.
-		bindExternalRefSync(tree,
+		bindWatchedRefSync(tree, watchRefs(&value),
 			[tree] { return treeSelection(tree); },
 			[&value] { return pathsFor(value); },
 			[tree](const std::vector<std::string>& paths) { setTreeSelection(tree, paths); });
@@ -1807,7 +1807,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 	if (editTarget != nullptr)
 	{
 		const T* boundSelection = m_value.boundValue();
-		bindExternalRefSync(table,
+		bindWatchedRefSync(table, watchRefs(editTarget),
 			[table, columnCount] { return tableRows(table, columnCount); },
 			[editTarget, columnCount] { return normalizedRows(*editTarget, columnCount); },
 			[table, syncing, sort, boundSelection, columns = m_columns, columnCount](const TableRows& next) {
@@ -1828,7 +1828,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 		// select() emits itemSelectionChanged for programmatic writes too, but
 		// the ref sync already wraps every push in a QSignalBlocker on the
 		// widget, so mirroring never re-enters the handler above.
-		bindExternalRefSync(table,
+		bindWatchedRefSync(table, watchRefs(&value, editTarget),
 			[table] { return tableSelection(table); },
 			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
 			[table](const std::vector<int>& indices) { setTableSelection(table, indices); });

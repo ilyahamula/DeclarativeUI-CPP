@@ -4,6 +4,7 @@
 #include "stacks.hpp"
 #include "foreach.hpp"
 #include "radiogroup.hpp"
+#include "observable.hpp"
 #include "grid.hpp"
 #include "scrollpanel.hpp"
 #include "splitter.hpp"
@@ -213,6 +214,13 @@ static_assert(NodeBuildable<RadioGroup>);
 static_assert(Hideable<RadioGroup>);
 static_assert(std::is_constructible_v<RadioGroup, int&, std::vector<std::string>>);
 static_assert(!std::is_constructible_v<RadioGroup, const int&, std::vector<std::string>>);
+
+// Observable<T> binds wherever T& does -- and only as a binding: a const one
+// has no T& to hand out, so it can never be mistaken for a snapshot.
+static_assert(std::is_convertible_v<Observable<ItemList>&, ItemList&>);
+static_assert(std::is_convertible_v<Observable<TableRows>&, TableRows&>);
+static_assert(!std::is_convertible_v<const Observable<TableRows>&, TableRows&>);
+static_assert(std::is_constructible_v<ListBox<std::string>, Observable<ItemList>&, std::string&>);
 
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);

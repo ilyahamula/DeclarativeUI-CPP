@@ -1233,7 +1233,7 @@ void ComboBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = m_choices.boundValue())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(combo,
+		bindWatchedRefSync(combo, watchRefs(boundItems),
 			[combo] { return nativeItems(combo); },
 			[boundItems] { return *boundItems; },
 			[combo, select, current, boundValue](const ItemList& items) {
@@ -1341,7 +1341,7 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = items.bound())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(boundItems),
 			[list] { return nativeItems(list); },
 			[boundItems] { return *boundItems; },
 			[list, boundValue](const ItemList& next) {
@@ -1355,7 +1355,7 @@ void ListBoxWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(&value, items.bound()),
 			[list] { return listBoxSelection(list, kMultiSelect); },
 			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setListBoxSelection(list, indices, kMultiSelect); });
@@ -1433,7 +1433,7 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	if (const ItemList* boundItems = items.bound())
 	{
 		const T* boundValue = m_value.boundValue();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(boundItems),
 			[list] { return nativeItems(list); },
 			[boundItems] { return *boundItems; },
 			[list, boundValue](const ItemList& next) {
@@ -1447,7 +1447,7 @@ void CheckListBoxWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(list,
+		bindWatchedRefSync(list, watchRefs(&value, items.bound()),
 			[list] { return checkListChecked(list); },
 			[&value, items] { return indicesFor(items(), value); },
 			[list](const std::vector<int>& indices) { setCheckListChecked(list, indices); });
@@ -1646,7 +1646,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	{
 		auto shown = std::make_shared<std::vector<TreeItem>>(*boundItems);
 		const T* boundSelection = m_value.boundValue();
-		bindExternalRefSync(tree,
+		bindWatchedRefSync(tree, watchRefs(boundItems),
 			[shown] { return *shown; },
 			[boundItems] { return *boundItems; },
 			[tree, shown, syncing, boundSelection, multi = m_multiSelect](const std::vector<TreeItem>& next) {
@@ -1668,7 +1668,7 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(tree,
+		bindWatchedRefSync(tree, watchRefs(&value),
 			[tree, multi = m_multiSelect] { return treeSelection(tree, multi); },
 			[&value] { return pathsFor(value); },
 			[tree, syncing, multi = m_multiSelect](const std::vector<std::string>& paths) {
@@ -1899,7 +1899,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 	if (editTarget != nullptr)
 	{
 		const T* boundSelection = m_value.boundValue();
-		bindExternalRefSync(view,
+		bindWatchedRefSync(view, watchRefs(editTarget),
 			[view, columnCount] { return dataViewRows(view, columnCount); },
 			[editTarget, columnCount] { return normalizedRows(*editTarget, columnCount); },
 			[view, syncing, boundSelection, columnCount](const TableRows& next) {
@@ -1917,7 +1917,7 @@ void TableWrapper<T>::realize(void* parentWindow)
 	if (m_value.isBound())
 	{
 		auto& value = m_value.get();
-		bindExternalRefSync(view,
+		bindWatchedRefSync(view, watchRefs(&value, editTarget),
 			[view] { return dataViewSelection(view, kMultiSelect); },
 			[&value, liveRows] { return rowIndicesFor(liveRows(), value); },
 			[view, syncing](const std::vector<int>& indices) {

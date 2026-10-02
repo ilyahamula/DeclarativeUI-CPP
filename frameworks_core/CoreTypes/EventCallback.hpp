@@ -75,7 +75,10 @@ public:
 	void operator()(const T& value) const
 	{
 		if (m_bound != nullptr)
+		{
 			*m_bound = value;
+			markChanged(m_bound); // counted when the variable is an Observable's
+		}
 		m_callback(value, m_native);
 	}
 

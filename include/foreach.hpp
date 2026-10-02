@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <type_traits>
@@ -122,6 +123,8 @@ private:
 	public:
 		Source(const std::vector<Item>* bound, std::vector<Item> items, Row row)
 			: m_bound(bound)
+			, m_version(bound != nullptr ? observedVersion(bound) : nullptr)
+			, m_lastVersion(m_version != nullptr ? *m_version : 0)
 			, m_items(std::move(items))
 			, m_row(std::move(row))
 		{
@@ -132,6 +135,14 @@ private:
 			SourceUpdate update;
 			if (m_bound == nullptr)
 				return update;
+			// An Observable vector says whether it changed; only then is it
+			// compared item by item to find WHICH rows did.
+			if (m_version != nullptr)
+			{
+				if (*m_version == m_lastVersion)
+					return update;
+				m_lastVersion = *m_version;
+			}
 			if constexpr (std::equality_comparable<Item>)
 			{
 				if (m_bound->size() != m_items.size())
@@ -163,6 +174,8 @@ private:
 
 	private:
 		const std::vector<Item>* m_bound;
+		const std::uint64_t* m_version;
+		std::uint64_t m_lastVersion;
 		std::vector<Item> m_items;
 		Row m_row;
 	};

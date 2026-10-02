@@ -632,6 +632,31 @@ TEST(imgui_escape_closes_a_dialog_without_a_cancel_button)
 	frames(2);
 }
 
+// Observable<ItemList> binds like ItemList&: on ImGui there is no poll, the
+// tree is rebuilt from the live value every frame.
+TEST(imgui_observable_items_bind_like_a_reference)
+{
+	Observable<ItemList> items { ItemList { "alpha", "beta" } };
+	std::string picked;
+	g_ui = [&] {
+		Dialog { "Observed",
+			VStack { ListBox{ items, picked }.withVisibleRows(4) }
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	items.edit()[0] = "gamma";
+	frames(2);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Observed");
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float x = w->Pos.x + st.WindowPadding.x + 20.0f;
+	const float y = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y
+		+ st.FramePadding.y + ImGui::GetTextLineHeightWithSpacing() * 0.5f;
+	click(x, y);
+	CHECK_EQ(picked, std::string("gamma"));
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

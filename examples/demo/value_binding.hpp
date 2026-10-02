@@ -1546,7 +1546,12 @@ inline auto drawTodoListUI(std::vector<DemoTodo>& todos, std::string& newTitle, 
 // stays open, and neither control resizes the window -- they keep the size of
 // their first content, as a bound ListBox does. `filePick` is shown by a
 // bound label, so the key binding is visible as it follows the rows.
-inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, TableRows& files,
+//
+// The rows are an Observable<TableRows>: bound exactly like a TableRows&, but
+// changed through edit(), which counts the change -- so the retained backends
+// poll one integer instead of comparing every row (review finding 7). The
+// folders stay a plain vector, which is polled by comparison.
+inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, Observable<TableRows>& files,
     std::string& folderPick, std::string& filePick)
 {
     return Dialog {
@@ -1571,13 +1576,14 @@ inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, TableRows& fi
                 Button{"Add file"}
                     .withFlags(LayoutFlags().Border(Side::Left, 6))
                     .onClick([&files] {
-                        files.push_back({ "file-" + std::to_string(files.size() + 1) + ".txt",
-                            std::to_string(files.size() * 7 + 3) });
+                        const std::size_t count = files.get().size();
+                        files.edit().push_back({ "file-" + std::to_string(count + 1) + ".txt",
+                            std::to_string(count * 7 + 3) });
                     }),
                 Button{"Grow selected"}
                     .withFlags(LayoutFlags().Border(Side::Left, 6))
                     .onClick([&files, &filePick] {
-                        for (auto& row : files)
+                        for (auto& row : files.edit())
                         {
                             if (!row.empty() && row[0] == filePick && row.size() > 1)
                                 row[1] = std::to_string(std::stoi(row[1]) * 2);
@@ -1586,7 +1592,7 @@ inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, TableRows& fi
                 Button{"Remove selected"}
                     .withFlags(LayoutFlags().Border(Side::Left, 6))
                     .onClick([&files, &filePick] {
-                        std::erase_if(files, [&](const TableRow& row) { return !row.empty() && row[0] == filePick; });
+                        std::erase_if(files.edit(), [&](const TableRow& row) { return !row.empty() && row[0] == filePick; });
                     })
             },
             HStack {

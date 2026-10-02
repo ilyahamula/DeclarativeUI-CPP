@@ -696,6 +696,40 @@ TEST(wx_bound_tree_and_table_follow_their_data)
 	pump();
 }
 
+// Observable rows: the poll reads the change counter, so an edit() refills the
+// table and a write through the raw binding reference is (by contract) not seen.
+TEST(wx_observable_rows_refill_by_their_counter)
+{
+	Observable<TableRows> rows { TableRows { { "a.txt", "1" }, { "b.txt", "2" } } };
+	Dialog { "Observed",
+		VStack {
+			Table{ { { "File", 120 }, { "Size", 60 } }, rows, std::string{} }.withVisibleRows(4)
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Observed");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* view = find<wxDataViewListCtrl>(w, [](wxDataViewListCtrl*) { return true; });
+	CHECK(view != nullptr);
+	if (view == nullptr)
+		return;
+
+	rows.edit().push_back({ "c.txt", "3" });
+	pump();
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 3);
+
+	static_cast<TableRows&>(rows).push_back({ "uncounted.txt", "0" });
+	pump();
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 3); // not counted, not seen
+	rows.edit();
+	pump();
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 4);
+	w->Close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	if (!wxEntryStart(argc, argv))

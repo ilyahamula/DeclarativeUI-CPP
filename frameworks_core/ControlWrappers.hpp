@@ -1453,6 +1453,7 @@ public:
 		if (column >= static_cast<int>(cells.size()))
 			cells.resize(column + 1);
 		cells[column] = text;
+		markChanged(rows); // counted when the rows are an Observable's
 	}
 
 	// Commit a new selection: the value first, then the user callback, so a

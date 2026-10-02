@@ -14,10 +14,10 @@ class DeclarativeApp : public wxApp
     std::vector<DemoTodo> m_todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
     std::string m_newTodo;
     std::string m_todoKeys = "Enter adds, Escape clears";
-    // Bound TreeView items and Table rows: the buttons change these, and
-    // both controls follow while keeping the selection.
+    // Bound TreeView items and Table rows (an Observable, so polled by its
+    // change counter): the buttons change these, both controls follow.
     std::vector<TreeItem> m_folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
-    TableRows m_files { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } };
+    Observable<TableRows> m_files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
     std::string m_folderPick = "Documents/Letters";
     std::string m_filePick = "budget.csv";
 

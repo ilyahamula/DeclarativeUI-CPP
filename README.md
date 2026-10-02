@@ -56,6 +56,7 @@ return Dialog {
 - **Runtime-sized content** — `VForEach{todos, [&](const Todo& t, std::size_t i) { return HStack{…}; }}` builds one row per item; bound to a `std::vector&`, rows follow the data live (only changed rows are rebuilt when the count stays the same)
 - **Icon buttons** — `Button{"Save"}.withIcon("icons/save.png")` draws a 16×16 (or `withIcon(path, {w, h})`) image left of the label; an empty label gives an icon-only button
 - **Keyboard defaults** — `Button{"OK"}.isDefault()` answers Enter and `Button{"Cancel"}.isCancel()` answers Escape, in a `Dialog` or a `Window`; `TextCtrl{q}.onEnter(...)` reports Enter first, then the default button is pressed. Enter in a multi-line field stays a newline
+- **Large bound data, cheaply** — wrap a big list, tree or table in `Observable<T>` (`Observable<TableRows> rows; rows.edit().push_back(…)`) and pass it wherever a `T&` binds: wx and Qt then poll a change counter instead of comparing the whole value, so an idle window costs nothing however much data it shows
 - **Stable ids** — `.withId("volume")` names a control: on ImGui its state is keyed by the name rather than its position in the tree (so an unbound value survives an `Expander` folding above it), and on wx/Qt it becomes the native window / object name
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable

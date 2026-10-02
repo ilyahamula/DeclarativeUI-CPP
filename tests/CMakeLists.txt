@@ -21,6 +21,7 @@ add_executable(layout_tests
     shortcut_parse_test.cpp
     file_filter_parse_test.cpp
     richtext_parse_test.cpp
+    ref_watch_test.cpp
     # Engine sources under test are compiled directly (not linked from
     # DeclarativeUI) so they provably build without any backend.
     ${CMAKE_SOURCE_DIR}/frameworks_core/LayoutFlags.cpp

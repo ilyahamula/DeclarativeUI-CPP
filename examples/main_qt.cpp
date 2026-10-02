@@ -17,10 +17,10 @@ int main(int argc, char** argv)
     std::vector<DemoTodo> todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
     std::string newTodo;
     std::string todoKeys = "Enter adds, Escape clears";
-    // Bound TreeView items and Table rows: the buttons change these, and
-    // both controls follow while keeping the selection.
+    // Bound TreeView items and Table rows (an Observable, so polled by its
+    // change counter): the buttons change these, both controls follow.
     std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
-    TableRows files { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } };
+    Observable<TableRows> files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
     std::string folderPick = "Documents/Letters";
     std::string filePick = "budget.csv";
 
