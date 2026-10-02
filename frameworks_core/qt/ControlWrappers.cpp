@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/qt/DialogKeys.hpp"
+#include "frameworks_core/qt/TextField.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
@@ -257,6 +258,7 @@ void TextCtrlWrapper::realize(void* parentWindow)
 			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
 
+	qt_text_field::apply(edit, std::move(m_field));
 }
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -286,6 +288,7 @@ void PasswordInputWrapper::realize(void* parentWindow)
 			[edit](const std::string& v) { edit->setText(qstr(v)); });
 	}
 
+	qt_text_field::apply(edit, std::move(m_field));
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -307,6 +310,7 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 			[edit](const std::string& v) { edit->setPlainText(qstr(v)); });
 	}
 
+	qt_text_field::apply(edit, std::move(m_field));
 }
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------

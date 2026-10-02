@@ -5,6 +5,7 @@
 #include "frameworks_core/CoreTypes/DialogKeys.hpp"
 #include "frameworks_core/CoreTypes/EventCallback.hpp"
 #include "frameworks_core/CoreTypes/StatusField.hpp"
+#include "frameworks_core/CoreTypes/TextField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
 #include "frameworks_core/CoreTypes/ExpanderState.hpp"
 #include "frameworks_core/CoreTypes/FileFilter.hpp"
@@ -138,9 +139,13 @@ public:
 	{
 	}
 
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
+
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
+	TextFieldOptions m_field;
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
@@ -165,9 +170,13 @@ public:
 	{
 	}
 
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
+
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
+	TextFieldOptions m_field;
 	BoundValue<std::string> m_value;
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
@@ -189,9 +198,13 @@ public:
 	{
 	}
 
+	// Focus and validity (TextField.hpp), set by the widget after construction.
+	void setFieldOptions(TextFieldOptions options) { m_field = std::move(options); }
+
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
 private:
+	TextFieldOptions m_field;
 	BoundValue<std::string> m_value;
 	EventCallback<const std::string&> m_onChange;
 };

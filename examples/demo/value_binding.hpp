@@ -1605,3 +1605,96 @@ inline auto drawTreeTableBindingUI(std::vector<TreeItem>& folders, Observable<Ta
         }
     };
 }
+
+// Focus and validity on the three text fields: the form opens with focus in
+// Name (isFocused()), Email and Password are checked as the user leaves them
+// (onBlur) and marked with isInvalid(bool&) -- the same bools that disable
+// "Sign up", the default button. "Check" moves focus to the first bad field
+// through Email's bound focus flag, and the notes field reports its focus
+// moves into the status line. A field's mark never changes its size.
+struct DemoSignUp
+{
+    std::string name;
+    std::string email;
+    std::string password;
+    std::string notes;
+    bool emailFocused = false;
+    bool emailInvalid = false;
+    bool passwordInvalid = false;
+    bool cannotSubmit = true;
+    std::string status = "Fill in the form";
+};
+
+inline auto drawSignUpFormUI(DemoSignUp& form)
+{
+    const auto validate = [&form] {
+        form.emailInvalid = !form.email.empty() && form.email.find('@') == std::string::npos;
+        form.passwordInvalid = !form.password.empty() && form.password.size() < 8;
+        form.cannotSubmit = form.name.empty() || form.email.empty() || form.password.empty()
+            || form.emailInvalid || form.passwordInvalid;
+    };
+    constexpr int kLabelW = 80;
+    constexpr int kFieldW = 220;
+    return Dialog {
+        "Sign up (focus + validation)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                StaticText{"Name"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{form.name}
+                    .withSize({kFieldW, -1})
+                    .isFocused()
+                    .onChange([validate](const std::string&) { validate(); })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"Email"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                TextCtrl{form.email}
+                    .withSize({kFieldW, -1})
+                    .withPlaceholder("name@example.com")
+                    .isFocused(form.emailFocused)
+                    .isInvalid(form.emailInvalid)
+                    .onBlur(validate)
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"Password"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                PasswordInput{form.password}
+                    .withSize({kFieldW, -1})
+                    .withPlaceholder("8 characters or more")
+                    .isInvalid(form.passwordInvalid)
+                    .onBlur(validate)
+            },
+            MultiLineTextCtrl{form.notes}
+                .withSize({kLabelW + kFieldW + 8, 60})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .onFocus([&form] { form.status = "Writing notes..."; })
+                .onBlur([&form] { form.status = "Notes: " + std::to_string(form.notes.size()) + " characters"; }),
+            StaticText{form.status}
+                .withSize({kLabelW + kFieldW + 8, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Spacer{},
+                Button{"Check"}
+                    .onClick([&form, validate] {
+                        validate();
+                        if (form.emailInvalid || form.email.empty())
+                        {
+                            form.status = "Fix the email first";
+                            form.emailFocused = true; // moves focus there
+                        }
+                        else
+                        {
+                            form.status = form.cannotSubmit ? "Something is still missing" : "Looks good";
+                        }
+                    }),
+                Button{"Sign up"}
+                    .isDefault()
+                    .isDisabled(form.cannotSubmit)
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&form] { form.status = "Signed up as " + form.name; })
+            }
+        }
+    };
+}

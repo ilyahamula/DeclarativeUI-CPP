@@ -252,8 +252,64 @@ private:
 	TextAlign m_align = TextAlign::Left;
 };
 
+// Focus and validity modifiers shared by the three text fields (TextField.hpp).
+// A mixin rather than Widget<W> members because they exist only for text
+// entry -- see TextFieldOptions for why.
+template <typename W>
+struct TextFieldModifiers
+{
+	// Focus moved into / out of the field. onBlur is the usual place to
+	// validate: the user has finished with it.
+	W& onFocus(std::function<void()> callback)
+	{
+		m_field.onFocus = std::move(callback);
+		return self();
+	}
+
+	W& onBlur(std::function<void()> callback)
+	{
+		m_field.onBlur = std::move(callback);
+		return self();
+	}
+
+	// Bound, the caller's bool follows focus both ways: it reads true while
+	// the field has focus, and setting it true moves focus there. Unbound,
+	// isFocused() is the field the window opens with focus in.
+	W& isFocused(bool& focused)
+	{
+		m_field.focused.bind(focused);
+		return self();
+	}
+
+	W& isFocused(const bool& focused = true)
+	{
+		m_field.focused.snapshot(focused);
+		return self();
+	}
+
+	// Mark the field invalid -- a red tint, never a size change. Bind it to
+	// the same bool that disables the form's OK button.
+	W& isInvalid(bool& invalid)
+	{
+		m_field.invalid.bind(invalid);
+		return self();
+	}
+
+	W& isInvalid(const bool& invalid = true)
+	{
+		m_field.invalid.snapshot(invalid);
+		return self();
+	}
+
+protected:
+	TextFieldOptions m_field;
+
+private:
+	W& self() { return static_cast<W&>(*this); }
+};
+
 // TextCtrl -----------------------------------------------------------
-struct TextCtrl : Widget<TextCtrl>
+struct TextCtrl : Widget<TextCtrl>, TextFieldModifiers<TextCtrl>
 {
 	using super = Widget<TextCtrl>;
 
@@ -324,7 +380,9 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
+		auto wrapper = std::make_unique<TextCtrlWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
+		wrapper->setFieldOptions(this->m_field);
+		return wrapper;
 	}
 
 private:
@@ -335,7 +393,7 @@ private:
 };
 
 // PasswordInput -----------------------------------------------------------
-struct PasswordInput : Widget<PasswordInput>
+struct PasswordInput : Widget<PasswordInput>, TextFieldModifiers<PasswordInput>
 {
 	using super = Widget<PasswordInput>;
 
@@ -400,7 +458,9 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
+		auto wrapper = std::make_unique<PasswordInputWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onEnter);
+		wrapper->setFieldOptions(this->m_field);
+		return wrapper;
 	}
 
 private:
@@ -411,7 +471,7 @@ private:
 };
 
 // MultiLineTextCtrl -----------------------------------------------------------
-struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>
+struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>, TextFieldModifiers<MultiLineTextCtrl>
 {
 	using super = Widget<MultiLineTextCtrl>;
 
@@ -450,7 +510,9 @@ private:
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<MultiLineTextCtrlWrapper>(m_value, pos, size, style, m_onChange);
+		auto wrapper = std::make_unique<MultiLineTextCtrlWrapper>(m_value, pos, size, style, m_onChange);
+		wrapper->setFieldOptions(this->m_field);
+		return wrapper;
 	}
 
 private:

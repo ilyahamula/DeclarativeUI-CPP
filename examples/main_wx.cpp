@@ -9,11 +9,9 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // The todo list (VForEach): rows follow this vector -- add and remove
-    // rows, tick them, and only the changed rows are rebuilt.
-    std::vector<DemoTodo> m_todos { { "Write the ForEach demo", true }, { "Try removing a row", false } };
-    std::string m_newTodo;
-    std::string m_todoKeys = "Enter adds, Escape clears";
+    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
+    // (isInvalid) on the three text fields.
+    DemoSignUp m_signUp;
     // Bound TreeView items and Table rows (an Observable, so polled by its
     // change counter): the buttons change these, both controls follow.
     std::vector<TreeItem> m_folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
@@ -25,7 +23,7 @@ public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawTodoListUI(m_todos, m_newTodo, m_todoKeys).show();
+        drawSignUpFormUI(m_signUp).show();
         drawTreeTableBindingUI(m_folders, m_files, m_folderPick, m_filePick).show();
         return true;
     }

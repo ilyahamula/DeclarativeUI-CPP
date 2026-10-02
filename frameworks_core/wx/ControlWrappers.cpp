@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/wx/DialogKeys.hpp"
+#include "frameworks_core/wx/TextField.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
 #include <cmath>
@@ -157,6 +158,7 @@ void TextCtrlWrapper::realize(void* parentWindow)
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 
+	wx_text_field::apply(txt, std::move(m_field));
 }
 
 // PasswordInputWrapper -----------------------------------------------------------
@@ -184,6 +186,7 @@ void PasswordInputWrapper::realize(void* parentWindow)
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 
+	wx_text_field::apply(txt, std::move(m_field));
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
@@ -208,6 +211,7 @@ void MultiLineTextCtrlWrapper::realize(void* parentWindow)
 			[txt](const std::string& v) { txt->ChangeValue(v); });
 	}
 
+	wx_text_field::apply(txt, std::move(m_field));
 }
 
 // ReadonlyTextCtrlWrapper -----------------------------------------------------------

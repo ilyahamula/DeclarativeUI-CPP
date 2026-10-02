@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/imgui/DialogKeys.hpp"
+#include "frameworks_core/imgui/TextField.hpp"
 #include <algorithm>
 #include <array>
 #include <cfloat>
@@ -222,9 +223,11 @@ void TextCtrlWrapper::render(const Rect& frame)
 	// InputTextWithHint draws the hint only while the buffer is empty, exactly
 	// as SetHint and setPlaceholderText do, and measures nothing -- the item is
 	// the width SetNextItemWidth gave it either way.
+	imgui_text_field::Scope field(m_field, snapshot.slotKey(1));
 	const bool edited = m_placeholder.empty()
 		? ImGui::InputText("##textctrl", &text)
 		: ImGui::InputTextWithHint("##textctrl", m_placeholder.c_str(), &text);
+	field.after();
 	if (edited)
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
@@ -251,10 +254,12 @@ void PasswordInputWrapper::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	snapshot.pushId();
+	imgui_text_field::Scope field(m_field, snapshot.slotKey(1));
 	const bool edited = m_placeholder.empty()
 		? ImGui::InputText("##passwordinput", &text, ImGuiInputTextFlags_Password)
 		: ImGui::InputTextWithHint("##passwordinput", m_placeholder.c_str(), &text,
 			ImGuiInputTextFlags_Password);
+	field.after();
 	if (edited)
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
@@ -285,7 +290,10 @@ void MultiLineTextCtrlWrapper::render(const Rect& frame)
 		? ImVec2((float)frame.width, (float)frame.height)
 		: ImVec2(0, 0);
 	snapshot.pushId();
-	if (ImGui::InputTextMultiline("##multilinetextctrl", &text, size))
+	imgui_text_field::Scope field(m_field, snapshot.slotKey(1));
+	const bool edited = ImGui::InputTextMultiline("##multilinetextctrl", &text, size);
+	field.after();
+	if (edited)
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
 	}

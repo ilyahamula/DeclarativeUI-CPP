@@ -657,6 +657,58 @@ TEST(imgui_observable_items_bind_like_a_reference)
 	frames(2);
 }
 
+// Focus and validity: the field opened with isFocused() takes typing first; a
+// bound flag set true moves focus (onFocus), clicking away blurs (onBlur, flag
+// back to false); isInvalid draws without moving anything.
+TEST(imgui_text_field_focus_follows_the_flag_and_reports)
+{
+	std::string name;
+	std::string email;
+	bool emailFocused = false;
+	bool emailInvalid = true;
+	std::vector<std::string> log;
+	g_ui = [&] {
+		Dialog { "Focus",
+			VStack {
+				TextCtrl{name}.withSize({200, -1}).isFocused(),
+				TextCtrl{email}.withSize({200, -1})
+					.isFocused(emailFocused)
+					.isInvalid(emailInvalid)
+					.onFocus([&] { log.push_back("focus"); })
+					.onBlur([&] { log.push_back("blur"); })
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(4);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Focus");
+	const ImVec2 size = w->Size;
+	frame(-1, -1, false, 'a');
+	frames(2);
+	CHECK_EQ(name, std::string("a")); // the starting focus took the typing
+
+	emailFocused = true;
+	frames(3);
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "focus");
+	frame(-1, -1, false, 'b');
+	frames(2);
+	CHECK_EQ(email, std::string("b"));
+	CHECK_EQ(name, std::string("a"));
+
+	click(w->Pos.x + w->Size.x - 10.0f, w->Pos.y + w->Size.y - 6.0f); // empty space
+	frames(2);
+	CHECK_EQ(log.size(), std::size_t(2));
+	CHECK(log.size() == 2 && log[1] == "blur");
+	CHECK(!emailFocused);
+
+	emailInvalid = false;
+	frames(2);
+	CHECK_EQ(w->Size.x, size.x); // validity never moves anything
+	CHECK_EQ(w->Size.y, size.y);
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

@@ -745,6 +745,62 @@ TEST(qt_bound_tree_and_table_follow_their_data)
 	pump();
 }
 
+// Focus and validity: the starting focus, a bound flag that moves focus and
+// follows it, onFocus / onBlur, and isInvalid tinting the palette's Base.
+TEST(qt_text_field_focus_follows_the_flag_and_reports)
+{
+	std::string name;
+	std::string email;
+	bool emailFocused = false;
+	bool emailInvalid = false;
+	std::vector<std::string> log;
+	Dialog { "Focus",
+		VStack {
+			TextCtrl{name}.isFocused(),
+			TextCtrl{email}
+				.isFocused(emailFocused)
+				.isInvalid(emailInvalid)
+				.onFocus([&] { log.push_back("focus"); })
+				.onBlur([&] { log.push_back("blur"); })
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Focus");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	w->activateWindow();
+	pump();
+	const auto edits = w->findChildren<QLineEdit*>();
+	CHECK_EQ(edits.size(), 2);
+	if (edits.size() != 2)
+		return;
+	QLineEdit* first = edits[0]->text().isEmpty() && edits[0]->y() < edits[1]->y() ? edits[0] : edits[1];
+	QLineEdit* second = first == edits[0] ? edits[1] : edits[0];
+	CHECK(QApplication::focusWidget() == first);
+
+	emailFocused = true;
+	pump(200);
+	CHECK(QApplication::focusWidget() == second);
+	CHECK(!log.empty() && log[0] == "focus");
+	CHECK(emailFocused);
+
+	first->setFocus();
+	pump(200);
+	CHECK(log.size() == 2 && log[1] == "blur");
+	CHECK(!emailFocused);
+
+	const QColor base = second->palette().color(QPalette::Base);
+	emailInvalid = true;
+	pump(200);
+	CHECK(second->palette().color(QPalette::Base) == QColor(253, 228, 228));
+	emailInvalid = false;
+	pump(200);
+	CHECK(second->palette().color(QPalette::Base) == base);
+	w->close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	// No display on CI, and none needed: every check reads widget state.

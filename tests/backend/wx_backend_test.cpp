@@ -730,6 +730,64 @@ TEST(wx_observable_rows_refill_by_their_counter)
 	pump();
 }
 
+// Focus and validity. The focus events are delivered as wx delivers them
+// (wxEVT_SET_FOCUS / KILL_FOCUS on the control); whether the platform grants
+// real focus to a test window is checked only where it does.
+TEST(wx_text_field_focus_follows_the_flag_and_reports)
+{
+	std::string email;
+	bool emailFocused = false;
+	bool emailInvalid = false;
+	std::vector<std::string> log;
+	Dialog { "Focus",
+		VStack {
+			TextCtrl{email}
+				.isFocused(emailFocused)
+				.isInvalid(emailInvalid)
+				.onFocus([&] { log.push_back("focus"); })
+				.onBlur([&] { log.push_back("blur"); })
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Focus");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* field = find<wxTextCtrl>(w, [](wxTextCtrl*) { return true; });
+	CHECK(field != nullptr);
+	if (field == nullptr)
+		return;
+
+	// a dialog gives its only field focus as it opens -- reported like any other
+	if (wxWindow::FindFocus() == field)
+		CHECK(emailFocused && !log.empty() && log.back() == "focus");
+	log.clear();
+	wxFocusEvent in(wxEVT_SET_FOCUS, field->GetId());
+	in.SetEventObject(field);
+	field->ProcessWindowEvent(in);
+	CHECK(!log.empty() && log[0] == "focus");
+	CHECK(emailFocused);
+	wxFocusEvent out(wxEVT_KILL_FOCUS, field->GetId());
+	out.SetEventObject(field);
+	field->ProcessWindowEvent(out);
+	CHECK(log.size() == 2 && log[1] == "blur");
+	CHECK(!emailFocused);
+
+	emailFocused = true; // a request: SetFocus()
+	pump();
+	if (wxWindow::FindFocus() != nullptr)
+		CHECK(wxWindow::FindFocus() == field);
+
+	emailInvalid = true;
+	pump();
+	CHECK(field->GetBackgroundColour() == wxColour(253, 228, 228));
+	emailInvalid = false;
+	pump();
+	CHECK(field->GetBackgroundColour() != wxColour(253, 228, 228));
+	w->Close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	if (!wxEntryStart(argc, argv))

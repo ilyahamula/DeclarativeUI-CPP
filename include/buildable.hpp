@@ -96,6 +96,17 @@ concept DialogKeyButton = requires(T element) {
 	element.isCancel();
 };
 
+// Elements with focus and validity (onFocus/onBlur/isFocused/isInvalid): the
+// text fields, the one kind of control "focus" means the same thing for on
+// every backend (CoreTypes/TextField.hpp).
+template<typename T>
+concept FocusHost = requires(T element, bool& flag) {
+	element.onFocus(std::function<void()>{});
+	element.onBlur(std::function<void()>{});
+	element.isFocused(flag);
+	element.isInvalid(flag);
+};
+
 // A picture that can say what happens to its pixels inside the frame the
 // engine gave it. Image alone: every other leaf either has no pixels of its
 // own to scale (a label, a field) or hands them to a native control that

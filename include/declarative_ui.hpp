@@ -156,6 +156,12 @@ static_assert(EnterHost<TextCtrl>);
 static_assert(EnterHost<PasswordInput>);
 static_assert(!EnterHost<MultiLineTextCtrl>);
 static_assert(DialogKeyButton<Button>);
+// Focus and validity: the three text fields only.
+static_assert(FocusHost<TextCtrl>);
+static_assert(FocusHost<PasswordInput>);
+static_assert(FocusHost<MultiLineTextCtrl>);
+static_assert(!FocusHost<Button>);
+static_assert(!FocusHost<ReadonlyTextCtrl>);
 static_assert(!DialogKeyButton<ToggleButton>);
 static_assert(requires(Button b) { { b.withIcon(std::string{}) } -> std::same_as<Button&>; });
 // withScaleMode() belongs to the one widget that owns pixels of its own, and
