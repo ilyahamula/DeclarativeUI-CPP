@@ -67,6 +67,45 @@ wxImage loadImage(const std::string& path)
 	return wxImage(path, wxBITMAP_TYPE_ANY);
 }
 
+#ifdef __WXMSW__
+// Win32 "clicks" a radio button that receives focus unchecked: its own
+// WM_SETFOCUS sends BN_CLICKED unless the mouse holds capture, which is how
+// arrow keys move the pick inside a native group. Ours are in no native group
+// and each is a tab stop, so a dialog focusing its first control -- or Tab
+// passing through -- would pick an option nobody chose and write it to the
+// bound int. That one click is dropped. A mouse click (capture first, click on
+// release) and Space (click on key-up) arrive outside WM_SETFOCUS as before.
+class UngroupedRadioButton : public wxRadioButton
+{
+public:
+	using wxRadioButton::wxRadioButton;
+
+	WXLRESULT MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override
+	{
+		constexpr WXUINT kSetFocus = 0x0007; // WM_SETFOCUS, without <windows.h>
+		if (message != kSetFocus)
+			return wxRadioButton::MSWWindowProc(message, wParam, lParam);
+		m_focusing = true;
+		const WXLRESULT result = wxRadioButton::MSWWindowProc(message, wParam, lParam);
+		m_focusing = false;
+		return result;
+	}
+
+	bool MSWCommand(WXUINT param, WXWORD id) override
+	{
+		constexpr WXUINT kClicked = 0; // BN_CLICKED
+		if (m_focusing && param == kClicked)
+			return true;
+		return wxRadioButton::MSWCommand(param, id);
+	}
+
+private:
+	bool m_focusing = false;
+};
+#else
+using UngroupedRadioButton = wxRadioButton;
+#endif
+
 } // unnamed namespace
 
 // ButtonWrapper -----------------------------------------------------------
@@ -546,7 +585,7 @@ void RadioButtonWrapper<T>::realize(void* parentWindow)
 #else
 	constexpr long kUngrouped = wxRB_SINGLE;
 #endif
-	auto* rb = new wxRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
+	auto* rb = new UngroupedRadioButton(static_cast<wxWindow*>(parentWindow), wxID_ANY, wxLabelText(m_label),
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | kUngrouped);
 	rb->SetValue(isChecked(m_value.get(), m_option));
 	m_nativeWidget = rb;

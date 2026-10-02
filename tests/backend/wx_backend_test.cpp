@@ -114,6 +114,9 @@ TEST(wx_radio_groups_survive_reshow_and_share_a_box)
 		if (w == nullptr)
 			return;
 
+		// Showing picks nothing: wxMSW focusing the first radio "clicked" it
+		CHECK_EQ(choice, 1);
+		CHECK_EQ(other, 0);
 		CHECK(radio(w, "Beta")->GetValue());
 		CHECK(!radio(w, "Alpha")->GetValue());
 		CHECK(radio(w, "One")->GetValue());
