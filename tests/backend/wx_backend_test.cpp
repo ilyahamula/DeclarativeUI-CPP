@@ -12,9 +12,11 @@
 #include <wx/statline.h>
 #include <wx/dataview.h>
 #include <wx/statusbr.h>
+#include <wx/tooltip.h>
 #include <wx/treectrl.h>
 #include <wx/wx.h>
 
+#include <cstdio>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -242,6 +244,34 @@ TEST(wx_separator_and_status_bar_follow_the_shared_rule)
 	auto* bar = find<wxStatusBar>(w, [](wxStatusBar*) { return true; });
 	CHECK(line != nullptr && line->GetSize().y == 1);
 	CHECK(bar != nullptr && bar->GetSize().x == statusBarContentWidth({ StatusField{"a", 100}, StatusField{"b"} }));
+	w->Close();
+	pump();
+}
+
+// wxSTB_SHOW_TIPS makes wx assert on any tooltip call: a bar without a tooltip
+// must make none (not even an unset), and one with a tooltip gives up the
+// style. On wxGTK/wxMSW the assert fires through the handler set in main().
+TEST(wx_status_bar_tooltips_do_not_assert)
+{
+	Dialog { "Tips",
+		VStack {
+			StatusBar { StatusField{"plain"} },
+			StatusBar { StatusField{"tipped"} }.withTooltip("A tip")
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Tips");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* plain = find<wxStatusBar>(w, [](wxStatusBar* b) { return b->GetStatusText(0) == "plain"; });
+	auto* tipped = find<wxStatusBar>(w, [](wxStatusBar* b) { return b->GetStatusText(0) == "tipped"; });
+	CHECK(plain != nullptr && tipped != nullptr);
+	if (plain == nullptr || tipped == nullptr)
+		return;
+	CHECK(plain->HasFlag(wxSTB_SHOW_TIPS) && plain->GetToolTip() == nullptr);
+	CHECK(!tipped->HasFlag(wxSTB_SHOW_TIPS));
+	CHECK(tipped->GetToolTip() != nullptr && tipped->GetToolTip()->GetTip() == "A tip");
 	w->Close();
 	pump();
 }
@@ -793,9 +823,20 @@ int main(int argc, char** argv)
 	if (!wxEntryStart(argc, argv))
 		return 2;
 	wxTheApp->CallOnInit();
-	// wxLogGui turns every wxLogError into a modal box on the next idle, which
-	// would stall pump() forever with nobody there to close it (CI).
+	// wxLogGui turns every wxLogError into a modal box on the next idle, and a
+	// GUI app's assert handler opens one too -- either stalls the run forever
+	// with nobody there to close it (CI). Both go to stderr; an assert fails
+	// the test it fired in.
 	delete wxLog::SetActiveTarget(new wxLogStderr);
+	wxSetAssertHandler([](const wxString& file, int line, const wxString& func,
+							const wxString& cond, const wxString& msg) {
+		std::fprintf(stderr, "%s(%d): assert \"%s\" failed in %s(): %s\n",
+			static_cast<const char*>(file.utf8_str()), line,
+			static_cast<const char*>(cond.utf8_str()),
+			static_cast<const char*>(func.utf8_str()),
+			static_cast<const char*>(msg.utf8_str()));
+		++testfw::failureCount();
+	});
 	const int result = testfw::runAll();
 	wxTheApp->OnExit();
 	wxEntryCleanup();

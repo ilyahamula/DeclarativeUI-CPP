@@ -57,8 +57,13 @@ void applyDisabled(wxWindow* window, const LayoutNode& node)
 void applyTooltip(wxWindow* window, const ControlWrapper& widget)
 {
 	auto push = [window](const std::string& text) {
+		// Nothing to remove is nothing to do: a wxStatusBar with
+		// wxSTB_SHOW_TIPS asserts on ANY tooltip call, an unset included.
 		if (text.empty())
-			window->UnsetToolTip();
+		{
+			if (window->GetToolTip() != nullptr)
+				window->UnsetToolTip();
+		}
 		else
 			window->SetToolTip(wxString::FromUTF8(text));
 	};

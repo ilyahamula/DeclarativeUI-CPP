@@ -850,8 +850,13 @@ void StatusBarWrapper::realize(void* parentWindow)
 	// A CHILD wxStatusBar, deliberately not wxFrame::CreateStatusBar(): that one
 	// docks itself to a frame, out of the engine's sight, and would make a
 	// status bar impossible in a Dialog or anywhere else down a stack.
-	auto* bar = new wxStatusBar(static_cast<wxWindow*>(parentWindow), wxID_ANY,
-		wxSTB_DEFAULT_STYLE | m_style);
+	// wxSTB_SHOW_TIPS (a truncated field's text as its tip) and a tooltip of
+	// our own are mutually exclusive -- wx asserts on SetToolTip -- so the
+	// caller's withTooltip() wins when there is one.
+	long style = wxSTB_DEFAULT_STYLE | m_style;
+	if (!tooltip().empty() || boundTooltip() != nullptr)
+		style &= ~wxSTB_SHOW_TIPS;
+	auto* bar = new wxStatusBar(static_cast<wxWindow*>(parentWindow), wxID_ANY, style);
 	m_nativeWidget = bar;
 
 	const int count = m_fields.empty() ? 1 : (int)m_fields.size();
