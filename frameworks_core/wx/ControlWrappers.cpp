@@ -46,8 +46,7 @@ namespace
 {
 
 // wxImage can decode nothing until its handlers are registered, and the
-// registration is process-wide -- so it is done once, by whichever of Image or
-// ToolBar is realized first.
+// registration is process-wide -- so it is done once, by the first load.
 void ensureImageHandlers()
 {
 	static const bool registered = [] {
@@ -55,6 +54,17 @@ void ensureImageHandlers()
 		return true;
 	}();
 	(void)registered;
+}
+
+// A path that fails to load is a caller's mistake we report through our own
+// logger, never wx's: wxImage's wxLogError reaches wxLogGui, which shows it as
+// a modal message box on the next idle -- in front of the user, or forever on
+// a machine with nobody to dismiss it.
+wxImage loadImage(const std::string& path)
+{
+	wxLogNull quiet;
+	ensureImageHandlers();
+	return wxImage(path, wxBITMAP_TYPE_ANY);
 }
 
 } // unnamed namespace
@@ -75,8 +85,7 @@ void ButtonWrapper::realize(void* parentWindow)
 	if (!m_iconPath.empty())
 	{
 		// Before the engine measures: the bitmap is part of the best size.
-		ensureImageHandlers();
-		wxImage image(m_iconPath, wxBITMAP_TYPE_ANY);
+		wxImage image = loadImage(m_iconPath);
 		if (image.IsOk())
 		{
 			image = image.Scale(std::max(1, m_iconSize.width), std::max(1, m_iconSize.height), wxIMAGE_QUALITY_HIGH);
@@ -696,11 +705,9 @@ void ImageWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ImageWrapper::realize()\t-> new wxStaticBitmap()\n");
 #endif
-	ensureImageHandlers();
-
 	// The ORIGINAL picture goes in, unscaled: the scaling needs the frame, and
 	// the frame is not decided until the engine places the control.
-	wxImage source(m_filePath, wxBITMAP_TYPE_ANY);
+	wxImage source = loadImage(m_filePath);
 	auto* bmpCtrl = new ScaledBitmapCtrl(static_cast<wxWindow*>(parentWindow),
 		source.IsOk() ? source : wxImage(16, 16), m_scaleMode,
 		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
@@ -727,8 +734,6 @@ void ToolBarWrapper::realize(void* parentWindow)
 #ifdef USE_LOGGER
 	Logger::instance().log("ToolBarWrapper::realize()\t-> new wxToolBar()\n");
 #endif
-	ensureImageHandlers();
-
 	// A CHILD wxToolBar, deliberately not wxFrame::CreateToolBar(): that one
 	// docks itself to a frame and would be invisible to the engine, and it
 	// would make a toolbar impossible inside a Dialog or anywhere down a stack.
@@ -759,7 +764,7 @@ void ToolBarWrapper::realize(void* parentWindow)
 		wxBitmap bitmap;
 		if (!tool.iconPath.empty())
 		{
-			wxImage image(tool.iconPath, wxBITMAP_TYPE_ANY);
+			wxImage image = loadImage(tool.iconPath);
 			if (image.IsOk())
 			{
 				if (m_iconSize.width > 0 && m_iconSize.height > 0)

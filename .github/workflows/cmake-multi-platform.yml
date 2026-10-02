@@ -125,10 +125,13 @@ jobs:
       # layout_tests is backend-free. backend_tests drives real widgets: ImGui
       # runs headless and Qt on the offscreen platform everywhere, while wx
       # needs a display -- the desktop session on macOS/Windows, xvfb on Linux.
+      # A per-test timeout: a GUI test that blocks (a modal nobody can close)
+      # fails in minutes instead of holding the runner for the 6 h job limit.
       - name: Test
+        timeout-minutes: 15
         run: |
           if [ "${{ runner.os }}" = "Linux" ] && [ "${{ matrix.backend }}" = "WX" ]; then
-            xvfb-run -a ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
+            xvfb-run -a ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure --timeout 300
           else
-            ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure
+            ctest --test-dir "$BUILD_DIR" --build-config ${{ matrix.build_type }} --output-on-failure --timeout 300
           fi

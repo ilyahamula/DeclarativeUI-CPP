@@ -793,6 +793,9 @@ int main(int argc, char** argv)
 	if (!wxEntryStart(argc, argv))
 		return 2;
 	wxTheApp->CallOnInit();
+	// wxLogGui turns every wxLogError into a modal box on the next idle, which
+	// would stall pump() forever with nobody there to close it (CI).
+	delete wxLog::SetActiveTarget(new wxLogStderr);
 	const int result = testfw::runAll();
 	wxTheApp->OnExit();
 	wxEntryCleanup();
