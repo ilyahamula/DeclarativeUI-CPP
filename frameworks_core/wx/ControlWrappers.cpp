@@ -1648,7 +1648,9 @@ void TreeViewWrapper<T>::realize(void* parentWindow)
 	tree->Bind(wxEVT_TREE_SEL_CHANGED, [tree, syncing, multi = m_multiSelect,
 		commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxTreeEvent& evt) {
 		evt.Skip();
-		if (!*syncing)
+		// wxGTK reports the selection emptying as the window is torn down;
+		// that is no pick of the user's, and the caller's value must keep it.
+		if (!*syncing && !tree->IsBeingDeleted())
 			commit(valueFor(treeSelection(tree, multi)));
 	});
 
@@ -1718,9 +1720,16 @@ namespace
 // An item's ORIGINAL row index, which wx carries for us in the item data. It
 // stays with the row when a column sort reorders the view, so it survives
 // exactly what a view position does not.
-int dataViewRowIndex(const wxDataViewListCtrl* view, const wxDataViewItem& item)
+//
+// GetItemData() indexes the store with GetRow(item) unchecked, and on wxGTK
+// (where the store maps items through a hash) an item it no longer holds is
+// wxNOT_FOUND -- an out-of-range read. So the row is checked first.
+int dataViewRowIndex(wxDataViewListCtrl* view, const wxDataViewItem& item)
 {
-	return item.IsOk() ? static_cast<int>(view->GetItemData(item)) : -1;
+	const wxDataViewListStore* store = view->GetStore();
+	if (!item.IsOk() || store->GetRow(item) >= static_cast<unsigned>(store->GetItemCount()))
+		return -1;
+	return static_cast<int>(view->GetItemData(item));
 }
 
 std::vector<int> dataViewSelection(wxDataViewListCtrl* view, bool multiSelect)
@@ -1900,7 +1909,8 @@ void TableWrapper<T>::realize(void* parentWindow)
 	view->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [view, syncing, liveRows,
 		commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxDataViewEvent& evt) {
 		evt.Skip();
-		if (!*syncing)
+		// As for the tree: a teardown's selection change is not the user's.
+		if (!*syncing && !view->IsBeingDeleted())
 			commit(valueFor(liveRows(), dataViewSelection(view, kMultiSelect)));
 	});
 

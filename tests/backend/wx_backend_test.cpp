@@ -21,6 +21,11 @@
 #include <thread>
 #include <vector>
 
+#ifdef __GLIBC__
+#include <execinfo.h>
+#include <unistd.h>
+#endif
+
 #ifdef __WXOSX__
 // A real Cocoa click (performClick), so native radio grouping, if any, happens
 // exactly as it would under the mouse. Objective-C++, kept in its own file.
@@ -724,6 +729,9 @@ TEST(wx_bound_tree_and_table_follow_their_data)
 	CHECK(found);
 	w->Close();
 	pump();
+	// wxGTK empties the selection as it tears the controls down: not a pick
+	CHECK_EQ(treePick, std::string("Fruits/Banana"));
+	CHECK_EQ(rowPick, std::string("b.txt"));
 }
 
 // Observable rows: the poll reads the change counter, so an edit() refills the
@@ -835,8 +843,16 @@ int main(int argc, char** argv)
 			static_cast<const char*>(cond.utf8_str()),
 			static_cast<const char*>(func.utf8_str()),
 			static_cast<const char*>(msg.utf8_str()));
+#ifdef __GLIBC__
+		// Only CI's wxGTK/wxMSW builds assert at all, so the stack is all there
+		// is to go on (-rdynamic gives it names).
+		void* frames[64];
+		backtrace_symbols_fd(frames, backtrace(frames, 64), STDERR_FILENO);
+#endif
 		++testfw::failureCount();
 	});
+	// Unbuffered, so a crash still shows the last test that finished.
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	const int result = testfw::runAll();
 	wxTheApp->OnExit();
 	wxEntryCleanup();
