@@ -734,6 +734,49 @@ TEST(wx_bound_tree_and_table_follow_their_data)
 	CHECK_EQ(rowPick, std::string("b.txt"));
 }
 
+// A refill re-applies the user's sort, and only when there is one: wxGTK's
+// Resort() with no sorting column compared by column -1 and read past the row.
+TEST(wx_table_refill_keeps_the_users_sort)
+{
+	TableRows rows { { "b.txt" }, { "c.txt" } };
+	Dialog { "Sorted",
+		VStack { Table{ { { "File", 120, true } }, rows, std::string{} }.withVisibleRows(4) }
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Sorted");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* view = find<wxDataViewListCtrl>(w, [](wxDataViewListCtrl*) { return true; });
+	CHECK(view != nullptr);
+	if (view == nullptr)
+		return;
+	auto shownFirst = [view] {
+		wxVariant value;
+		view->GetStore()->GetValue(value, view->RowToItem(0), 0);
+		return value.GetString();
+	};
+
+	rows.push_back({ "a.txt" }); // unsorted: declaration order
+	pump();
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 3);
+	CHECK(shownFirst() == "b.txt");
+
+	// The user sorts descending. wxOSX's SetSortOrder() only marks the column
+	// (the view sorts on a real header click), so the order is checked where
+	// the call does sort -- wxGTK, the platform this path broke on.
+	view->GetColumn(0)->SetSortOrder(false);
+	pump();
+	const bool sorted = shownFirst() == "c.txt";
+	rows.push_back({ "d.txt" });
+	pump();
+	CHECK_EQ(static_cast<int>(view->GetItemCount()), 4);
+	if (sorted)
+		CHECK(shownFirst() == "d.txt");
+	w->Close();
+	pump();
+}
+
 // Observable rows: the poll reads the change counter, so an edit() refills the
 // table and a write through the raw binding reference is (by contract) not seen.
 TEST(wx_observable_rows_refill_by_their_counter)

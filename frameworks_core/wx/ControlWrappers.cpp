@@ -1932,7 +1932,9 @@ void TableWrapper<T>::realize(void* parentWindow)
 					: valueFor(dataViewRows(view, columnCount), dataViewSelection(view, kMultiSelect));
 				*syncing = true;
 				fillDataView(view, next, columnCount);
-				if (wxDataViewModel* model = view->GetModel())
+				// Only a sort the user picked is re-applied: with no sorting
+				// column wxGTK still sorts, by column -1, reading past the row.
+				if (wxDataViewModel* model = view->GetModel(); model && view->GetSortingColumn())
 					model->Resort();
 				setDataViewSelection(view, rowIndicesFor(next, keep), kMultiSelect);
 				*syncing = false;
