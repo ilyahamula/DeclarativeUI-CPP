@@ -12,17 +12,17 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // Calendar: Monday-first and Sunday-first side by side, and one date
-    // shared by a calendar and a DatePicker.
-    Date isoDate = todayDate();
-    Date usDate = todayDate();
-    std::string calendarStatus = "Pick a day";
-    Date sharedDate = todayDate();
-    bool calendarDisabled = false;
+    // VirtualList: a million generated log lines beside a ListBox, and a
+    // list whose row, count and revision are caller-owned.
+    int logCount = 1000000;
+    int logRow = -1;
+    std::string languagePick = "C++";
+    std::string listStatus = "Pick a log line";
+    DemoVirtualList virtualList;
 
     // One show() per open on a retained backend.
-    drawCalendarGalleryUI(isoDate, usDate, calendarStatus).show();
-    drawCalendarBindingUI(sharedDate, calendarDisabled).show();
+    drawVirtualListGalleryUI(logCount, logRow, languagePick, listStatus).show();
+    drawVirtualListBindingUI(virtualList).show();
 
     return app.exec();
 }

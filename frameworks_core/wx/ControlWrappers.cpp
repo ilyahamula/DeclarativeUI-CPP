@@ -1,6 +1,7 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/wx/DialogKeys.hpp"
 #include "frameworks_core/wx/SpinnerPanel.hpp"
+#include "frameworks_core/wx/VirtualListCtrl.hpp"
 #ifdef __WXOSX__
 #include "frameworks_core/wx/OsxSliderTicks.hpp"
 #endif
@@ -1394,6 +1395,92 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// VirtualListWrapper -----------------------------------------------------------
+
+void VirtualListWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("VirtualListWrapper::realize()\t-> new wxListCtrl(wxLC_VIRTUAL)\n");
+#endif
+	auto* list = new VirtualListCtrl(static_cast<wxWindow*>(parentWindow), m_rowText,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+	list->SetItemCount(std::max(0, m_count.get()));
+	list->selectRow(m_value.get());
+	m_nativeWidget = list;
+
+	// No row is measured (that is the point), so the size is the shared width
+	// and visibleRows of the control's own row height. A real row's rect when
+	// there is one, else the font plus the generic control's row padding.
+	constexpr int kListFrame = 6;
+	wxRect row;
+	const int rowHeight = list->GetItemCount() > 0 && list->GetItemRect(0, row)
+		? row.height
+		: list->GetCharHeight() + 6;
+	m_initialSize = Size { kDefaultVirtualListWidth, rowHeight * m_visibleRows + kListFrame };
+
+	// The generic control reports a programmatic selection like a click, so
+	// every push below holds this guard. A deselect is checked after the
+	// event settles: MSW deselects the old row before selecting the new one,
+	// and only a click on empty space leaves nothing selected.
+	auto syncing = std::make_shared<bool>(false);
+	auto commit = std::make_shared<ValueCommit<int, EventCallback<int>>>(
+		commitTo(m_value, std::move(m_onChange), m_nativeWidget));
+	list->Bind(wxEVT_LIST_ITEM_SELECTED, [syncing, commit](wxListEvent& evt) {
+		evt.Skip();
+		if (!*syncing)
+			(*commit)(static_cast<int>(evt.GetIndex()));
+	});
+	list->Bind(wxEVT_LIST_ITEM_DESELECTED, [list, syncing, commit](wxListEvent& evt) {
+		evt.Skip();
+		if (*syncing)
+			return;
+		list->CallAfter([list, commit] {
+			if (list->selectedRow() < 0)
+				(*commit)(-1);
+		});
+	});
+
+	// The count first, so a selection pushed in the same tick finds its row.
+	if (const int* count = m_count.boundValue())
+	{
+		bindExternalRefSync(list,
+			[list] { return static_cast<int>(list->GetItemCount()); },
+			[count] { return std::max(0, *count); },
+			[list](int n) {
+				list->SetItemCount(n);
+				list->Refresh();
+			});
+	}
+	if (const int* revision = m_revision.boundValue())
+	{
+		auto shown = std::make_shared<int>(*revision);
+		bindExternalRefSync(list,
+			[shown] { return *shown; },
+			[revision] { return *revision; },
+			[list, shown](int next) {
+				*shown = next;
+				if (list->GetItemCount() > 0)
+					list->RefreshItems(0, list->GetItemCount() - 1);
+			});
+	}
+	if (const int* selected = m_value.boundValue())
+	{
+		bindExternalRefSync(list,
+			[list] { return list->selectedRow(); },
+			[selected] { return *selected; },
+			[list, syncing](int row) {
+				*syncing = true;
+				list->selectRow(row);
+				*syncing = false;
+			});
+	}
+}
+
+Size VirtualListWrapper::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize;
+}
 
 // CalendarWrapper -----------------------------------------------------------
 

@@ -957,6 +957,56 @@ TEST(imgui_calendar_picks_by_the_first_day_of_the_week)
 	frames(2);
 }
 
+// VirtualList: a million rows cost only the visible ones; a click selects;
+// a selection written from outside asks for (and scrolls to) its row; the
+// count grows live.
+TEST(imgui_virtual_list_asks_only_for_visible_rows)
+{
+	int count = 1000000;
+	int selected = -1;
+	int reported = -2;
+	int calls = 0;
+	int lastAsked = -1;
+	const auto rowText = [&](int i) {
+		++calls;
+		lastAsked = std::max(lastAsked, i);
+		return "Row " + std::to_string(i);
+	};
+	g_ui = [&] {
+		Dialog { "Big",
+			VStack {
+				VirtualList{ count, rowText, selected }
+					.withVisibleRows(8)
+					.onChange([&](int row) { reported = row; })
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(3);
+	calls = 0;
+	frames(1);
+	CHECK(calls > 0);
+	CHECK(calls < 40); // one frame: the visible rows, not a million
+
+	const ImGuiWindow* w = ImGui::FindWindowByName("Big");
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float rowY = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y + st.FramePadding.y
+		+ ImGui::GetTextLineHeightWithSpacing() * 2.5f;
+	click(w->Pos.x + st.WindowPadding.x + 30.0f, rowY);
+	CHECK_EQ(selected, 2);
+	CHECK_EQ(reported, 2);
+
+	lastAsked = -1;
+	selected = 500000;
+	frames(3);
+	CHECK(lastAsked >= 500000); // the far row was drawn to be revealed
+
+	count = 1000005;
+	frames(2);
+	CHECK_EQ(selected, 500000);
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

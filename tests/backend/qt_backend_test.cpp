@@ -27,6 +27,7 @@
 #include <QTabWidget>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QListView>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QPlainTextEdit>
@@ -1033,6 +1034,60 @@ TEST(qt_calendar_binds_and_honours_the_first_day)
 	due = Date { 2027, 1, 2 };
 	pump(200);
 	CHECK(calendars[0]->selectedDate() == QDate(2027, 1, 2));
+	w->close();
+	pump();
+}
+
+// VirtualList: a QListView over a model that owns no rows. A million rows,
+// and only a handful asked for; the selection binds both ways (and survives a
+// count change, which resets the model); a revision asks the rows again.
+TEST(qt_virtual_list_asks_only_for_visible_rows)
+{
+	int count = 1000000;
+	int selected = 3;
+	int revision = 0;
+	int reported = -2;
+	int calls = 0;
+	std::string prefix = "Row ";
+	Dialog { "Big",
+		VStack {
+			VirtualList{ count, [&](int i) { ++calls; return prefix + std::to_string(i); }, selected }
+				.withVisibleRows(8)
+				.withRevision(revision)
+				.onChange([&](int row) { reported = row; })
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Big");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* view = w->findChild<QListView*>();
+	CHECK(view != nullptr);
+	if (view == nullptr)
+		return;
+	CHECK_EQ(view->model()->rowCount(), 1000000);
+	CHECK(calls < 2000); // the visible rows (and a few repaints), never a million
+	CHECK_EQ(view->selectionModel()->selectedRows().front().row(), 3);
+
+	view->selectionModel()->setCurrentIndex(view->model()->index(7, 0), QItemSelectionModel::ClearAndSelect);
+	pump();
+	CHECK_EQ(selected, 7);
+	CHECK_EQ(reported, 7);
+
+	selected = 900000;
+	pump(200);
+	CHECK_EQ(view->selectionModel()->selectedRows().front().row(), 900000);
+
+	count = 1000010;
+	pump(200);
+	CHECK_EQ(view->model()->rowCount(), 1000010);
+	CHECK_EQ(view->selectionModel()->selectedRows().front().row(), 900000);
+
+	prefix = "Item ";
+	++revision;
+	pump(200);
+	CHECK(view->model()->index(0, 0).data().toString().startsWith("Item "));
 	w->close();
 	pump();
 }

@@ -1188,6 +1188,84 @@ private:
 	EventCallback<const std::string&> m_onChange;
 };
 
+// VirtualList -----------------------------------------------------------
+// A list for large data. It holds no items: it asks `rowText(i)` for the rows
+// on screen only, so a million rows cost what the visible ones do:
+//
+//   VirtualList{ count, [&](int i) { return log[i].message; }, selectedRow }
+//       .withVisibleRows(10)
+//
+// Bind the count and the list grows and shrinks with it; when rows change
+// with the count unchanged, bump a bound revision counter (withRevision). The
+// selection is one row index, -1 for none. `rowText` is called from the UI
+// thread whenever a row is drawn, so it must stay valid -- and cheap -- for as
+// long as the window shows. It is sized like a ListBox: visibleRows tall, and
+// 200 px wide unless withSize() says otherwise (no row is ever measured).
+struct VirtualList : Widget<VirtualList>
+{
+	using super = Widget<VirtualList>;
+	using RowText = std::function<std::string(int)>;
+
+	static constexpr int kDefaultVisibleRows = 8;
+
+	VirtualList(const int& count, RowText rowText)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(-1) {}
+	VirtualList(int& count, RowText rowText)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(-1) {}
+	VirtualList(const int& count, RowText rowText, const int& selected)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(selected) {}
+	VirtualList(const int& count, RowText rowText, int& selected)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(selected) {}
+	VirtualList(int& count, RowText rowText, const int& selected)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(selected) {}
+	VirtualList(int& count, RowText rowText, int& selected)
+		: super(), m_count(count), m_rowText(std::move(rowText)), m_value(selected) {}
+
+	VirtualList& withVisibleRows(int rows)
+	{
+		m_visibleRows = rows > 0 ? rows : 1;
+		return *this;
+	}
+
+	// A counter the caller increments after changing rows in place (the count
+	// unchanged): the visible rows are asked for their text again.
+	VirtualList& withRevision(int& revision)
+	{
+		m_revision.bind(revision);
+		return *this;
+	}
+
+	VirtualList& onChange(std::function<void(int)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+	VirtualList& onChange(std::function<void(int, void*)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<VirtualListWrapper>(m_count, m_rowText, m_value, m_revision,
+			m_visibleRows, pos, size, style, m_onChange);
+	}
+
+private:
+	BoundValue<int> m_count;
+	RowText m_rowText;
+	BoundValue<int> m_value;
+	BoundValue<int> m_revision { 0 };
+	int m_visibleRows = kDefaultVisibleRows;
+	EventCallback<int> m_onChange;
+};
+
 // Calendar -----------------------------------------------------------
 // A month view for picking a day -- the large sibling of DatePicker:
 //

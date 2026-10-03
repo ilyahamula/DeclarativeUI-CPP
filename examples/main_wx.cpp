@@ -9,20 +9,20 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // Calendar: Monday-first and Sunday-first side by side, and one date
-    // shared by a calendar and a DatePicker.
-    Date m_isoDate = todayDate();
-    Date m_usDate = todayDate();
-    std::string m_calendarStatus = "Pick a day";
-    Date m_sharedDate = todayDate();
-    bool m_calendarDisabled = false;
+    // VirtualList: a million generated log lines beside a ListBox, and a
+    // list whose row, count and revision are caller-owned.
+    int m_logCount = 1000000;
+    int m_logRow = -1;
+    std::string m_languagePick = "C++";
+    std::string m_listStatus = "Pick a log line";
+    DemoVirtualList m_virtualList;
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawCalendarGalleryUI(m_isoDate, m_usDate, m_calendarStatus).show();
-        drawCalendarBindingUI(m_sharedDate, m_calendarDisabled).show();
+        drawVirtualListGalleryUI(m_logCount, m_logRow, m_languagePick, m_listStatus).show();
+        drawVirtualListBindingUI(m_virtualList).show();
         return true;
     }
 };

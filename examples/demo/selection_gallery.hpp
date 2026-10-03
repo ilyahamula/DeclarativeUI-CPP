@@ -173,3 +173,40 @@ inline auto drawEditableComboGalleryUI(std::string& font, std::string& city, std
         }
     };
 }
+
+// VirtualList beside the ListBox it scales past: the ListBox holds its six
+// items, the VirtualList a million log lines it never stores -- each row is
+// produced by the function when it scrolls into view. Its selection is
+// reported into the label underneath.
+inline auto drawVirtualListGalleryUI(int& logCount, int& logRow, std::string& languagePick,
+    std::string& status)
+{
+    return Dialog {
+        "Large lists",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                VStack {
+                    StaticText{"ListBox (6 items)"}.withSize({160, 20}),
+                    ListBox<std::string>{ {"C++", "Rust", "Python", "Go", "Zig", "Ada"}, languagePick }
+                        .withVisibleRows(10)
+                        .withSize({160, -1})
+                },
+                VStack {
+                    LayoutFlags().Border(Side::Left, 16),
+                    StaticText{"VirtualList (1,000,000 rows)"}.withSize({300, 20}),
+                    VirtualList{ logCount,
+                        [](int i) { return "#" + std::to_string(i) + "  request served in " + std::to_string(i % 97 + 3) + " ms"; },
+                        logRow }
+                        .withVisibleRows(10)
+                        .withSize({300, -1})
+                        .withTooltip("Rows are produced on demand; nothing is stored")
+                        .onChange([&status](int row) { status = "Selected log line " + std::to_string(row); })
+                }
+            },
+            StaticText{status}
+                .withSize({476, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

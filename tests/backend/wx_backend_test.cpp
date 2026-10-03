@@ -7,6 +7,7 @@
 
 #include "declarative_ui.hpp"
 #include "frameworks_core/wx/SpinnerPanel.hpp"
+#include "frameworks_core/wx/VirtualListCtrl.hpp"
 
 #include <wx/combobox.h>
 #include <wx/listbox.h>
@@ -1128,6 +1129,54 @@ TEST(wx_calendar_binds_and_honours_the_first_day)
 	due = Date { 2027, 1, 2 };
 	pump();
 	CHECK(monday->GetDate() == wxDateTime(2, wxDateTime::Jan, 2027));
+	w->Close();
+	pump();
+}
+
+// VirtualList: a wxLC_VIRTUAL wxListCtrl. A million rows, and only the ones
+// drawn asked for; the selection binds both ways; the count grows live.
+TEST(wx_virtual_list_asks_only_for_visible_rows)
+{
+	int count = 1000000;
+	int selected = 3;
+	int reported = -2;
+	int calls = 0;
+	Dialog { "Big",
+		VStack {
+			VirtualList{ count, [&](int i) { ++calls; return "Row " + std::to_string(i); }, selected }
+				.withVisibleRows(8)
+				.onChange([&](int row) { reported = row; })
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Big");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* list = find<VirtualListCtrl>(w, [](VirtualListCtrl*) { return true; });
+	CHECK(list != nullptr);
+	if (list == nullptr)
+		return;
+	CHECK_EQ(static_cast<int>(list->GetItemCount()), 1000000);
+	CHECK(calls < 2000);
+	CHECK_EQ(list->selectedRow(), 3);
+
+	list->SetItemState(7, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED); // like a click
+	wxListEvent picked(wxEVT_LIST_ITEM_SELECTED, list->GetId());
+	picked.SetEventObject(list);
+	picked.m_itemIndex = 7;
+	list->ProcessWindowEvent(picked);
+	pump();
+	CHECK_EQ(selected, 7);
+	CHECK_EQ(reported, 7);
+
+	selected = 900000;
+	pump();
+	CHECK_EQ(list->selectedRow(), 900000);
+
+	count = 1000010;
+	pump();
+	CHECK_EQ(static_cast<int>(list->GetItemCount()), 1000010);
 	w->Close();
 	pump();
 }

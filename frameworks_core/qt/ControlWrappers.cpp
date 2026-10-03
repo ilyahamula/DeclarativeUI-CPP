@@ -1,6 +1,7 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/qt/DialogKeys.hpp"
 #include "frameworks_core/qt/SpinnerView.hpp"
+#include "frameworks_core/qt/VirtualListView.hpp"
 #include "frameworks_core/qt/TextField.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
@@ -1231,6 +1232,102 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// VirtualListWrapper -----------------------------------------------------------
+
+namespace
+{
+
+int virtualListSelection(const QListView* view)
+{
+	const QModelIndexList rows = view->selectionModel()->selectedRows();
+	return rows.isEmpty() ? -1 : rows.front().row();
+}
+
+void selectVirtualRow(QListView* view, int row)
+{
+	QAbstractItemModel* model = view->model();
+	if (row < 0 || row >= model->rowCount())
+	{
+		view->selectionModel()->clearSelection();
+		return;
+	}
+	const QModelIndex index = model->index(row, 0);
+	view->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+	view->scrollTo(index);
+}
+
+} // unnamed namespace
+
+void VirtualListWrapper::realize(void* parentWindow)
+{
+	auto* view = new QListView(static_cast<QWidget*>(parentWindow));
+	auto* model = new VirtualListModel(m_rowText, std::max(0, m_count.get()), view);
+	view->setModel(model);
+	view->setUniformItemSizes(true);
+	view->setSelectionMode(QAbstractItemView::SingleSelection);
+	view->setEditTriggers(QAbstractItemView::NoEditTriggers);
+	selectVirtualRow(view, m_value.get());
+	m_nativeWidget = view;
+
+	// No row is measured beyond the first (that is the point): the shared
+	// width, and visibleRows of the view's own row height.
+	const int rowHeight = model->count() > 0 ? view->sizeHintForRow(0) : view->fontMetrics().height() + 4;
+	m_initialSize = Size { kDefaultVirtualListWidth, rowHeight * m_visibleRows + view->frameWidth() * 2 };
+
+	// The selection model emits, not the view, so RefSync's QSignalBlocker on
+	// the view does not cover it: a model reset and a pushed selection hold
+	// this guard instead.
+	auto syncing = std::make_shared<bool>(false);
+	QObject::connect(view->selectionModel(), &QItemSelectionModel::selectionChanged, view,
+		[view, syncing, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)] {
+			if (!*syncing)
+				commit(virtualListSelection(view));
+		});
+
+	// The count first, so a selection pushed in the same tick finds its row;
+	// a reset drops the selection, so it is put back.
+	if (const int* count = m_count.boundValue())
+	{
+		bindExternalRefSync(view,
+			[model] { return model->count(); },
+			[count] { return std::max(0, *count); },
+			[view, model, syncing](int n) {
+				const int keep = virtualListSelection(view);
+				*syncing = true;
+				model->setCount(n);
+				selectVirtualRow(view, keep);
+				*syncing = false;
+			});
+	}
+	if (const int* revision = m_revision.boundValue())
+	{
+		auto shown = std::make_shared<int>(*revision);
+		bindExternalRefSync(view,
+			[shown] { return *shown; },
+			[revision] { return *revision; },
+			[model, shown](int next) {
+				*shown = next;
+				model->refresh();
+			});
+	}
+	if (const int* selected = m_value.boundValue())
+	{
+		bindExternalRefSync(view,
+			[view] { return virtualListSelection(view); },
+			[selected] { return *selected; },
+			[view, syncing](int row) {
+				*syncing = true;
+				selectVirtualRow(view, row);
+				*syncing = false;
+			});
+	}
+}
+
+Size VirtualListWrapper::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize;
+}
 
 // CalendarWrapper -----------------------------------------------------------
 

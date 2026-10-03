@@ -1952,3 +1952,59 @@ inline auto drawCalendarBindingUI(Date& date, bool& disabled)
         }
     };
 }
+
+// VirtualList over caller-owned state: the selected row is one int shared with
+// a SpinBox (type a row number and the list scrolls to it), the count is bound
+// ("Add 1000 rows" grows the list live), and "Shout" changes every row's text
+// in place and bumps the revision so the visible rows are asked again. A bool
+// disables the list and its controls.
+struct DemoVirtualList
+{
+    int count = 50000;
+    int selected = 0;
+    int revision = 0;
+    bool shout = false;
+    bool disabled = false;
+};
+
+inline auto drawVirtualListBindingUI(DemoVirtualList& s)
+{
+    return Dialog {
+        "VirtualList + SpinBox (shared row)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            VirtualList{ s.count,
+                [&s](int i) {
+                    const std::string text = "Customer " + std::to_string(i);
+                    return s.shout ? text + "!!!" : text;
+                },
+                s.selected }
+                .withVisibleRows(8)
+                .withRevision(s.revision)
+                .withSize({260, -1})
+                .isDisabled(s.disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                StaticText{"Row"}.withSize({40, 20}).withFlags(LayoutFlags().CenterVertical()),
+                SpinBox{ Range<int>{ .min = -1, .max = 10000000 }, s.selected }
+                    .withSize({120, -1})
+                    .isDisabled(s.disabled)
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Button{"Add 1000 rows"}
+                    .isDisabled(s.disabled)
+                    .onClick([&s] { s.count += 1000; }),
+                Button{"Shout"}
+                    .isDisabled(s.disabled)
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&s] {
+                        s.shout = !s.shout;
+                        ++s.revision; // same count, new text: ask the rows again
+                    }),
+                CheckBox{s.disabled, "Disable"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 10).CenterVertical())
+            }
+        }
+    };
+}

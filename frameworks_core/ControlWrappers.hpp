@@ -1011,6 +1011,51 @@ private:
 	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
 };
 
+// VirtualListWrapper -----------------------------------------------------------
+// A list that holds NO items: a row count and a function producing a row's
+// text on demand, so a million rows cost what the visible ones do. wx: a
+// wxLC_VIRTUAL report wxListCtrl asking OnGetItemText; Qt: a QListView over a
+// model that asks the function in data(), uniform row heights; ImGui: a list
+// box walked through ImGuiListClipper. The count is bound (it grows and the
+// list follows); `revision` is an optional bound counter the caller bumps when
+// rows CHANGED without the count changing. The selection is one row index, -1
+// for none.
+//
+// Width cannot come from the content -- measuring every row is exactly what a
+// virtual list exists to avoid -- so it measures kDefaultVirtualListWidth wide
+// (withSize changes it) and visibleRows tall on every backend.
+inline constexpr int kDefaultVirtualListWidth = 200;
+
+class VirtualListWrapper : public ControlWrapper
+{
+public:
+	VirtualListWrapper(BoundValue<int> count, std::function<std::string(int)> rowText,
+		BoundValue<int> selected, BoundValue<int> revision, int visibleRows,
+		const Position& pos, const Size& size, long style,
+		EventCallback<int> onChange = {})
+		: ControlWrapper(pos, size, style)
+		, m_count(std::move(count))
+		, m_rowText(std::move(rowText))
+		, m_value(std::move(selected))
+		, m_revision(std::move(revision))
+		, m_visibleRows(visibleRows)
+		, m_onChange(std::move(onChange))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
+
+private:
+	BoundValue<int> m_count;
+	std::function<std::string(int)> m_rowText;
+	BoundValue<int> m_value;
+	BoundValue<int> m_revision;
+	int m_visibleRows;
+	EventCallback<int> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt: measured once at realize()
+};
+
 // CalendarWrapper -----------------------------------------------------------
 // A month view; the value is the selected Date. Native on wx (wxCalendarCtrl:
 // GTK and MSW native, the generic control on macOS) and Qt (QCalendarWidget,

@@ -19,18 +19,18 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // Calendar: Monday-first and Sunday-first side by side, and one date
-    // shared by a calendar and a DatePicker.
-    Date isoDate = todayDate();
-    Date usDate = todayDate();
-    std::string calendarStatus = "Pick a day";
-    Date sharedDate = todayDate();
-    bool calendarDisabled = false;
+    // VirtualList: a million generated log lines beside a ListBox, and a
+    // list whose row, count and revision are caller-owned.
+    int logCount = 1000000;
+    int logRow = -1;
+    std::string languagePick = "C++";
+    std::string listStatus = "Pick a log line";
+    DemoVirtualList virtualList;
 
     runImGuiApp([&]
     {
-        drawCalendarGalleryUI(isoDate, usDate, calendarStatus).show();
-        drawCalendarBindingUI(sharedDate, calendarDisabled).show();
+        drawVirtualListGalleryUI(logCount, logRow, languagePick, listStatus).show();
+        drawVirtualListBindingUI(virtualList).show();
     });
 
     return 0;

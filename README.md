@@ -69,7 +69,7 @@ return Dialog {
 | Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl`, `SearchField` (`.onSearch()`) |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` (list only), `EditableCombo` (free text + suggestions) |
-| Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
+| Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `VirtualList` (rows on demand, millions), `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` (`.withOrientation()`, `.withTicks()`) |
 | Pickers           | `DatePicker`, `Calendar` (month view, Monday- or Sunday-first), `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar` (value or `.Indeterminate()`), `Spinner` (`.withImage()` turns a logo), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |

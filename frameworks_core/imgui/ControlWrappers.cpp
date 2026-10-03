@@ -1131,6 +1131,75 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// VirtualListWrapper -----------------------------------------------------------
+// A list box walked through ImGuiListClipper, so only the rows on screen call
+// rowText. The count and a revision need no sync here -- the tree is rebuilt
+// every frame from the caller's live values. What does need a home outside
+// the frame is the last selection seen, so a selection changed from OUTSIDE
+// scrolls its row into view (what wx's EnsureVisible and Qt's scrollTo do),
+// while a click never jerks the list.
+
+namespace
+{
+
+std::unordered_map<std::uint64_t, int>& virtualListLastSelection()
+{
+	static std::unordered_map<std::uint64_t, int> last;
+	return last;
+}
+
+} // unnamed namespace
+
+Size VirtualListWrapper::measureIntrinsic(const Constraints&)
+{
+	// ListBox's shape: visibleRows of text lines plus frame padding.
+	const float h = ImGui::GetTextLineHeightWithSpacing() * (float)m_visibleRows
+		+ ImGui::GetStyle().FramePadding.y * 2.0f;
+	return Size { kDefaultVirtualListWidth, ceilInt(h) };
+}
+
+void VirtualListWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<int> snapshot(m_value, m_stableId);
+	int& selected = m_value.get();
+	const int count = std::max(0, m_count.get());
+	const Size natural = measureIntrinsic({});
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2((float)natural.width, (float)natural.height);
+
+	auto& lastSeen = virtualListLastSelection()[snapshot.slotKey(1)];
+	const bool reveal = selected != lastSeen && selected >= 0 && selected < count;
+
+	snapshot.pushId();
+	if (ImGui::BeginListBox("##vlist", box))
+	{
+		ImGuiListClipper clipper;
+		clipper.Begin(count);
+		if (reveal)
+			clipper.IncludeItemByIndex(selected);
+		while (clipper.Step())
+		{
+			for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+			{
+				ImGui::PushID(row);
+				const std::string text = m_rowText ? m_rowText(row) : std::string();
+				if (ImGui::Selectable(text.c_str(), row == selected))
+				{
+					selected = row;
+					m_onChange(row, m_nativeWidget);
+				}
+				if (reveal && row == selected)
+					ImGui::SetScrollHereY();
+				ImGui::PopID();
+			}
+		}
+		ImGui::EndListBox();
+	}
+	ImGui::PopID();
+	lastSeen = selected;
+}
+
 // CalendarWrapper -----------------------------------------------------------
 // Drawn from CoreTypes/Calendar.hpp: a header (arrows and "Month Year"), a
 // weekday row, and six rows of seven day buttons; days of the neighbouring

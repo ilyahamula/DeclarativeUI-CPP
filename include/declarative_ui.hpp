@@ -203,6 +203,11 @@ concept Hideable = requires(T element, bool& flag) {
 static_assert(Hideable<Button>);
 static_assert(Hideable<StaticText>);
 static_assert(Hideable<SearchField>);
+// VirtualList: rows on demand; count and selection follow the binding pair.
+static_assert(NodeBuildable<VirtualList>);
+static_assert(Hideable<VirtualList>);
+static_assert(std::is_constructible_v<VirtualList, int&, VirtualList::RowText, int&>);
+static_assert(std::is_constructible_v<VirtualList, const int&, VirtualList::RowText>);
 // Calendar: a month view on the usual Date binding pair.
 static_assert(NodeBuildable<Calendar>);
 static_assert(Hideable<Calendar>);
