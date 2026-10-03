@@ -203,6 +203,12 @@ concept Hideable = requires(T element, bool& flag) {
 static_assert(Hideable<Button>);
 static_assert(Hideable<StaticText>);
 static_assert(Hideable<SearchField>);
+// Calendar: a month view on the usual Date binding pair.
+static_assert(NodeBuildable<Calendar>);
+static_assert(Hideable<Calendar>);
+static_assert(std::is_constructible_v<Calendar, Date&>);
+static_assert(std::is_constructible_v<Calendar, const Date&>);
+static_assert(std::is_default_constructible_v<Calendar>);
 // Spinner: a leaf with no value; its running flag binds.
 static_assert(NodeBuildable<Spinner>);
 static_assert(Hideable<Spinner>);

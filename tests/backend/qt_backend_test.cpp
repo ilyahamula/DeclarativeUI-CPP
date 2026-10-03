@@ -15,6 +15,7 @@
 #include <vector>
 #include <QElapsedTimer>
 #include <QCheckBox>
+#include <QCalendarWidget>
 #include <QComboBox>
 #include <QListWidget>
 #include <QFrame>
@@ -992,6 +993,46 @@ TEST(qt_spinner_runs_with_its_flag)
 	busy = true;
 	pump(200);
 	CHECK(views[0]->timerActive());
+	w->close();
+	pump();
+}
+
+// Calendar: a QCalendarWidget told the first day of the week, week numbers
+// off; a pick writes the bound date, an outside write moves the selection.
+TEST(qt_calendar_binds_and_honours_the_first_day)
+{
+	Date due { 2026, 10, 3 };
+	Date us { 2026, 10, 3 };
+	Date reported {};
+	Dialog { "Cal",
+		HStack {
+			Calendar{due}.onChange([&](const Date& d) { reported = d; }),
+			Calendar{us}.withFirstDayOfWeek(FirstDayOfWeek::Sunday)
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Cal");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto calendars = w->findChildren<QCalendarWidget*>();
+	CHECK_EQ(calendars.size(), 2);
+	if (calendars.size() != 2)
+		return;
+	std::sort(calendars.begin(), calendars.end(), [](QWidget* a, QWidget* b) { return a->x() < b->x(); });
+	CHECK(calendars[0]->firstDayOfWeek() == Qt::Monday);
+	CHECK(calendars[1]->firstDayOfWeek() == Qt::Sunday);
+	CHECK(calendars[0]->verticalHeaderFormat() == QCalendarWidget::NoVerticalHeader);
+	CHECK(calendars[0]->selectedDate() == QDate(2026, 10, 3));
+
+	calendars[0]->setSelectedDate(QDate(2026, 10, 15)); // like a click
+	pump();
+	CHECK(due == (Date { 2026, 10, 15 }));
+	CHECK(reported == (Date { 2026, 10, 15 }));
+
+	due = Date { 2027, 1, 2 };
+	pump(200);
+	CHECK(calendars[0]->selectedDate() == QDate(2027, 1, 2));
 	w->close();
 	pump();
 }

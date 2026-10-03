@@ -20,6 +20,7 @@
 #include <wx/wx.h>
 #include <wx/hyperlink.h>
 #include <wx/activityindicator.h>
+#include <wx/calctrl.h>
 #include <wx/srchctrl.h>
 #include <wx/spinctrl.h>
 #include <wx/datectrl.h>
@@ -1393,6 +1394,61 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// CalendarWrapper -----------------------------------------------------------
+
+namespace
+{
+
+wxDateTime toWxDate(const Date& date)
+{
+	return wxDateTime(static_cast<wxDateTime::wxDateTime_t>(date.day),
+		static_cast<wxDateTime::Month>(date.month - 1), date.year);
+}
+
+Date fromWxDate(const wxDateTime& date)
+{
+	return Date { date.GetYear(), static_cast<int>(date.GetMonth()) + 1, static_cast<int>(date.GetDay()) };
+}
+
+} // unnamed namespace
+
+void CalendarWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("CalendarWrapper::realize()\t-> new wxCalendarCtrl()\n");
+#endif
+	// The first day is a style bit, read by MSW and the generic control (macOS);
+	// wxGTK's native calendar follows the system locale and ignores it. The
+	// surrounding weeks show greyed, as QCalendarWidget always shows them.
+	const long firstDay = m_firstDay == FirstDayOfWeek::Sunday ? wxCAL_SUNDAY_FIRST : wxCAL_MONDAY_FIRST;
+	auto* calendar = new wxCalendarCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, toWxDate(m_value.get()),
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		m_style | firstDay | wxCAL_SHOW_SURROUNDING_WEEKS);
+	m_nativeWidget = calendar;
+
+	// Some ports report a programmatic SetDate as a selection, so the RefSync
+	// push holds a guard the handler checks -- the TreeView/Table move.
+	auto syncing = std::make_shared<bool>(false);
+	calendar->Bind(wxEVT_CALENDAR_SEL_CHANGED, [calendar, syncing,
+		commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCalendarEvent& evt) {
+		evt.Skip();
+		if (!*syncing)
+			commit(fromWxDate(calendar->GetDate()));
+	});
+	if (m_value.isBound())
+	{
+		const Date& value = m_value.get();
+		bindExternalRefSync(calendar,
+			[calendar] { return fromWxDate(calendar->GetDate()); },
+			[&value] { return value; },
+			[calendar, syncing](const Date& date) {
+				*syncing = true;
+				calendar->SetDate(toWxDate(date));
+				*syncing = false;
+			});
+	}
+}
 
 // SpinnerWrapper -----------------------------------------------------------
 

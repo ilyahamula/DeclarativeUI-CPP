@@ -19,15 +19,18 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // Spinner: the gallery (default, sized, logo, stopped) and a running
-    // flag shared by two spinners, a CheckBox and a ToggleButton.
-    bool spinnerBusy = true;
-    std::string spinnerStatus = "Working...";
+    // Calendar: Monday-first and Sunday-first side by side, and one date
+    // shared by a calendar and a DatePicker.
+    Date isoDate = todayDate();
+    Date usDate = todayDate();
+    std::string calendarStatus = "Pick a day";
+    Date sharedDate = todayDate();
+    bool calendarDisabled = false;
 
     runImGuiApp([&]
     {
-        drawSpinnerGalleryUI().show();
-        drawSpinnerBindingUI(spinnerBusy, spinnerStatus).show();
+        drawCalendarGalleryUI(isoDate, usDate, calendarStatus).show();
+        drawCalendarBindingUI(sharedDate, calendarDisabled).show();
     });
 
     return 0;

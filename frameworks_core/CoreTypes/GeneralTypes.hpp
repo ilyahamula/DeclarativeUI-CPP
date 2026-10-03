@@ -117,6 +117,8 @@ struct Date
 	int year  = 2000;
 	int month = 1;    // 1-12
 	int day   = 1;    // 1-31
+
+	bool operator==(const Date&) const = default;
 };
 
 // Days in `month` (1-12) of `year`, Gregorian. What a date field clamps its day

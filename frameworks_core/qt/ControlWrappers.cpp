@@ -12,6 +12,7 @@
 #endif
 
 #include <QAction>
+#include <QCalendarWidget>
 #include <QIcon>
 #include <QPen>
 #include <QKeyEvent>
@@ -1230,6 +1231,36 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// CalendarWrapper -----------------------------------------------------------
+
+void CalendarWrapper::realize(void* parentWindow)
+{
+	auto* calendar = new QCalendarWidget(static_cast<QWidget*>(parentWindow));
+	calendar->setFirstDayOfWeek(m_firstDay == FirstDayOfWeek::Sunday ? Qt::Sunday : Qt::Monday);
+	// ISO week numbers are on by default here and nowhere else.
+	calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
+	const Date& initial = m_value.get();
+	calendar->setSelectedDate(QDate(initial.year, initial.month, initial.day));
+	m_nativeWidget = calendar;
+
+	const auto current = [calendar] {
+		const QDate date = calendar->selectedDate();
+		return Date { date.year(), date.month(), date.day() };
+	};
+	// Connected after the initial selection; the RefSync push runs under a
+	// QSignalBlocker, so a programmatic date never reads as a pick.
+	QObject::connect(calendar, &QCalendarWidget::selectionChanged,
+		[current, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)] { commit(current()); });
+	if (m_value.isBound())
+	{
+		const Date& value = m_value.get();
+		bindExternalRefSync(calendar,
+			current,
+			[&value] { return value; },
+			[calendar](const Date& date) { calendar->setSelectedDate(QDate(date.year, date.month, date.day)); });
+	}
+}
 
 // SpinnerWrapper -----------------------------------------------------------
 

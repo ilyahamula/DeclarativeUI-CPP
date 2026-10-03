@@ -901,6 +901,62 @@ TEST(imgui_measure_state_is_per_window)
 	frames(2);
 }
 
+// Calendar: the drawn month grid. The same cell is a different day for a
+// Monday-first and a Sunday-first week (October 2026 starts on a Thursday),
+// a pick writes the bound date and reports it, the arrow moves the month on
+// show without touching the date, and an outside write brings its month back.
+namespace
+{
+ImVec2 calendarCellCentre(const char* window, int index)
+{
+	const ImGuiWindow* w = ImGui::FindWindowByName(window);
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const ImVec2 origin(w->Pos.x + st.WindowPadding.x, w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y);
+	const float cellW = std::max(ImGui::CalcTextSize("00").x, ImGui::CalcTextSize("We").x) + st.FramePadding.x * 2.0f + 2.0f;
+	const float cellH = ImGui::GetFrameHeight();
+	const float gridTop = ImGui::GetFrameHeight() + 4.0f + ImGui::GetTextLineHeight() + 4.0f;
+	return ImVec2(origin.x + (index % 7) * (cellW + 2.0f) + cellW * 0.5f,
+		origin.y + gridTop + (index / 7) * (cellH + 2.0f) + cellH * 0.5f);
+}
+} // namespace
+
+TEST(imgui_calendar_picks_by_the_first_day_of_the_week)
+{
+	Date monday { 2026, 10, 3 };
+	Date sunday { 2026, 10, 3 };
+	Date reported {};
+	g_ui = [&] {
+		Dialog { "CalMon", VStack { Calendar{monday}.onChange([&](const Date& d) { reported = d; }) } }
+			.setPosition({0, 0}).show();
+		Dialog { "CalSun", VStack { Calendar{sunday}.withFirstDayOfWeek(FirstDayOfWeek::Sunday) } }
+			.setPosition({400, 0}).show();
+	};
+	frames(4);
+	const ImVec2 mon = calendarCellCentre("CalMon", 17);
+	click(mon.x, mon.y);
+	CHECK(monday == (Date { 2026, 10, 15 }));
+	CHECK(reported == (Date { 2026, 10, 15 }));
+	const ImVec2 sun = calendarCellCentre("CalSun", 17);
+	click(sun.x, sun.y);
+	CHECK(sunday == (Date { 2026, 10, 14 }));
+
+	// the next-month arrow: the right end of the header row
+	const ImGuiWindow* w = ImGui::FindWindowByName("CalMon");
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float headerY = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y + ImGui::GetFrameHeight() * 0.5f;
+	click(w->Pos.x + st.WindowPadding.x + (float)w->ContentSize.x - ImGui::GetFrameHeight() * 0.5f, headerY);
+	CHECK(monday == (Date { 2026, 10, 15 })); // navigating is not picking
+	click(mon.x, mon.y);                       // November 2026 starts on a Sunday: index 17 is the 12th
+	CHECK(monday == (Date { 2026, 11, 12 }));
+
+	monday = Date { 2026, 10, 3 };             // from outside: October comes back
+	frames(2);
+	click(mon.x, mon.y);
+	CHECK(monday == (Date { 2026, 10, 15 }));
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

@@ -1188,6 +1188,70 @@ private:
 	EventCallback<const std::string&> m_onChange;
 };
 
+// Calendar -----------------------------------------------------------
+// A month view for picking a day -- the large sibling of DatePicker:
+//
+//   Calendar{ due }.withFirstDayOfWeek(FirstDayOfWeek::Sunday)   // US style
+//
+// The date follows the usual binding pair; with none given it opens on today.
+// The week starts on Monday unless told otherwise (wxGTK always follows the
+// system locale -- its native calendar has no setting). Navigating months
+// changes only what is shown; a pick writes the date and reports it.
+struct Calendar : Widget<Calendar>
+{
+	using super = Widget<Calendar>;
+
+	Calendar()
+		: super()
+		, m_value(todayDate())
+	{
+	}
+
+	explicit Calendar(const Date& date)
+		: super()
+		, m_value(date)
+	{
+	}
+
+	explicit Calendar(Date& date)
+		: super()
+		, m_value(date)
+	{
+	}
+
+	Calendar& withFirstDayOfWeek(FirstDayOfWeek first)
+	{
+		m_firstDay = first;
+		return *this;
+	}
+
+	Calendar& onChange(std::function<void(const Date&)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+	Calendar& onChange(std::function<void(const Date&, void*)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<CalendarWrapper>(m_value, m_firstDay, pos, size, style, m_onChange);
+	}
+
+private:
+	BoundValue<Date> m_value;
+	FirstDayOfWeek m_firstDay = FirstDayOfWeek::Monday;
+	EventCallback<const Date&> m_onChange;
+};
+
 // Spinner -----------------------------------------------------------
 // A busy indicator for work with no measurable progress -- the round sibling
 // of ProgressBar{}.Indeterminate():

@@ -2,6 +2,7 @@
 
 #include "ControlWrapper.hpp"
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
+#include "frameworks_core/CoreTypes/Calendar.hpp"
 #include "frameworks_core/CoreTypes/DialogKeys.hpp"
 #include "frameworks_core/CoreTypes/EventCallback.hpp"
 #include "frameworks_core/CoreTypes/Spinner.hpp"
@@ -1008,6 +1009,35 @@ private:
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
 	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
+};
+
+// CalendarWrapper -----------------------------------------------------------
+// A month view; the value is the selected Date. Native on wx (wxCalendarCtrl:
+// GTK and MSW native, the generic control on macOS) and Qt (QCalendarWidget,
+// week numbers off to match), drawn on ImGui from CoreTypes/Calendar.hpp. All
+// three are told the first day of the week -- except wxGTK, whose native
+// calendar follows the system locale and has no setting for it. Each measures
+// at its own natural size; the native calendars differ a lot, so a layout that
+// must match on every backend pins one with withSize().
+class CalendarWrapper : public ControlWrapper
+{
+public:
+	CalendarWrapper(BoundValue<Date> value, FirstDayOfWeek firstDay,
+		const Position& pos, const Size& size, long style,
+		EventCallback<const Date&> onChange = {})
+		: ControlWrapper(pos, size, style)
+		, m_value(std::move(value))
+		, m_firstDay(firstDay)
+		, m_onChange(std::move(onChange))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	BoundValue<Date> m_value;
+	FirstDayOfWeek m_firstDay;
+	EventCallback<const Date&> m_onChange;
 };
 
 // SpinnerWrapper -----------------------------------------------------------

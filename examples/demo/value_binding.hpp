@@ -1910,3 +1910,45 @@ inline auto drawSpinnerBindingUI(bool& busy, std::string& status)
         }
     };
 }
+
+// Calendar + DatePicker over one Date: picking a day in either moves the
+// other, "Today" and "Next week" write it from outside (the calendar brings
+// that month back into view), and a bool disables both.
+inline void addDays(Date& date, int days)
+{
+    date.day += days;
+    while (date.day > daysInMonth(date.year, date.month))
+    {
+        date.day -= daysInMonth(date.year, date.month);
+        if (++date.month > 12) { date.month = 1; ++date.year; }
+    }
+}
+
+inline auto drawCalendarBindingUI(Date& date, bool& disabled)
+{
+    return Dialog {
+        "Calendar + DatePicker (shared date)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            Calendar{date}
+                .withFirstDayOfWeek(FirstDayOfWeek::Sunday)
+                .isDisabled(disabled),
+            DatePicker{date}
+                .withSize({230, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                .isDisabled(disabled),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Button{"Today"}
+                    .isDisabled(disabled)
+                    .onClick([&date] { date = todayDate(); }),
+                Button{"Next week"}
+                    .isDisabled(disabled)
+                    .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    .onClick([&date] { addDays(date, 7); }),
+                CheckBox{disabled, "Disable"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 10).CenterVertical())
+            }
+        }
+    };
+}

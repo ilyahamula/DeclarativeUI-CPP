@@ -9,17 +9,20 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // Spinner: the gallery (default, sized, logo, stopped) and a running
-    // flag shared by two spinners, a CheckBox and a ToggleButton.
-    bool m_spinnerBusy = true;
-    std::string m_spinnerStatus = "Working...";
+    // Calendar: Monday-first and Sunday-first side by side, and one date
+    // shared by a calendar and a DatePicker.
+    Date m_isoDate = todayDate();
+    Date m_usDate = todayDate();
+    std::string m_calendarStatus = "Pick a day";
+    Date m_sharedDate = todayDate();
+    bool m_calendarDisabled = false;
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawSpinnerGalleryUI().show();
-        drawSpinnerBindingUI(m_spinnerBusy, m_spinnerStatus).show();
+        drawCalendarGalleryUI(m_isoDate, m_usDate, m_calendarStatus).show();
+        drawCalendarBindingUI(m_sharedDate, m_calendarDisabled).show();
         return true;
     }
 };

@@ -408,3 +408,38 @@ inline auto drawSpinnerGalleryUI()
         }
     };
 }
+
+// Calendar, in both week conventions side by side: Monday first (the default,
+// ISO 8601) and Sunday first (US). Each reports its pick into the status line.
+// On wxGTK both follow the system locale -- its native calendar has no
+// first-day setting.
+inline auto drawCalendarGalleryUI(Date& isoDate, Date& usDate, std::string& status)
+{
+    const auto text = [](const char* name, const Date& d) {
+        return std::string(name) + ": " + std::to_string(d.year) + "-" + std::to_string(d.month)
+            + "-" + std::to_string(d.day);
+    };
+    return Dialog {
+        "Calendars",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                VStack {
+                    StaticText{"Monday first (default)"}.withSize({220, 20}),
+                    Calendar{isoDate}
+                        .onChange([&status, text](const Date& d) { status = text("Monday-first", d); })
+                },
+                VStack {
+                    LayoutFlags().Border(Side::Left, 16),
+                    StaticText{"Sunday first (US)"}.withSize({220, 20}),
+                    Calendar{usDate}
+                        .withFirstDayOfWeek(FirstDayOfWeek::Sunday)
+                        .onChange([&status, text](const Date& d) { status = text("Sunday-first", d); })
+                }
+            },
+            StaticText{status}
+                .withSize({456, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

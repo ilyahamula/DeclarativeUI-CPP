@@ -71,7 +71,7 @@ return Dialog {
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` (list only), `EditableCombo` (free text + suggestions) |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` (`.withOrientation()`, `.withTicks()`) |
-| Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
+| Pickers           | `DatePicker`, `Calendar` (month view, Monday- or Sunday-first), `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar` (value or `.Indeterminate()`), `Spinner` (`.withImage()` turns a logo), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |

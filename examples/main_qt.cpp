@@ -12,14 +12,17 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // Spinner: the gallery (default, sized, logo, stopped) and a running
-    // flag shared by two spinners, a CheckBox and a ToggleButton.
-    bool spinnerBusy = true;
-    std::string spinnerStatus = "Working...";
+    // Calendar: Monday-first and Sunday-first side by side, and one date
+    // shared by a calendar and a DatePicker.
+    Date isoDate = todayDate();
+    Date usDate = todayDate();
+    std::string calendarStatus = "Pick a day";
+    Date sharedDate = todayDate();
+    bool calendarDisabled = false;
 
     // One show() per open on a retained backend.
-    drawSpinnerGalleryUI().show();
-    drawSpinnerBindingUI(spinnerBusy, spinnerStatus).show();
+    drawCalendarGalleryUI(isoDate, usDate, calendarStatus).show();
+    drawCalendarBindingUI(sharedDate, calendarDisabled).show();
 
     return app.exec();
 }

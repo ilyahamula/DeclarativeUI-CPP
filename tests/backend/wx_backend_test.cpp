@@ -12,6 +12,7 @@
 #include <wx/listbox.h>
 #include <wx/statline.h>
 #include <wx/activityindicator.h>
+#include <wx/calctrl.h>
 #include <wx/dataview.h>
 #include <wx/slider.h>
 #ifdef __WXOSX__
@@ -1086,6 +1087,47 @@ TEST(wx_spinner_runs_with_its_flag)
 	pump();
 	CHECK(!first->IsRunning());
 	CHECK(!panel->isRunning());
+	w->Close();
+	pump();
+}
+
+// Calendar: a wxCalendarCtrl (the generic control on macOS) with the first
+// day of the week as a style bit and the surrounding weeks shown; a pick
+// writes the bound date, an outside write moves the selection.
+TEST(wx_calendar_binds_and_honours_the_first_day)
+{
+	Date due { 2026, 10, 3 };
+	Date us { 2026, 10, 3 };
+	Date reported {};
+	Dialog { "Cal",
+		HStack {
+			Calendar{due}.onChange([&](const Date& d) { reported = d; }),
+			Calendar{us}.withFirstDayOfWeek(FirstDayOfWeek::Sunday)
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Cal");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* monday = find<wxCalendarCtrl>(w, [](wxCalendarCtrl* c) { return c->HasFlag(wxCAL_MONDAY_FIRST); });
+	auto* sunday = find<wxCalendarCtrl>(w, [](wxCalendarCtrl* c) { return c->HasFlag(wxCAL_SUNDAY_FIRST); });
+	CHECK(monday != nullptr && sunday != nullptr);
+	if (monday == nullptr || sunday == nullptr)
+		return;
+	CHECK(monday->HasFlag(wxCAL_SHOW_SURROUNDING_WEEKS));
+	CHECK(monday->GetDate() == wxDateTime(3, wxDateTime::Oct, 2026));
+
+	monday->SetDate(wxDateTime(15, wxDateTime::Oct, 2026)); // like a click
+	wxCalendarEvent picked(monday, monday->GetDate(), wxEVT_CALENDAR_SEL_CHANGED);
+	monday->ProcessWindowEvent(picked);
+	pump();
+	CHECK(due == (Date { 2026, 10, 15 }));
+	CHECK(reported == (Date { 2026, 10, 15 }));
+
+	due = Date { 2027, 1, 2 };
+	pump();
+	CHECK(monday->GetDate() == wxDateTime(2, wxDateTime::Jan, 2027));
 	w->Close();
 	pump();
 }

@@ -1131,6 +1131,181 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// CalendarWrapper -----------------------------------------------------------
+// Drawn from CoreTypes/Calendar.hpp: a header (arrows and "Month Year"), a
+// weekday row, and six rows of seven day buttons; days of the neighbouring
+// months show dimmed and, clicked, select that day and move to its month --
+// what QCalendarWidget and wx's surrounding weeks do. The month on show is
+// view state the wrapper cannot keep (the tree is rebuilt every frame), so it
+// lives in a store keyed like the control's snapshot, and it follows the date
+// whenever the date changes, from a pick or from outside. Cells grow to fill
+// an explicit withSize(); the item is exactly the frame.
+
+namespace
+{
+
+constexpr float kCalendarGap = 2.0f;
+
+struct CalendarView
+{
+	int year = 0;
+	int month = 0;
+	Date shownFor {};
+	bool initialised = false;
+};
+
+std::unordered_map<std::uint64_t, CalendarView>& calendarViews()
+{
+	static std::unordered_map<std::uint64_t, CalendarView> views;
+	return views;
+}
+
+ImVec2 calendarCell()
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float width = std::max(ImGui::CalcTextSize("00").x, ImGui::CalcTextSize("We").x)
+		+ style.FramePadding.x * 2.0f + 2.0f;
+	return ImVec2(width, ImGui::GetFrameHeight());
+}
+
+} // unnamed namespace
+
+Size CalendarWrapper::measureIntrinsic(const Constraints&)
+{
+	const ImVec2 cell = calendarCell();
+	const float width = cell.x * 7.0f + kCalendarGap * 6.0f;
+	const float height = ImGui::GetFrameHeight() + kCalendarGap * 2.0f + ImGui::GetTextLineHeight()
+		+ kCalendarGap * 2.0f + cell.y * 6.0f + kCalendarGap * 5.0f;
+	return Size { ceilInt(width), ceilInt(height) };
+}
+
+void CalendarWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<Date> snapshot(m_value, m_stableId);
+	Date& date = m_value.get();
+	CalendarView& view = calendarViews()[snapshot.slotKey(1)];
+	if (!view.initialised || !(view.shownFor == date))
+	{
+		view.year = date.year;
+		view.month = date.month;
+		view.shownFor = date;
+		view.initialised = true;
+	}
+
+	const Size natural = measureIntrinsic({});
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2((float)natural.width, (float)natural.height);
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float headerH = ImGui::GetFrameHeight();
+	const float weekdayH = ImGui::GetTextLineHeight();
+	const ImVec2 natCell = calendarCell();
+	const float gridTop = headerH + kCalendarGap * 2.0f + weekdayH + kCalendarGap * 2.0f;
+	const ImVec2 cell(std::max(natCell.x, (box.x - kCalendarGap * 6.0f) / 7.0f),
+		std::max(natCell.y, (box.y - gridTop - kCalendarGap * 5.0f) / 6.0f));
+
+	snapshot.pushId();
+
+	// Header: < Month Year >
+	ImGui::SetCursorScreenPos(origin);
+	if (ImGui::ArrowButton("##prev", ImGuiDir_Left))
+		shiftMonth(view.year, view.month, -1);
+	ImGui::SetCursorScreenPos(ImVec2(origin.x + box.x - headerH, origin.y));
+	if (ImGui::ArrowButton("##next", ImGuiDir_Right))
+		shiftMonth(view.year, view.month, 1);
+	const std::string title = std::string(monthName(view.month)) + " " + std::to_string(view.year);
+	const ImVec2 titleSize = ImGui::CalcTextSize(title.c_str());
+	ImGui::GetWindowDrawList()->AddText(
+		ImVec2(origin.x + (box.x - titleSize.x) * 0.5f, origin.y + (headerH - titleSize.y) * 0.5f),
+		ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
+
+	// Weekday headers
+	const auto headers = weekdayHeaders(m_firstDay);
+	const float weekdayY = origin.y + headerH + kCalendarGap * 2.0f;
+	for (int column = 0; column < 7; ++column)
+	{
+		const char* name = headers[static_cast<std::size_t>(column)];
+		const float x = origin.x + column * (cell.x + kCalendarGap) + (cell.x - ImGui::CalcTextSize(name).x) * 0.5f;
+		ImGui::GetWindowDrawList()->AddText(ImVec2(x, weekdayY), ImGui::GetColorU32(ImGuiCol_TextDisabled), name);
+	}
+
+	// Days: this month's, and the neighbours' filling the six weeks
+	const auto grid = monthGrid(view.year, view.month, m_firstDay);
+	int prevYear = view.year;
+	int prevMonth = view.month;
+	shiftMonth(prevYear, prevMonth, -1);
+	int nextYear = view.year;
+	int nextMonth = view.month;
+	shiftMonth(nextYear, nextMonth, 1);
+	const int lead = static_cast<int>(std::find_if(grid.begin(), grid.end(), [](int d) { return d != 0; }) - grid.begin());
+	const int days = daysInMonth(view.year, view.month);
+	const Date today = todayDate();
+	for (int index = 0; index < 42; ++index)
+	{
+		Date cellDate {};
+		bool inMonth = true;
+		if (index < lead)
+		{
+			cellDate = Date { prevYear, prevMonth, daysInMonth(prevYear, prevMonth) - (lead - 1 - index) };
+			inMonth = false;
+		}
+		else if (index >= lead + days)
+		{
+			cellDate = Date { nextYear, nextMonth, index - lead - days + 1 };
+			inMonth = false;
+		}
+		else
+		{
+			cellDate = Date { view.year, view.month, grid[static_cast<std::size_t>(index)] };
+		}
+
+		const int row = index / 7;
+		const int column = index % 7;
+		ImGui::SetCursorScreenPos(ImVec2(origin.x + column * (cell.x + kCalendarGap),
+			origin.y + gridTop + row * (cell.y + kCalendarGap)));
+		const bool selected = cellDate == date;
+		int pushed = 0;
+		if (selected)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+			++pushed;
+		}
+		else
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			++pushed;
+		}
+		if (!inMonth)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+			++pushed;
+		}
+		ImGui::PushID(index);
+		const std::string label = std::to_string(cellDate.day);
+		if (ImGui::Button(label.c_str(), cell))
+		{
+			date = cellDate;
+			view.year = cellDate.year;
+			view.month = cellDate.month;
+			view.shownFor = cellDate;
+			m_onChange(date, m_nativeWidget);
+		}
+		if (cellDate == today)
+		{
+			ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+				ImGui::GetColorU32(ImGuiCol_CheckMark), style.FrameRounding);
+		}
+		ImGui::PopID();
+		ImGui::PopStyleColor(pushed);
+	}
+
+	// The item: exactly the frame, for hover, tooltip and the drift guard.
+	ImGui::SetCursorScreenPos(origin);
+	ImGui::Dummy(box);
+	ImGui::PopID();
+}
+
 // SpinnerWrapper -----------------------------------------------------------
 // Drawn on the window draw list inside the frame, with a Dummy of the frame as
 // the item (hover, tooltip, drift guard) -- the Image/Separator move. The tree
