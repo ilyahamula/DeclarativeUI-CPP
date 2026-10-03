@@ -983,6 +983,7 @@ TEST(wx_editable_combo_takes_typing_and_picks)
 	fonts = { "Times", "Georgia" };
 	pump();
 	CHECK_EQ(static_cast<int>(combo->GetCount()), 2);
+	CHECK_EQ(font, std::string("Helvetica")); // wxGTK's Set() raises wxEVT_TEXT("")
 	CHECK(combo->GetValue() == "Helvetica");
 	font = "Georgia";
 	pump();

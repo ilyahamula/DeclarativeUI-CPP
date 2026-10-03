@@ -1625,9 +1625,13 @@ void EditableComboWrapper::realize(void* parentWindow)
 	// but not all, a wxEVT_TEXT as well. Both report through one commit that
 	// drops a repeat of the text it last saw, so a pick is one onChange
 	// everywhere. The RefSync push records what it wrote for the same reason.
+	// wxGTK's Set() goes through wxTextEntry::Clear(), a SetValue("") that
+	// raises wxEVT_TEXT; `syncing` keeps the items push from reporting that
+	// emptied text as typing (it would write "" to the caller's string).
 	auto last = std::make_shared<std::string>(m_value.get());
-	auto report = [combo, last, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const std::string& text) {
-		if (text == *last)
+	auto syncing = std::make_shared<bool>(false);
+	auto report = [combo, last, syncing, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const std::string& text) {
+		if (*syncing || text == *last)
 			return;
 		*last = text;
 		commit(text);
@@ -1641,10 +1645,12 @@ void EditableComboWrapper::realize(void* parentWindow)
 		bindWatchedRefSync(combo, watchRefs(boundItems),
 			[combo] { return nativeItems(combo); },
 			[boundItems] { return *boundItems; },
-			[combo](const ItemList& items) {
+			[combo, syncing](const ItemList& items) {
 				const wxString keep = combo->GetValue();
+				*syncing = true;
 				combo->Set(toArrayString(items));
 				combo->ChangeValue(keep);
+				*syncing = false;
 			});
 	}
 	if (m_value.isBound())
