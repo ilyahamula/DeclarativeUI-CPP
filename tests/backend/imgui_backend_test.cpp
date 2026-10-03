@@ -753,6 +753,55 @@ TEST(imgui_search_field_owns_its_enter_and_clears)
 	frames(2);
 }
 
+// EditableCombo: typing writes free text, the arrow opens the list and a pick
+// writes that item's text (one onChange each), an outside write shows.
+TEST(imgui_editable_combo_takes_typing_and_picks)
+{
+	std::string font = "Arial";
+	ItemList fonts { "Arial", "Courier", "Helvetica" };
+	int changes = 0;
+	g_ui = [&] {
+		Dialog { "Fonts",
+			VStack {
+				EditableCombo{font, fonts}.withSize({200, -1})
+					.onChange([&](const std::string&) { ++changes; })
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(4);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Fonts");
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float y = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y + ImGui::GetFrameHeight() * 0.5f;
+	const float x0 = w->Pos.x + st.WindowPadding.x;
+
+	click(x0 + 60.0f, y);
+	frame(-1, -1, false, 'X');
+	frames(1);
+	CHECK_EQ(font, std::string("ArialX"));
+	CHECK_EQ(changes, 1);
+
+	// the arrow: last frame-height square of the 200 px control
+	click(x0 + 200.0f - ImGui::GetFrameHeight() * 0.5f, y);
+	frames(1);
+	ImGuiContext& g = *ImGui::GetCurrentContext();
+	CHECK(!g.OpenPopupStack.empty());
+	if (!g.OpenPopupStack.empty() && g.OpenPopupStack.back().Window != nullptr)
+	{
+		const ImGuiWindow* popup = g.OpenPopupStack.back().Window;
+		const float rowY = popup->Pos.y + st.WindowPadding.y + ImGui::GetTextLineHeightWithSpacing() * 1.5f;
+		click(popup->Pos.x + 30.0f, rowY); // the second item
+		CHECK_EQ(font, std::string("Courier"));
+		CHECK_EQ(changes, 2);
+	}
+
+	font = "Times";
+	fonts.push_back("Times");
+	frames(2);
+	CHECK_EQ(font, std::string("Times"));
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

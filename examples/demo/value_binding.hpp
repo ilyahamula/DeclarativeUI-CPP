@@ -21,6 +21,7 @@
 
 #include "declarative_ui.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <functional>
@@ -1763,6 +1764,49 @@ inline auto drawSearchBindingUI(DemoSearchBinding& s)
                     .onClick([&s] {
                         s.query = "an"; // written from outside: the field follows
                         filterDemoItems(s);
+                    }),
+                CheckBox{s.disabled, "Disable"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 10).CenterVertical())
+            }
+        }
+    };
+}
+
+// EditableCombo over one std::string, shared with a TextCtrl and a label --
+// typing in either field moves the other -- and over a BOUND item list:
+// "Remember" adds the current text to the suggestions, and the drop-down
+// follows on every backend while keeping the text. A bool disables both
+// fields and the button.
+struct DemoComboBinding
+{
+    std::string tag = "urgent";
+    ItemList recent { "urgent", "later", "waiting" };
+    bool disabled = false;
+};
+
+inline auto drawEditableComboBindingUI(DemoComboBinding& s)
+{
+    return Dialog {
+        "EditableCombo + TextCtrl (shared text)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            EditableCombo{s.tag, s.recent}
+                .withSize({220, -1})
+                .isDisabled(s.disabled),
+            TextCtrl{s.tag}
+                .withSize({220, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 6))
+                .isDisabled(s.disabled),
+            StaticText{s.tag}
+                .withSize({220, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Button{"Remember"}
+                    .isDisabled(s.disabled)
+                    .onClick([&s] {
+                        if (!s.tag.empty() && std::find(s.recent.begin(), s.recent.end(), s.tag) == s.recent.end())
+                            s.recent.push_back(s.tag);
                     }),
                 CheckBox{s.disabled, "Disable"}
                     .withFlags(LayoutFlags().Border(Side::Left, 10).CenterVertical())

@@ -19,18 +19,18 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // SearchField: the gallery (default and custom placeholders, Enter that
-    // searches instead of pressing the default button) and a live filter.
-    std::string quickSearch;
-    std::string fileSearch;
-    std::string docTitle = "Untitled";
-    std::string searchStatus = "Type in the file search";
-    DemoSearchBinding searchBinding;
+    // EditableCombo: the gallery (free text vs the list-only ComboBox) and a
+    // shared text with a bound, growing list of suggestions.
+    std::string comboFont = "Arial";
+    std::string comboCity;
+    std::string comboSize = "Medium";
+    std::string comboStatus = "Pick or type";
+    DemoComboBinding comboBinding;
 
     runImGuiApp([&]
     {
-        drawSearchGalleryUI(quickSearch, fileSearch, docTitle, searchStatus).show();
-        drawSearchBindingUI(searchBinding).show();
+        drawEditableComboGalleryUI(comboFont, comboCity, comboSize, comboStatus).show();
+        drawEditableComboBindingUI(comboBinding).show();
     });
 
     return 0;

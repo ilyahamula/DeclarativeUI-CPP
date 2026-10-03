@@ -1363,6 +1363,71 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// EditableComboWrapper -----------------------------------------------------------
+
+void EditableComboWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("EditableComboWrapper::realize()\t-> new wxComboBox()\n");
+#endif
+	// No wxCB_READONLY: the text is the value. Measured before the hint, which
+	// must not widen an auto-fit window (applyHint's rule).
+	auto* combo = new wxComboBox(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_value.get(),
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height),
+		toArrayString(m_items.get()), m_style);
+	const wxSize best = combo->GetBestSize();
+	m_initialSize = Size { best.x, best.y };
+	if (!m_placeholder.empty())
+	{
+		combo->SetHint(m_placeholder);
+		combo->CacheBestSize(best);
+	}
+	m_nativeWidget = combo;
+
+	// Typing raises wxEVT_TEXT; a pick raises wxEVT_COMBOBOX and, on most ports
+	// but not all, a wxEVT_TEXT as well. Both report through one commit that
+	// drops a repeat of the text it last saw, so a pick is one onChange
+	// everywhere. The RefSync push records what it wrote for the same reason.
+	auto last = std::make_shared<std::string>(m_value.get());
+	auto report = [combo, last, commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const std::string& text) {
+		if (text == *last)
+			return;
+		*last = text;
+		commit(text);
+	};
+	combo->Bind(wxEVT_TEXT, [report](wxCommandEvent& evt) { report(evt.GetString().ToStdString()); });
+	combo->Bind(wxEVT_COMBOBOX, [combo, report](wxCommandEvent&) { report(combo->GetStringSelection().ToStdString()); });
+
+	// Bound items: repopulate, keeping the text -- Set() clears it on some ports.
+	if (const ItemList* boundItems = m_items.boundValue())
+	{
+		bindWatchedRefSync(combo, watchRefs(boundItems),
+			[combo] { return nativeItems(combo); },
+			[boundItems] { return *boundItems; },
+			[combo](const ItemList& items) {
+				const wxString keep = combo->GetValue();
+				combo->Set(toArrayString(items));
+				combo->ChangeValue(keep);
+			});
+	}
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		bindExternalRefSync(combo,
+			[combo] { return combo->GetValue().ToStdString(); },
+			[&value] { return value; },
+			[combo, last](const std::string& v) {
+				*last = v;
+				combo->ChangeValue(v);
+			});
+	}
+}
+
+Size EditableComboWrapper::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
+}
+
 // ListBoxWrapper -----------------------------------------------------------
 
 namespace

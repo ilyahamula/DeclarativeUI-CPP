@@ -933,6 +933,56 @@ TEST(wx_search_field_owns_its_enter_and_clears)
 	pump();
 }
 
+// EditableCombo: an editable wxComboBox; typing and picking both write the
+// text, a pick reports once however many events the port sends, bound items
+// repopulate and keep the text.
+TEST(wx_editable_combo_takes_typing_and_picks)
+{
+	std::string font = "Arial";
+	ItemList fonts { "Arial", "Courier", "Helvetica" };
+	std::vector<std::string> log;
+	Dialog { "Fonts",
+		VStack { EditableCombo{font, fonts}.onChange([&](const std::string& t) { log.push_back(t); }) }
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Fonts");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* combo = find<wxComboBox>(w, [](wxComboBox*) { return true; });
+	CHECK(combo != nullptr && !combo->HasFlag(wxCB_READONLY));
+	if (combo == nullptr)
+		return;
+	CHECK(combo->GetValue() == "Arial");
+
+	combo->SetValue("Comic Sans"); // like typing: raises wxEVT_TEXT
+	pump();
+	CHECK_EQ(font, std::string("Comic Sans"));
+
+	// a pick: the selection, then the events a port may send for it
+	combo->SetSelection(2);
+	wxCommandEvent picked(wxEVT_COMBOBOX, combo->GetId());
+	picked.SetEventObject(combo);
+	combo->ProcessWindowEvent(picked);
+	wxCommandEvent text(wxEVT_TEXT, combo->GetId());
+	text.SetEventObject(combo);
+	text.SetString("Helvetica");
+	combo->ProcessWindowEvent(text);
+	pump();
+	CHECK_EQ(font, std::string("Helvetica"));
+	CHECK_EQ(std::count(log.begin(), log.end(), std::string("Helvetica")), 1L);
+
+	fonts = { "Times", "Georgia" };
+	pump();
+	CHECK_EQ(static_cast<int>(combo->GetCount()), 2);
+	CHECK(combo->GetValue() == "Helvetica");
+	font = "Georgia";
+	pump();
+	CHECK(combo->GetValue() == "Georgia");
+	w->Close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	if (!wxEntryStart(argc, argv))

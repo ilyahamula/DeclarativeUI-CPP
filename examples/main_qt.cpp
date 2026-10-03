@@ -12,17 +12,17 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // SearchField: the gallery (default and custom placeholders, Enter that
-    // searches instead of pressing the default button) and a live filter.
-    std::string quickSearch;
-    std::string fileSearch;
-    std::string docTitle = "Untitled";
-    std::string searchStatus = "Type in the file search";
-    DemoSearchBinding searchBinding;
+    // EditableCombo: the gallery (free text vs the list-only ComboBox) and a
+    // shared text with a bound, growing list of suggestions.
+    std::string comboFont = "Arial";
+    std::string comboCity;
+    std::string comboSize = "Medium";
+    std::string comboStatus = "Pick or type";
+    DemoComboBinding comboBinding;
 
     // One show() per open on a retained backend.
-    drawSearchGalleryUI(quickSearch, fileSearch, docTitle, searchStatus).show();
-    drawSearchBindingUI(searchBinding).show();
+    drawEditableComboGalleryUI(comboFont, comboCity, comboSize, comboStatus).show();
+    drawEditableComboBindingUI(comboBinding).show();
 
     return app.exec();
 }

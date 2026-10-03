@@ -1218,6 +1218,56 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// EditableComboWrapper -----------------------------------------------------------
+
+void EditableComboWrapper::realize(void* parentWindow)
+{
+	auto* combo = new QComboBox(static_cast<QWidget*>(parentWindow));
+	combo->setEditable(true);
+	// NoInsert: by default an editable QComboBox appends the typed text to its
+	// list on Enter, which wx and ImGui never do -- and the list is the
+	// caller's. With nothing to insert, the key is ignored and travels on to
+	// the window's default button (DialogKeys.hpp), as in a TextCtrl.
+	combo->setInsertPolicy(QComboBox::NoInsert);
+	setComboItems(combo, m_items.get());
+	combo->setEditText(qstr(m_value.get()));
+	if (!m_placeholder.empty())
+		combo->lineEdit()->setPlaceholderText(qstr(m_placeholder));
+	m_nativeWidget = combo;
+	const QSize hint = combo->sizeHint();
+	m_initialSize = Size { hint.width(), hint.height() };
+
+	// editTextChanged covers both: typing, and a pick (which sets the text).
+	QObject::connect(combo, &QComboBox::editTextChanged,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
+
+	// Bound items: repopulate, keeping the text. Under RefSync's blocker.
+	if (const ItemList* boundItems = m_items.boundValue())
+	{
+		bindWatchedRefSync(combo, watchRefs(boundItems),
+			[combo] { return comboItems(combo); },
+			[boundItems] { return *boundItems; },
+			[combo](const ItemList& items) {
+				const QString keep = combo->currentText();
+				setComboItems(combo, items);
+				combo->setEditText(keep);
+			});
+	}
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		bindExternalRefSync(combo,
+			[combo] { return combo->currentText().toStdString(); },
+			[&value] { return value; },
+			[combo](const std::string& v) { combo->setEditText(qstr(v)); });
+	}
+}
+
+Size EditableComboWrapper::measureIntrinsic(const Constraints&)
+{
+	return m_initialSize; // bound items only (measuresItself)
+}
+
 // ListBoxWrapper -----------------------------------------------------------
 
 namespace

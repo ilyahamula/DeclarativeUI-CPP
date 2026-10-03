@@ -203,6 +203,12 @@ concept Hideable = requires(T element, bool& flag) {
 static_assert(Hideable<Button>);
 static_assert(Hideable<StaticText>);
 static_assert(Hideable<SearchField>);
+// EditableCombo: free text with suggestions; both text and items bind.
+static_assert(NodeBuildable<EditableCombo>);
+static_assert(Hideable<EditableCombo>);
+static_assert(PlaceholderHost<EditableCombo>);
+static_assert(std::is_constructible_v<EditableCombo, std::string&, ItemList&>);
+static_assert(std::is_constructible_v<EditableCombo, const std::string&, const ItemList&>);
 static_assert(Hideable<VStack<Button>>);
 static_assert(Hideable<HStack<Button>>);
 static_assert(Hideable<VGroupBox<Button>>);

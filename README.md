@@ -68,7 +68,7 @@ return Dialog {
 |-------------------|---------|
 | Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl`, `SearchField` (`.onSearch()`) |
-| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` |
+| Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` (list only), `EditableCombo` (free text + suggestions) |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |

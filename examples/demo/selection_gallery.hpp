@@ -131,3 +131,45 @@ inline auto drawRadioGroupUI(int& shipping, int& size, int& wrap, bool& hideWrap
         }
     };
 }
+
+// EditableCombo beside the read-only ComboBox it complements: the ComboBox can
+// only pick from its list, the EditableCombo takes any text and offers the
+// list as suggestions. A placeholder shows while the field is empty, and the
+// status line names what each one reported.
+inline auto drawEditableComboGalleryUI(std::string& font, std::string& city, std::string& size,
+    std::string& status)
+{
+    constexpr int kLabelW = 120;
+    constexpr int kFieldW = 200;
+    return Dialog {
+        "Editable combos",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                StaticText{"Font"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                EditableCombo{font, {"Arial", "Courier New", "Georgia", "Helvetica", "Verdana"}}
+                    .withSize({kFieldW, -1})
+                    .withTooltip("Pick one, or type any font name")
+                    .onChange([&status](const std::string& f) { status = "Font: " + f; })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"City"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                EditableCombo{city, {"Kyiv", "Lviv", "Odesa", "Kharkiv"}}
+                    .withPlaceholder("Type or pick a city")
+                    .withSize({kFieldW, -1})
+                    .onChange([&status](const std::string& c) { status = "City: " + c; })
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 6),
+                StaticText{"Size (list only)"}.withSize({kLabelW, 20}).withFlags(LayoutFlags().CenterVertical()),
+                ComboBox{ {"Small", "Medium", "Large"}, size }
+                    .withSize({kFieldW, -1})
+                    .onChange([&status](const std::string& s) { status = "Size: " + s; })
+            },
+            StaticText{status}
+                .withSize({kLabelW + kFieldW + 8, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

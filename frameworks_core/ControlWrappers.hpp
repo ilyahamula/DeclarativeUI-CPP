@@ -948,6 +948,42 @@ private:
 extern template class ComboBoxWrapper<std::string>;
 extern template class ComboBoxWrapper<int>;
 
+// EditableComboWrapper -----------------------------------------------------------
+// A text field with a drop-down of suggestions: the value is the TEXT, which
+// may be any string -- picking an item writes that item's text, typing writes
+// what was typed. The read-only choice is ComboBox; this is the other one.
+//
+// Native on wx (wxComboBox without wxCB_READONLY) and Qt (an editable
+// QComboBox, NoInsert so Enter never adds the typed text to the list),
+// composed on ImGui (a text field, an arrow button, a popup list). Enter is
+// not the field's: it reaches the window's default button, as in a TextCtrl
+// without onEnter. Bound items repopulate and keep the text; the control keeps
+// the size of its first items, as a bound ComboBox does.
+class EditableComboWrapper : public ControlWrapper
+{
+public:
+	EditableComboWrapper(BoundValue<ItemList> items, BoundValue<std::string> text, std::string placeholder,
+		const Position& pos, const Size& size, long style,
+		EventCallback<const std::string&> onChange = {})
+		: ControlWrapper(pos, size, style)
+		, m_items(std::move(items))
+		, m_value(std::move(text))
+		, m_placeholder(std::move(placeholder))
+		, m_onChange(std::move(onChange))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_SELF_MEASURED_OVERRIDES(m_items.isBound());
+
+private:
+	BoundValue<ItemList> m_items;
+	BoundValue<std::string> m_value;
+	std::string m_placeholder;
+	EventCallback<const std::string&> m_onChange;
+	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
+};
+
 // Item-set decode/encode -----------------------------------------------------
 // Indices are how every list-shaped wrapper carries a set of items internally,
 // and these two functions are the only places the bound type is decoded, so

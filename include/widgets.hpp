@@ -1110,6 +1110,84 @@ ComboBox(ItemList&, T&) -> ComboBox<T>;
 template <ComboBoxValue T>
 ComboBox(ItemList&, const T&) -> ComboBox<T>;
 
+// EditableCombo -----------------------------------------------------------
+// A text field with a list of suggestions. The bound value is the TEXT, so it
+// can be anything -- a pick from the list writes that item, typing writes what
+// was typed:
+//
+//   EditableCombo{ fontName, { "Arial", "Courier", "Helvetica" } }
+//
+// For a choice restricted to the list, use ComboBox. Both the text and the
+// items follow the usual pair (a non-const lvalue binds); bound items
+// repopulate the list and keep the text. onChange fires on every edit and
+// every pick. Enter is not the field's own: it presses the window's default
+// button, as in a plain TextCtrl.
+struct EditableCombo : Widget<EditableCombo>
+{
+	using super = Widget<EditableCombo>;
+
+	EditableCombo(const std::string& text, const ItemList& items)
+		: super()
+		, m_items(items)
+		, m_value(text)
+	{
+	}
+
+	EditableCombo(std::string& text, const ItemList& items)
+		: super()
+		, m_items(items)
+		, m_value(text)
+	{
+	}
+
+	EditableCombo(const std::string& text, ItemList& items)
+		: super()
+		, m_items(items)
+		, m_value(text)
+	{
+	}
+
+	EditableCombo(std::string& text, ItemList& items)
+		: super()
+		, m_items(items)
+		, m_value(text)
+	{
+	}
+
+	EditableCombo& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
+	EditableCombo& onChange(std::function<void(const std::string&)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+	EditableCombo& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<EditableComboWrapper>(m_items, m_value, m_placeholder, pos, size, style, m_onChange);
+	}
+
+private:
+	BoundValue<ItemList> m_items;
+	BoundValue<std::string> m_value;
+	std::string m_placeholder;
+	EventCallback<const std::string&> m_onChange;
+};
+
 // ListBox -----------------------------------------------------------
 // Scrollable list of selectable items. The bound type picks the mode:
 // int/std::string select one item, std::vector<int>/std::vector<std::string>

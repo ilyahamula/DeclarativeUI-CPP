@@ -1060,6 +1060,65 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// EditableComboWrapper -----------------------------------------------------------
+// ImGui has no editable combo, so it is composed: an InputTextWithHint and an
+// ArrowButton side by side (no spacing between, so the two are exactly the
+// frame), and a plain popup list opened under the field at the field's width.
+// The popup is an ordinary BeginPopup -- the same kind ImGui::Combo opens from
+// inside place()'s group -- and a disabled control can never open it, since
+// its arrow is disabled with it.
+
+Size EditableComboWrapper::measureIntrinsic(const Constraints&)
+{
+	// The wider of a text field's floor and the widest item, plus the arrow.
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float text = std::max((float)editableFloorWidth(),
+		widestItem(m_items.get()) + style.FramePadding.x * 2.0f);
+	const Size size { ceilInt(text + ImGui::GetFrameHeight()), frameHeight() };
+	return m_items.isBound() ? firstMeasured(m_stableId, size) : size;
+}
+
+void EditableComboWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
+	std::string& text = m_value.get();
+	const float arrow = ImGui::GetFrameHeight();
+	const float width = sized(frame) ? (float)frame.width : (float)measureIntrinsic({}).width;
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	snapshot.pushId();
+	ImGui::SetNextItemWidth(std::max(1.0f, width - arrow));
+	const bool edited = m_placeholder.empty()
+		? ImGui::InputText("##text", &text)
+		: ImGui::InputTextWithHint("##text", m_placeholder.c_str(), &text);
+	if (edited)
+		m_onChange(text, m_nativeWidget);
+
+	ImGui::SameLine(0.0f, 0.0f);
+	if (ImGui::ArrowButton("##open", ImGuiDir_Down))
+		ImGui::OpenPopup("##items");
+
+	ImGui::SetNextWindowPos(ImVec2(origin.x, origin.y + ImGui::GetFrameHeight()));
+	ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f),
+		ImVec2(width, ImGui::GetTextLineHeightWithSpacing() * 8.0f + ImGui::GetStyle().WindowPadding.y * 2.0f));
+	if (ImGui::BeginPopup("##items"))
+	{
+		const ItemList& items = m_items.get();
+		for (int i = 0; i < static_cast<int>(items.size()); ++i)
+		{
+			ImGui::PushID(i);
+			if (ImGui::Selectable(items[i].c_str(), items[i] == text))
+			{
+				text = items[i];
+				m_onChange(text, m_nativeWidget);
+			}
+			ImGui::PopID();
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::PopID();
+}
+
 // ListBoxWrapper -----------------------------------------------------------
 
 template <ListBoxValue T>

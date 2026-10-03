@@ -850,6 +850,57 @@ TEST(qt_search_field_owns_its_enter_and_clears)
 	pump();
 }
 
+// EditableCombo: an editable QComboBox that never inserts; typing and picking
+// both write the text (one onChange each), Enter goes on to the default
+// button, bound items repopulate and keep the text.
+TEST(qt_editable_combo_takes_typing_and_picks)
+{
+	std::string font = "Arial";
+	ItemList fonts { "Arial", "Courier", "Helvetica" };
+	std::vector<std::string> log;
+	Dialog { "Fonts",
+		VStack {
+			EditableCombo{font, fonts}.onChange([&](const std::string& t) { log.push_back(t); }),
+			Button{"OK"}.isDefault().onClick([&] { log.push_back("ok"); })
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Fonts");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* combo = w->findChild<QComboBox*>();
+	CHECK(combo != nullptr && combo->isEditable());
+	if (combo == nullptr)
+		return;
+	CHECK(combo->currentText() == "Arial");
+
+	combo->lineEdit()->setText("Comic Sans"); // free text, not in the list
+	pump();
+	CHECK_EQ(font, std::string("Comic Sans"));
+	combo->setCurrentIndex(2); // a pick
+	pump();
+	CHECK_EQ(font, std::string("Helvetica"));
+	CHECK(log.size() == 2 && log[1] == "Helvetica");
+
+	log.clear();
+	QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+	QApplication::sendEvent(combo->lineEdit(), &enter);
+	pump();
+	CHECK_EQ(combo->count(), 3); // nothing inserted
+	CHECK(std::find(log.begin(), log.end(), "ok") != log.end());
+
+	fonts = { "Times", "Georgia" };
+	pump(200);
+	CHECK_EQ(combo->count(), 2);
+	CHECK(combo->currentText() == "Helvetica");
+	font = "Georgia";
+	pump(200);
+	CHECK(combo->currentText() == "Georgia");
+	w->close();
+	pump();
+}
+
 int main(int argc, char** argv)
 {
 	// No display on CI, and none needed: every check reads widget state.
