@@ -187,8 +187,9 @@ inline auto drawVirtualListGalleryUI(int& logCount, int& logRow, std::string& la
             LayoutFlags().Expand().Border(Side::All, 12),
             HStack {
                 VStack {
-                    StaticText{"ListBox (6 items)"}.withSize({160, 20}),
-                    ListBox<std::string>{ {"C++", "Rust", "Python", "Go", "Zig", "Ada"}, languagePick }
+                    StaticText{"ListBox (7 items)"}.withSize({160, 20}),
+                    // "Ticket ##42": ImGui would cut it at "##"; it shows in full on all three
+                    ListBox<std::string>{ {"C++", "Rust", "Python", "Go", "Zig", "Ada", "Ticket ##42"}, languagePick }
                         .withVisibleRows(10)
                         .withSize({160, -1})
                 },

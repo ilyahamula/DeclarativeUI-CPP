@@ -1007,6 +1007,51 @@ TEST(imgui_virtual_list_asks_only_for_visible_rows)
 	frames(2);
 }
 
+// Labels containing "##" are shown in full (imgui/Labels.hpp). ImGui hides
+// everything from "##" on and has no escape for it, so these widgets draw the
+// text themselves. Proof by glyph count: each visible glyph adds 4 vertices to
+// the window's draw list, '#' and 'x' alike, so a dialog labelled "Ab##cd" must
+// draw exactly as many vertices as the same dialog labelled "Abxxcd" -- with
+// the text cut at "##" it would draw 8 per widget fewer. And the text beyond
+// "##" is part of a check box's label: clicking it ticks the box.
+TEST(imgui_labels_with_double_hash_show_in_full)
+{
+	std::string label;
+	std::string listPick;
+	std::string comboPick;
+	bool ticked = false;
+	g_ui = [&] {
+		Dialog { "Hashes",
+			VStack {
+				Button{label},
+				CheckBox{ticked, label},
+				ListBox<std::string>{ ItemList { label, "other" }, listPick }.withVisibleRows(3),
+				ComboBox<std::string>{ ItemList { label, "other" }, comboPick }
+			}
+		}.setPosition({0, 0}).show();
+	};
+	const auto vertices = [&](const std::string& text) {
+		label = listPick = comboPick = text;
+		frames(4);
+		return ImGui::FindWindowByName("Hashes")->DrawList->VtxBuffer.Size;
+	};
+	const int plain = vertices("Abxxcd");
+	const int hashed = vertices("Ab##cd");
+	CHECK_EQ(hashed, plain);
+
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const ImGuiWindow* w = ImGui::FindWindowByName("Hashes");
+
+	// the check box's text after "##" is part of the label: clicking it ticks
+	const float textX = w->Pos.x + st.WindowPadding.x + ImGui::GetFrameHeight() + st.ItemInnerSpacing.x
+		+ ImGui::CalcTextSize("Ab##c").x;
+	const ImVec2 row = rowCentre("Hashes", 1);
+	click(textX, row.y);
+	CHECK(ticked);
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

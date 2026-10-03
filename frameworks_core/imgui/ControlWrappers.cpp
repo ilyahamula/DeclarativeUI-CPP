@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/imgui/DialogKeys.hpp"
+#include "frameworks_core/imgui/Labels.hpp"
 #include "frameworks_core/imgui/TextField.hpp"
 #include <algorithm>
 #include <array>
@@ -151,7 +152,6 @@ Size ButtonWrapper::measureIntrinsic(const Constraints&)
 
 void ButtonWrapper::render(const Rect& frame)
 {
-	const char* label = m_label.empty() ? "##button" : m_label.c_str();
 	const CachedTexture& icon = m_iconPath.empty() ? CachedTexture {} : textureFor(m_iconPath);
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	bool clicked = false;
@@ -181,9 +181,8 @@ void ButtonWrapper::render(const Rect& frame)
 	}
 	else
 	{
-		clicked = sized(frame)
-			? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
-			: ImGui::Button(label);
+		clicked = imgui_labels::button(m_label,
+			sized(frame) ? ImVec2((float)frame.width, (float)frame.height) : ImVec2(0, 0));
 	}
 	ImGui::PopID();
 	if (m_dialogKeys != kNoDialogKey)
@@ -413,11 +412,10 @@ Size ClickableTextWrapper::measureIntrinsic(const Constraints&)
 
 void ClickableTextWrapper::render(const Rect& frame)
 {
-	const char* text = m_text.empty() ? "##clickable" : m_text.c_str();
+	const std::string text = m_text.empty() ? std::string("##clickable") : m_text;
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
-	const bool clicked = sized(frame)
-		? ImGui::Selectable(text, false, 0, selectableSizeArg(frame))
-		: ImGui::Selectable(text);
+	const bool clicked = imgui_labels::selectable(text, false, 0,
+		sized(frame) ? selectableSizeArg(frame) : ImVec2(0, 0));
 	ImGui::PopID();
 	if (clicked)
 	{
@@ -434,12 +432,11 @@ Size LinkTextWrapper::measureIntrinsic(const Constraints&)
 
 void LinkTextWrapper::render(const Rect& frame)
 {
-	const char* text = m_text.empty() ? "##link" : m_text.c_str();
+	const std::string text = m_text.empty() ? std::string("##link") : m_text;
 	ImGui::PushID(WidgetIdManager::nextWidgetId());
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.26f, 0.59f, 0.98f, 1.00f));
-	const bool clicked = sized(frame)
-		? ImGui::Selectable(text, false, 0, selectableSizeArg(frame))
-		: ImGui::Selectable(text);
+	const bool clicked = imgui_labels::selectable(text, false, 0,
+		sized(frame) ? selectableSizeArg(frame) : ImVec2(0, 0));
 	ImGui::PopStyleColor();
 	ImGui::PopID();
 	if (clicked)
@@ -931,11 +928,10 @@ template <RadioButtonValue T>
 void RadioButtonWrapper<T>::render(const Rect&)
 {
 	WidgetSnapshot<T> snapshot(m_value, m_stableId);
-	const char* label = m_label.empty() ? "##radio" : m_label.c_str();
 	snapshot.pushId();
 	// Picking writes the radio's own value, the same rule as wx and Qt: a bool
 	// radio sets true (it never clears itself), an int radio writes its option.
-	if (ImGui::RadioButton(label, isChecked(m_value.get(), m_option)))
+	if (imgui_labels::radioButton(m_label, isChecked(m_value.get(), m_option)))
 	{
 		m_value.set(picked(m_option));
 		m_onChange(m_value.get(), m_nativeWidget);
@@ -956,9 +952,8 @@ Size CheckBoxWrapper::measureIntrinsic(const Constraints&)
 void CheckBoxWrapper::render(const Rect&)
 {
 	WidgetSnapshot<bool> snapshot(m_value, m_stableId);
-	const char* label = m_label.empty() ? "##checkbox" : m_label.c_str();
 	snapshot.pushId();
-	if (ImGui::Checkbox(label, &m_value.get()))
+	if (imgui_labels::checkbox(m_label, &m_value.get()))
 	{
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
@@ -975,7 +970,6 @@ Size ToggleButtonWrapper::measureIntrinsic(const Constraints&)
 void ToggleButtonWrapper::render(const Rect& frame)
 {
 	WidgetSnapshot<bool> snapshot(m_value, m_stableId);
-	const char* label = m_label.empty() ? "##toggle" : m_label.c_str();
 	snapshot.pushId();
 	const bool wasToggled = m_value.get();
 	if (wasToggled)
@@ -983,9 +977,8 @@ void ToggleButtonWrapper::render(const Rect& frame)
 		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 	}
-	const bool clicked = sized(frame)
-		? ImGui::Button(label, ImVec2((float)frame.width, (float)frame.height))
-		: ImGui::Button(label);
+	const bool clicked = imgui_labels::button(m_label,
+		sized(frame) ? ImVec2((float)frame.width, (float)frame.height) : ImVec2(0, 0));
 	if (clicked)
 	{
 		m_value.set(!m_value.get());
@@ -1116,12 +1109,46 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 	if (sized(frame))
 		ImGui::SetNextItemWidth((float)frame.width);
 	snapshot.pushId();
-	if (ImGui::Combo("##combo", &m_currentItem, m_items.c_str()))
+	// BeginCombo rather than ImGui::Combo, so the preview and the items can be
+	// shown in full when they contain "##" (imgui/Labels.hpp). The frame is
+	// taken before BeginCombo -- CalcItemWidth reads SetNextItemWidth without
+	// consuming it -- because once the popup is open the last item is in it.
+	const ItemList& choices = m_choices.get();
+	const bool valid = m_currentItem >= 0 && m_currentItem < static_cast<int>(choices.size());
+	const std::string preview = valid ? choices[static_cast<std::size_t>(m_currentItem)] : std::string();
+	const bool drawPreview = imgui_labels::hidesText(preview);
+	const ImVec2 frameMin = ImGui::GetCursorScreenPos();
+	const float frameWidth = ImGui::CalcItemWidth();
+	bool picked = false;
+	if (ImGui::BeginCombo("##combo", drawPreview ? "" : preview.c_str()))
+	{
+		for (int i = 0; i < static_cast<int>(choices.size()); ++i)
+		{
+			ImGui::PushID(i);
+			if (imgui_labels::selectable(choices[static_cast<std::size_t>(i)], i == m_currentItem))
+			{
+				m_currentItem = i;
+				picked = true;
+			}
+			if (i == m_currentItem)
+				ImGui::SetItemDefaultFocus();
+			ImGui::PopID();
+		}
+		ImGui::EndCombo();
+	}
+	if (drawPreview)
+	{
+		const ImVec2 pad = ImGui::GetStyle().FramePadding;
+		const float height = ImGui::GetFrameHeight();
+		imgui_labels::drawText(ImVec2(frameMin.x + pad.x, frameMin.y + pad.y),
+			ImVec2(frameMin.x + frameWidth - height, frameMin.y + height - pad.y), preview, ImVec2(0, 0));
+	}
+	if (picked)
 	{
 		if constexpr (std::is_same_v<T, int>)
 			m_value.set(m_currentItem);
-		else if (m_currentItem >= 0 && m_currentItem < static_cast<int>(m_choices.get().size()))
-			m_value.set(m_choices.get()[m_currentItem]);
+		else
+			m_value.set(choices[static_cast<std::size_t>(m_currentItem)]);
 
 		m_onChange(m_value.get(), m_nativeWidget);
 	}
@@ -1184,7 +1211,7 @@ void VirtualListWrapper::render(const Rect& frame)
 			{
 				ImGui::PushID(row);
 				const std::string text = m_rowText ? m_rowText(row) : std::string();
-				if (ImGui::Selectable(text.c_str(), row == selected))
+				if (imgui_labels::selectable(text, row == selected))
 				{
 					selected = row;
 					m_onChange(row, m_nativeWidget);
@@ -1476,7 +1503,7 @@ void EditableComboWrapper::render(const Rect& frame)
 		for (int i = 0; i < static_cast<int>(items.size()); ++i)
 		{
 			ImGui::PushID(i);
-			if (ImGui::Selectable(items[i].c_str(), items[i] == text))
+			if (imgui_labels::selectable(items[i], items[i] == text))
 			{
 				text = items[i];
 				m_onChange(text, m_nativeWidget);
@@ -1526,7 +1553,10 @@ void ListBoxWrapper<T>::render(const Rect& frame)
 	{
 		for (int i = 0; i < (int)items.size(); ++i)
 		{
-			if (!ImGui::Selectable(items[i].c_str(), isSelected(i)))
+			ImGui::PushID(i);
+			const bool clicked = imgui_labels::selectable(items[i], isSelected(i));
+			ImGui::PopID();
+			if (!clicked)
 				continue;
 
 			std::vector<int> next { i };
@@ -1598,7 +1628,7 @@ void CheckListBoxWrapper<T>::render(const Rect& frame)
 			// Per-row id: two items may legitimately carry the same label, and
 			// the label is all Checkbox has to key itself by.
 			ImGui::PushID(i);
-			const bool toggled = ImGui::Checkbox(items[i].c_str(), &ticked);
+			const bool toggled = imgui_labels::checkbox(items[i], &ticked);
 			ImGui::PopID();
 			if (!toggled)
 				continue;
@@ -1993,7 +2023,7 @@ void TableWrapper<T>::render(const Rect& frame)
 						// the whole row. AllowOverlap so the other columns' items
 						// still take hover, which is what lets them be
 						// double-clicked into an editor.
-						if (ImGui::Selectable(text.c_str(), isSelected(row),
+						if (imgui_labels::selectable(text, isSelected(row),
 							ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
 						{
 							nextSelection = { row };
@@ -2196,8 +2226,7 @@ void ToolBarWrapper::render(const Rect& frame)
 		{
 			// No icon, or one that failed to load: the label IS the tool, so
 			// the row is never blank (R9.3).
-			const char* label = tool.label.empty() ? "##tool" : tool.label.c_str();
-			clicked = ImGui::Button(label, ImVec2(width, rowHeight));
+			clicked = imgui_labels::button(tool.label, ImVec2(width, rowHeight));
 		}
 
 		if (clicked)

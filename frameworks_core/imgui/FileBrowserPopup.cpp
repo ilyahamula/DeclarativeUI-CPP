@@ -1,3 +1,4 @@
+#include "frameworks_core/imgui/Labels.hpp"
 #include "frameworks_core/imgui/FileBrowserPopup.hpp"
 
 #include "imgui.h"
@@ -290,8 +291,11 @@ void FileBrowser::drawPending()
 		{
 			const Entry& entry = s.entries[(std::size_t)i];
 			const std::string label = entry.isDirectory ? entry.name + "/" : entry.name;
-			if (ImGui::Selectable(label.c_str(), s.selected == i,
-				ImGuiSelectableFlags_AllowDoubleClick))
+			ImGui::PushID(i);
+			const bool picked = imgui_labels::selectable(label, s.selected == i,
+				ImGuiSelectableFlags_AllowDoubleClick);
+			ImGui::PopID();
+			if (picked)
 			{
 				s.selected = i;
 				if (!entry.isDirectory)
@@ -337,8 +341,11 @@ void FileBrowser::drawPending()
 			{
 				for (int i = 0; i < (int)s.filters.size(); ++i)
 				{
-					if (ImGui::Selectable(s.filters[(std::size_t)i].description.c_str(),
-						s.filterIndex == i))
+					ImGui::PushID(i);
+					const bool picked = imgui_labels::selectable(s.filters[(std::size_t)i].description,
+						s.filterIndex == i);
+					ImGui::PopID();
+					if (picked)
 					{
 						s.filterIndex = i;
 						s.listingStale = true; // a new filter is a new listing
