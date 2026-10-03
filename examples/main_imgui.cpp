@@ -19,20 +19,18 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
-    // (isInvalid) on the three text fields.
-    DemoSignUp signUp;
-    // Bound TreeView items and Table rows (an Observable, so polled by its
-    // change counter): the buttons change these, both controls follow.
-    std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
-    Observable<TableRows> files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
-    std::string folderPick = "Documents/Letters";
-    std::string filePick = "budget.csv";
+    // SearchField: the gallery (default and custom placeholders, Enter that
+    // searches instead of pressing the default button) and a live filter.
+    std::string quickSearch;
+    std::string fileSearch;
+    std::string docTitle = "Untitled";
+    std::string searchStatus = "Type in the file search";
+    DemoSearchBinding searchBinding;
 
     runImGuiApp([&]
     {
-        drawSignUpFormUI(signUp).show();
-        drawTreeTableBindingUI(folders, files, folderPick, filePick).show();
+        drawSearchGalleryUI(quickSearch, fileSearch, docTitle, searchStatus).show();
+        drawSearchBindingUI(searchBinding).show();
     });
 
     return 0;

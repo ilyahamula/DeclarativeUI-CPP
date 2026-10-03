@@ -156,6 +156,13 @@ static_assert(EnterHost<TextCtrl>);
 static_assert(EnterHost<PasswordInput>);
 static_assert(!EnterHost<MultiLineTextCtrl>);
 static_assert(DialogKeyButton<Button>);
+// SearchField: a leaf with the usual binding pair and a placeholder; its Enter
+// is onSearch, not onEnter (it never hands Enter on to the default button).
+static_assert(NodeBuildable<SearchField>);
+static_assert(PlaceholderHost<SearchField>);
+static_assert(!EnterHost<SearchField>);
+static_assert(std::is_constructible_v<SearchField, std::string&>);
+static_assert(std::is_constructible_v<SearchField, const std::string&>);
 // Focus and validity: the three text fields only.
 static_assert(FocusHost<TextCtrl>);
 static_assert(FocusHost<PasswordInput>);
@@ -195,6 +202,7 @@ concept Hideable = requires(T element, bool& flag) {
 };
 static_assert(Hideable<Button>);
 static_assert(Hideable<StaticText>);
+static_assert(Hideable<SearchField>);
 static_assert(Hideable<VStack<Button>>);
 static_assert(Hideable<HStack<Button>>);
 static_assert(Hideable<VGroupBox<Button>>);

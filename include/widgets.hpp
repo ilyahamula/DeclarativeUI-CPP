@@ -470,6 +470,83 @@ private:
 	EventCallback<const std::string&> m_onEnter;
 };
 
+// SearchField -----------------------------------------------------------
+// A search box: the query is the value, with the usual binding pair, and
+//
+//   SearchField{query}
+//       .onChange([&](const std::string& q) { filter(q); })   // every edit
+//       .onSearch([&](const std::string& q) { run(q); })      // Enter
+//
+// Enter is the field's own -- onSearch runs and the window's default button
+// is not pressed. The clear button empties the field as an ordinary edit
+// (onChange with ""). The placeholder defaults to "Search".
+struct SearchField : Widget<SearchField>
+{
+	using super = Widget<SearchField>;
+
+	SearchField()
+		: super()
+	{
+	}
+
+	explicit SearchField(const std::string& query)
+		: super()
+		, m_value(query)
+	{
+	}
+
+	explicit SearchField(std::string& query)
+		: super()
+		, m_value(query)
+	{
+	}
+
+	SearchField& withPlaceholder(std::string hint)
+	{
+		m_placeholder = std::move(hint);
+		return *this;
+	}
+
+	SearchField& onChange(std::function<void(const std::string&)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+	SearchField& onChange(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onChange.set(std::move(callback));
+		return *this;
+	}
+
+	SearchField& onSearch(std::function<void(const std::string&)> callback)
+	{
+		m_onSearch.set(std::move(callback));
+		return *this;
+	}
+
+	SearchField& onSearch(std::function<void(const std::string&, void*)> callback)
+	{
+		m_onSearch.set(std::move(callback));
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<SearchFieldWrapper>(m_value, m_placeholder, pos, size, style, m_onChange, m_onSearch);
+	}
+
+private:
+	BoundValue<std::string> m_value;
+	std::string m_placeholder = "Search";
+	EventCallback<const std::string&> m_onChange;
+	EventCallback<const std::string&> m_onSearch;
+};
+
 // MultiLineTextCtrl -----------------------------------------------------------
 struct MultiLineTextCtrl : Widget<MultiLineTextCtrl>, TextFieldModifiers<MultiLineTextCtrl>
 {

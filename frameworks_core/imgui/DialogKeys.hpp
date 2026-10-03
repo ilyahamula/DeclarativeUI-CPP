@@ -31,6 +31,8 @@ struct Offers
 {
 	std::function<void()> defaultPress;
 	std::function<void()> cancelPress;
+	// A field that owns its Enter (a SearchField) took this frame's Enter.
+	bool enterConsumed = false;
 };
 
 inline Offers* g_current = nullptr;
@@ -68,7 +70,7 @@ public:
 			const auto press = m_offers.cancelPress;
 			press();
 		}
-		else if (m_offers.defaultPress && enterPressed())
+		else if (m_offers.defaultPress && !m_offers.enterConsumed && enterPressed())
 		{
 			const auto press = m_offers.defaultPress;
 			press();
@@ -105,6 +107,15 @@ public:
 private:
 	bool m_previous;
 };
+
+// This frame's Enter belonged to a field (SearchField's onSearch): the window
+// must not also press its default button -- what wx's char hook and Qt's
+// accepted key event decide on the retained backends.
+inline void consumeEnter()
+{
+	if (g_current != nullptr)
+		g_current->enterConsumed = true;
+}
 
 // First offer of each role wins: tree order, as on wx and Qt.
 inline void offer(unsigned roles, const std::function<void()>& press)

@@ -185,6 +185,37 @@ private:
 	EventCallback<const std::string&> m_onEnter;
 };
 
+// SearchFieldWrapper -----------------------------------------------------------
+// A single-line field for a search query: a magnifier on the left, a clear
+// button on the right while there is text, and onSearch on Enter. Native on wx
+// (wxSearchCtrl), a QLineEdit with Qt's own clear button on Qt, composed on
+// ImGui. Its Enter belongs to it: onSearch runs and the window's default button
+// is NOT pressed -- a search box inside a form searches, it does not submit.
+// Clearing is an ordinary edit (onChange with ""), never an onSearch.
+class SearchFieldWrapper : public ControlWrapper
+{
+public:
+	SearchFieldWrapper(BoundValue<std::string> value, std::string placeholder,
+		const Position& pos, const Size& size, long style,
+		EventCallback<const std::string&> onChange = {},
+		EventCallback<const std::string&> onSearch = {})
+		: ControlWrapper(pos, size, style)
+		, m_value(std::move(value))
+		, m_placeholder(std::move(placeholder))
+		, m_onChange(std::move(onChange))
+		, m_onSearch(std::move(onSearch))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+
+private:
+	BoundValue<std::string> m_value;
+	std::string m_placeholder;
+	EventCallback<const std::string&> m_onChange;
+	EventCallback<const std::string&> m_onSearch;
+};
+
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 class MultiLineTextCtrlWrapper : public ControlWrapper
 {

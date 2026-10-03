@@ -67,7 +67,7 @@ return Dialog {
 | Category          | Widgets |
 |-------------------|---------|
 | Text              | `StaticText` (`.withAlign()`), `RichText` (markup, `onLink`), `ReadonlyTextCtrl`, `ClickableText`, `LinkText` |
-| Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl` |
+| Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl`, `SearchField` (`.onSearch()`) |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` |

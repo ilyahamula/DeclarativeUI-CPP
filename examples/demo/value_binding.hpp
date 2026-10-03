@@ -21,6 +21,7 @@
 
 #include "declarative_ui.hpp"
 
+#include <cctype>
 #include <chrono>
 #include <functional>
 #include <string>
@@ -1694,6 +1695,77 @@ inline auto drawSignUpFormUI(DemoSignUp& form)
                     .isDisabled(form.cannotSubmit)
                     .withFlags(LayoutFlags().Border(Side::Left, 6))
                     .onClick([&form] { form.status = "Signed up as " + form.name; })
+            }
+        }
+    };
+}
+
+// SearchField over one std::string, shared with a label that echoes it and a
+// list it filters live: every edit (typed, cleared with the field's own
+// button, or written from outside by "Show fruit") re-filters the bound
+// ItemList through onChange, and the list follows on every backend. A bool
+// disables the field and the button together.
+struct DemoSearchBinding
+{
+    std::string query;
+    ItemList all { "Apple", "Apricot", "Banana", "Blueberry", "Carrot", "Cherry",
+                   "Cucumber", "Grape", "Leek", "Lemon", "Mango", "Pear" };
+    ItemList shown = all;
+    std::string picked;
+    std::string lastSearch = "Press Enter to search";
+    bool disabled = false;
+};
+
+inline void filterDemoItems(DemoSearchBinding& s)
+{
+    std::string needle = s.query;
+    for (auto& c : needle)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    s.shown.clear();
+    for (const auto& item : s.all)
+    {
+        std::string lower = item;
+        for (auto& c : lower)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (lower.find(needle) != std::string::npos)
+            s.shown.push_back(item);
+    }
+}
+
+inline auto drawSearchBindingUI(DemoSearchBinding& s)
+{
+    return Dialog {
+        "SearchField + list (shared query)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            SearchField{s.query}
+                .withPlaceholder("Filter produce...")
+                .withSize({240, -1})
+                .isDisabled(s.disabled)
+                .onChange([&s](const std::string&) { filterDemoItems(s); })
+                .onSearch([&s](const std::string& q) {
+                    s.lastSearch = "Searched for \"" + q + "\": " + std::to_string(s.shown.size()) + " hits";
+                }),
+            StaticText{s.query}
+                .withSize({240, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            ListBox{s.shown, s.picked}
+                .withVisibleRows(6)
+                .withSize({240, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            StaticText{s.lastSearch}
+                .withSize({240, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 6)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Button{"Show fruit"}
+                    .isDisabled(s.disabled)
+                    .onClick([&s] {
+                        s.query = "an"; // written from outside: the field follows
+                        filterDemoItems(s);
+                    }),
+                CheckBox{s.disabled, "Disable"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 10).CenterVertical())
             }
         }
     };

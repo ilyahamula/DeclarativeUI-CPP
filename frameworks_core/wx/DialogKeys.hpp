@@ -2,6 +2,7 @@
 
 #include "frameworks_core/CoreTypes/DialogKeys.hpp"
 
+#include <wx/srchctrl.h>
 #include <wx/wx.h>
 
 // Enter / Escape for Button::isDefault() / isCancel() on wx.
@@ -77,9 +78,18 @@ inline bool press(wxWindow* window, DialogKeyRole role)
 }
 
 // Whether the focused control consumes Enter itself.
+//
+// A wxSearchCtrl owns its Enter (it is onSearch), and the focus may be on it
+// (native on macOS and GTK) or on the text child the generic one is built
+// from (MSW) -- so the parent is asked too.
 inline bool focusWantsEnter()
 {
-	auto* text = dynamic_cast<wxTextCtrl*>(wxWindow::FindFocus());
+	wxWindow* focus = wxWindow::FindFocus();
+	if (focus == nullptr)
+		return false;
+	if (dynamic_cast<wxSearchCtrl*>(focus) != nullptr || dynamic_cast<wxSearchCtrl*>(focus->GetParent()) != nullptr)
+		return true;
+	auto* text = dynamic_cast<wxTextCtrl*>(focus);
 	return text != nullptr && (text->IsMultiLine() || text->HasFlag(wxTE_PROCESS_ENTER));
 }
 

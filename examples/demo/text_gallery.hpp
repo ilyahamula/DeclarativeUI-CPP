@@ -120,3 +120,49 @@ inline auto drawTextUI(
         }
     };
 }
+
+// SearchField, among the text inputs it is usually seen with. The first one
+// keeps the default "Search" placeholder; the second has its own and reports
+// both kinds of event into the status line, so the difference shows: every
+// edit is an onChange, only Enter is an onSearch -- and Enter in it never
+// presses "Save", the dialog's default button, while Enter in the plain
+// TextCtrl does.
+inline auto drawSearchGalleryUI(std::string& quickSearch, std::string& fileSearch,
+    std::string& title, std::string& status)
+{
+    constexpr int kFieldW = 260;
+    return Dialog {
+        "Search fields",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            StaticText{"Quick search (default placeholder):"}
+                .withSize({kFieldW, 20}),
+            SearchField{quickSearch}
+                .withSize({kFieldW, -1})
+                .withTooltip("Type, then press Enter"),
+            StaticText{"Files:"}
+                .withSize({kFieldW, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            SearchField{fileSearch}
+                .withPlaceholder("Search files...")
+                .withSize({kFieldW, -1})
+                .onChange([&status](const std::string& q) { status = "onChange: \"" + q + "\""; })
+                .onSearch([&status](const std::string& q) { status = "onSearch: \"" + q + "\""; }),
+            StaticText{"Document title (Enter saves):"}
+                .withSize({kFieldW, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            TextCtrl{title}
+                .withSize({kFieldW, -1}),
+            StaticText{status}
+                .withSize({kFieldW, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 10)),
+            HStack {
+                LayoutFlags().Border(Side::Top, 8),
+                Spacer{},
+                Button{"Save"}
+                    .isDefault()
+                    .onClick([&status, &title] { status = "Saved \"" + title + "\""; })
+            }
+        }
+    };
+}

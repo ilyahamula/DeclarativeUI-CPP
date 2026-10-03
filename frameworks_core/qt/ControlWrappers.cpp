@@ -12,6 +12,8 @@
 
 #include <QAction>
 #include <QIcon>
+#include <QPen>
+#include <QKeyEvent>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QButtonGroup>
@@ -289,6 +291,83 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	}
 
 	qt_text_field::apply(edit, std::move(m_field));
+}
+
+// SearchFieldWrapper -----------------------------------------------------------
+
+namespace
+{
+
+// A QLineEdit that keeps Enter. QLineEdit emits returnPressed and then
+// IGNORES the key, which would carry it on to the window's filter and press
+// the default button (DialogKeys.hpp); a search field's Enter is its own, so
+// it is accepted here instead. A virtual override, no Q_OBJECT.
+class SearchLineEdit : public QLineEdit
+{
+public:
+	using QLineEdit::QLineEdit;
+
+	std::function<void()> onReturn;
+
+protected:
+	void keyPressEvent(QKeyEvent* event) override
+	{
+		const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
+		if (enter && (event->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier)
+		{
+			if (onReturn)
+				onReturn();
+			event->accept();
+			return;
+		}
+		QLineEdit::keyPressEvent(event);
+	}
+};
+
+// Qt ships no portable search icon (QIcon::fromTheme is Linux-only in
+// practice), so the magnifier is painted -- in the field's own text colour,
+// dimmed, the way the placeholder is.
+QIcon magnifierIcon(const QWidget* field)
+{
+	const qreal dpr = field->devicePixelRatioF();
+	QPixmap pixmap(QSize(16, 16) * dpr);
+	pixmap.setDevicePixelRatio(dpr);
+	pixmap.fill(Qt::transparent);
+	QPainter painter(&pixmap);
+	painter.setRenderHint(QPainter::Antialiasing);
+	QColor colour = field->palette().color(QPalette::Text);
+	colour.setAlphaF(0.55);
+	painter.setPen(QPen(colour, 1.6));
+	painter.drawEllipse(QRectF(2.5, 2.5, 8.0, 8.0));
+	painter.drawLine(QPointF(9.5, 9.5), QPointF(13.5, 13.5));
+	return QIcon(pixmap);
+}
+
+} // unnamed namespace
+
+void SearchFieldWrapper::realize(void* parentWindow)
+{
+	auto* edit = new SearchLineEdit(qstr(m_value.get()), static_cast<QWidget*>(parentWindow));
+	// Neither the icon nor the hint changes QLineEdit's sizeHint (a fixed
+	// character count), so nothing here can resize an auto-fit window.
+	edit->setClearButtonEnabled(true);
+	edit->addAction(magnifierIcon(edit), QLineEdit::LeadingPosition);
+	if (!m_placeholder.empty())
+		edit->setPlaceholderText(qstr(m_placeholder));
+	m_nativeWidget = edit;
+
+	QObject::connect(edit, &QLineEdit::textChanged,
+		[commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](const QString& text) { commit(text.toStdString()); });
+	if (m_onSearch)
+		edit->onReturn = [edit, cb = std::move(m_onSearch)] { cb(edit->text().toStdString(), edit); };
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		bindExternalRefSync(edit,
+			[edit] { return edit->text().toStdString(); },
+			[&value] { return value; },
+			[edit](const std::string& v) { edit->setText(qstr(v)); });
+	}
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------

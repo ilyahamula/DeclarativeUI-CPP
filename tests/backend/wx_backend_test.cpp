@@ -11,6 +11,7 @@
 #include <wx/listbox.h>
 #include <wx/statline.h>
 #include <wx/dataview.h>
+#include <wx/srchctrl.h>
 #include <wx/statusbr.h>
 #include <wx/tooltip.h>
 #include <wx/treectrl.h>
@@ -18,6 +19,7 @@
 
 #include <cstdio>
 #include <functional>
+#include <algorithm>
 #include <thread>
 #include <vector>
 
@@ -868,6 +870,65 @@ TEST(wx_text_field_focus_follows_the_flag_and_reports)
 	emailInvalid = false;
 	pump();
 	CHECK(field->GetBackgroundColour() != wxColour(253, 228, 228));
+	w->Close();
+	pump();
+}
+
+// SearchField: a native wxSearchCtrl. The bound query follows both ways,
+// wxEVT_SEARCH runs onSearch, the window's char hook leaves Enter to the
+// field (no default button), and the cancel event empties it.
+TEST(wx_search_field_owns_its_enter_and_clears)
+{
+	std::string query = "cats";
+	std::vector<std::string> log;
+	Dialog { "Search",
+		VStack {
+			SearchField{query}
+				.onChange([&](const std::string& q) { log.push_back("change:" + q); })
+				.onSearch([&](const std::string& q) { log.push_back("search:" + q); }),
+			Button{"OK"}.isDefault().onClick([&] { log.push_back("ok"); })
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Search");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* search = find<wxSearchCtrl>(w, [](wxSearchCtrl*) { return true; });
+	CHECK(search != nullptr);
+	if (search == nullptr)
+		return;
+	CHECK(search->GetValue() == "cats");
+	CHECK(search->GetDescriptiveText() == "Search");
+
+	search->SetFocus();
+	pump();
+	if (wxWindow::FindFocus() != nullptr)
+	{
+		wxKeyEvent hook(wxEVT_CHAR_HOOK);
+		hook.m_keyCode = WXK_RETURN;
+		hook.SetEventObject(w);
+		w->ProcessWindowEvent(hook);
+		CHECK(hook.GetSkipped()); // left to the field
+		CHECK(std::find(log.begin(), log.end(), "ok") == log.end());
+	}
+
+	wxCommandEvent searchEvent(wxEVT_SEARCH, search->GetId());
+	searchEvent.SetEventObject(search);
+	search->ProcessWindowEvent(searchEvent);
+	CHECK(!log.empty() && log.back() == "search:cats");
+
+	log.clear();
+	wxCommandEvent cancel(wxEVT_SEARCH_CANCEL, search->GetId());
+	cancel.SetEventObject(search);
+	search->ProcessWindowEvent(cancel);
+	pump();
+	CHECK(query.empty());
+	CHECK(!log.empty() && log[0] == "change:");
+
+	query = "dogs";
+	pump();
+	CHECK(search->GetValue() == "dogs");
 	w->Close();
 	pump();
 }

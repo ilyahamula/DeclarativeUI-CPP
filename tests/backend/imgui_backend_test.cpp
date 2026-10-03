@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <algorithm>
 #include <thread>
 #include <vector>
 #include <string>
@@ -705,6 +706,49 @@ TEST(imgui_text_field_focus_follows_the_flag_and_reports)
 	frames(2);
 	CHECK_EQ(w->Size.x, size.x); // validity never moves anything
 	CHECK_EQ(w->Size.y, size.y);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// SearchField: typing writes the bound query, Enter runs onSearch and does
+// NOT press the window's default button, the clear button empties the field
+// as an ordinary edit (onChange with "", no onSearch).
+TEST(imgui_search_field_owns_its_enter_and_clears)
+{
+	std::string query;
+	std::vector<std::string> log;
+	g_ui = [&] {
+		Dialog { "Search",
+			VStack {
+				SearchField{query}.withSize({220, -1})
+					.onChange([&](const std::string& q) { log.push_back("change:" + q); })
+					.onSearch([&](const std::string& q) { log.push_back("search:" + q); }),
+				Button{"OK"}.isDefault().onClick([&] { log.push_back("ok"); })
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(4);
+	const ImVec2 field = rowCentre("Search", 0);
+	click(field.x + 60.0f, field.y);
+	frame(-1, -1, false, 'c');
+	frame(-1, -1, false, 'a');
+	frames(1);
+	CHECK_EQ(query, std::string("ca"));
+
+	log.clear();
+	key(ImGuiKey_Enter);
+	CHECK(std::find(log.begin(), log.end(), "search:ca") != log.end());
+	CHECK(std::find(log.begin(), log.end(), "ok") == log.end());
+
+	// the clear button: the right-hand icon slot of the 220 px field
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const ImGuiWindow* w = ImGui::FindWindowByName("Search");
+	const float clearX = w->Pos.x + st.WindowPadding.x + 220.0f - st.FramePadding.x - ImGui::GetFontSize() * 0.5f;
+	log.clear();
+	click(clearX, field.y);
+	CHECK(query.empty());
+	CHECK(std::find(log.begin(), log.end(), "change:") != log.end());
+	CHECK(std::find(log.begin(), log.end(), "search:") == log.end());
 	g_ui = nullptr;
 	frames(2);
 }

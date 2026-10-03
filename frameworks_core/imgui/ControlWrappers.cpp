@@ -272,6 +272,83 @@ void PasswordInputWrapper::render(const Rect& frame)
 	ImGui::PopID();
 }
 
+// SearchFieldWrapper -----------------------------------------------------------
+// One InputTextWithHint with its frame padding widened by one icon on each
+// side: the magnifier is drawn in the left pad and the clear button sits in
+// the right one, so the text never runs under either and the item is still
+// exactly the frame. The clear button is an InvisibleButton over the field,
+// which SetNextItemAllowOverlap lets win the hover.
+
+namespace
+{
+
+float searchIconSize()
+{
+	return ImGui::GetFontSize();
+}
+
+} // unnamed namespace
+
+Size SearchFieldWrapper::measureIntrinsic(const Constraints&)
+{
+	const float icons = 2.0f * (searchIconSize() + ImGui::GetStyle().FramePadding.x);
+	return Size { editableFloorWidth() + ceilInt(icons), frameHeight() };
+}
+
+void SearchFieldWrapper::render(const Rect& frame)
+{
+	WidgetSnapshot<std::string> snapshot(m_value, m_stableId);
+	std::string& text = m_value.get();
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float icon = searchIconSize();
+	const float height = ImGui::GetFrameHeight();
+	const float width = sized(frame) ? (float)frame.width : (float)measureIntrinsic({}).width;
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+
+	snapshot.pushId();
+	ImGui::SetNextItemWidth(width);
+	ImGui::SetNextItemAllowOverlap();
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+		ImVec2(style.FramePadding.x * 2.0f + icon, style.FramePadding.y));
+	const bool edited = ImGui::InputTextWithHint("##search", m_placeholder.c_str(), &text);
+	ImGui::PopStyleVar();
+	// Enter ends the edit in the frame it is pressed: that is the search, and
+	// the window's default button must not see it (DialogKeys.hpp).
+	if (ImGui::IsItemDeactivated() && imgui_dialog_keys::WindowScope::enterPressed())
+	{
+		imgui_dialog_keys::consumeEnter();
+		m_onSearch(text, m_nativeWidget);
+	}
+	if (edited)
+		m_onChange(text, m_nativeWidget);
+
+	// Colours through GetColorU32, so a disabled scope dims them like the text.
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+	const ImVec2 lens(origin.x + style.FramePadding.x + icon * 0.42f, origin.y + height * 0.46f);
+	draw->AddCircle(lens, icon * 0.28f, dim, 0, 1.5f);
+	draw->AddLine(ImVec2(lens.x + icon * 0.2f, lens.y + icon * 0.2f),
+		ImVec2(lens.x + icon * 0.42f, lens.y + icon * 0.42f), dim, 1.5f);
+
+	if (!text.empty())
+	{
+		const ImVec2 clearPos(origin.x + width - style.FramePadding.x - icon, origin.y + (height - icon) * 0.5f);
+		ImGui::SetCursorScreenPos(clearPos);
+		if (ImGui::InvisibleButton("##clear", ImVec2(icon, icon)))
+		{
+			text.clear();
+			m_onChange(text, m_nativeWidget);
+		}
+		const ImU32 mark = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+		const float inset = icon * 0.3f;
+		draw->AddLine(ImVec2(clearPos.x + inset, clearPos.y + inset),
+			ImVec2(clearPos.x + icon - inset, clearPos.y + icon - inset), mark, 1.5f);
+		draw->AddLine(ImVec2(clearPos.x + icon - inset, clearPos.y + inset),
+			ImVec2(clearPos.x + inset, clearPos.y + icon - inset), mark, 1.5f);
+	}
+	ImGui::PopID();
+}
+
 // MultiLineTextCtrlWrapper -----------------------------------------------------------
 
 Size MultiLineTextCtrlWrapper::measureIntrinsic(const Constraints&)

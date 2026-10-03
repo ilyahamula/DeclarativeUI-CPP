@@ -12,19 +12,17 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
-    // (isInvalid) on the three text fields.
-    DemoSignUp signUp;
-    // Bound TreeView items and Table rows (an Observable, so polled by its
-    // change counter): the buttons change these, both controls follow.
-    std::vector<TreeItem> folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
-    Observable<TableRows> files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
-    std::string folderPick = "Documents/Letters";
-    std::string filePick = "budget.csv";
+    // SearchField: the gallery (default and custom placeholders, Enter that
+    // searches instead of pressing the default button) and a live filter.
+    std::string quickSearch;
+    std::string fileSearch;
+    std::string docTitle = "Untitled";
+    std::string searchStatus = "Type in the file search";
+    DemoSearchBinding searchBinding;
 
     // One show() per open on a retained backend.
-    drawSignUpFormUI(signUp).show();
-    drawTreeTableBindingUI(folders, files, folderPick, filePick).show();
+    drawSearchGalleryUI(quickSearch, fileSearch, docTitle, searchStatus).show();
+    drawSearchBindingUI(searchBinding).show();
 
     return app.exec();
 }

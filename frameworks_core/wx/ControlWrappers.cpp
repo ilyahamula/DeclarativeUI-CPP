@@ -15,6 +15,7 @@
 
 #include <wx/wx.h>
 #include <wx/hyperlink.h>
+#include <wx/srchctrl.h>
 #include <wx/spinctrl.h>
 #include <wx/datectrl.h>
 #include <wx/timectrl.h>
@@ -235,6 +236,55 @@ void PasswordInputWrapper::realize(void* parentWindow)
 	}
 
 	wx_text_field::apply(txt, std::move(m_field));
+}
+
+// SearchFieldWrapper -----------------------------------------------------------
+
+void SearchFieldWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("SearchFieldWrapper::realize()\t-> new wxSearchCtrl()\n");
+#endif
+	auto* search = new wxSearchCtrl(static_cast<wxWindow*>(parentWindow), wxID_ANY, m_value.get(),
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style | wxTE_PROCESS_ENTER);
+	search->ShowSearchButton(true);
+	search->ShowCancelButton(true);
+	// The hint is pinned out of the best size, as applyHint() does for a
+	// TextCtrl: a long placeholder must not widen an auto-fit window.
+	if (!m_placeholder.empty())
+	{
+		const wxSize best = search->GetBestSize();
+		search->SetDescriptiveText(m_placeholder);
+		search->CacheBestSize(best);
+	}
+	m_nativeWidget = search;
+
+	search->Bind(wxEVT_TEXT, [commit = commitTo(m_value, std::move(m_onChange), m_nativeWidget)](wxCommandEvent& evt) {
+		commit(evt.GetString().ToStdString());
+	});
+	// Enter (and, on macOS, a click on the magnifier). Not Skip()ped: the
+	// window's char hook already left Enter to this control (focusWantsEnter),
+	// and it must not reach a default button by any other route.
+	if (m_onSearch)
+	{
+		search->Bind(wxEVT_SEARCH, [search, cb = std::move(m_onSearch)](wxCommandEvent&) {
+			cb(search->GetValue().ToStdString(), search);
+		});
+	}
+	// The cancel button: macOS empties the field itself, the generic control
+	// only reports -- SetValue is the edit either way, and reaches onChange.
+	search->Bind(wxEVT_SEARCH_CANCEL, [search](wxCommandEvent&) {
+		if (!search->GetValue().empty())
+			search->SetValue(wxString());
+	});
+	if (m_value.isBound())
+	{
+		auto& value = m_value.get();
+		bindExternalRefSync(search,
+			[search] { return search->GetValue().ToStdString(); },
+			[&value] { return value; },
+			[search](const std::string& v) { search->ChangeValue(v); });
+	}
 }
 
 // MultiLineTextCtrlWrapper -----------------------------------------------------------

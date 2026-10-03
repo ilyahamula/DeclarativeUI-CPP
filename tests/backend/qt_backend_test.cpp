@@ -8,6 +8,7 @@
 
 #include <QApplication>
 
+#include <algorithm>
 #include <thread>
 #include <vector>
 #include <QElapsedTimer>
@@ -21,6 +22,7 @@
 #include <QPlainTextEdit>
 #include <QStyleOption>
 #include <QTabWidget>
+#include <QKeyEvent>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
@@ -797,6 +799,53 @@ TEST(qt_text_field_focus_follows_the_flag_and_reports)
 	emailInvalid = false;
 	pump(200);
 	CHECK(second->palette().color(QPalette::Base) == base);
+	w->close();
+	pump();
+}
+
+// SearchField: the bound query follows both ways, Enter runs onSearch and is
+// accepted -- the default button is not pressed -- and Qt's clear button is
+// on, with a leading magnifier action.
+TEST(qt_search_field_owns_its_enter_and_clears)
+{
+	std::string query = "cats";
+	std::vector<std::string> log;
+	Dialog { "Search",
+		VStack {
+			SearchField{query}
+				.onChange([&](const std::string& q) { log.push_back("change:" + q); })
+				.onSearch([&](const std::string& q) { log.push_back("search:" + q); }),
+			Button{"OK"}.isDefault().onClick([&] { log.push_back("ok"); })
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Search");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* edit = w->findChild<QLineEdit*>();
+	CHECK(edit != nullptr);
+	if (edit == nullptr)
+		return;
+	CHECK(edit->text() == "cats");
+	CHECK(edit->isClearButtonEnabled());
+	CHECK(edit->placeholderText() == "Search");
+	CHECK(!edit->actions().isEmpty());
+
+	QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+	QApplication::sendEvent(edit, &enter);
+	CHECK_EQ(log.size(), std::size_t(1));
+	CHECK(!log.empty() && log[0] == "search:cats");
+
+	log.clear();
+	edit->clear(); // what the clear button does
+	pump();
+	CHECK(query.empty());
+	CHECK(!log.empty() && log[0] == "change:");
+
+	query = "dogs";
+	pump(200);
+	CHECK(edit->text() == "dogs");
 	w->close();
 	pump();
 }

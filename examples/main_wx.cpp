@@ -9,22 +9,20 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // The sign-up form: focus (isFocused, onFocus/onBlur) and validity
-    // (isInvalid) on the three text fields.
-    DemoSignUp m_signUp;
-    // Bound TreeView items and Table rows (an Observable, so polled by its
-    // change counter): the buttons change these, both controls follow.
-    std::vector<TreeItem> m_folders { { "Documents", { { "Invoices" }, { "Letters" } }, true }, { "Pictures", { { "2026" } } } };
-    Observable<TableRows> m_files { TableRows { { "readme.txt", "12" }, { "budget.csv", "48" }, { "notes.md", "7" } } };
-    std::string m_folderPick = "Documents/Letters";
-    std::string m_filePick = "budget.csv";
+    // SearchField: the gallery (default and custom placeholders, Enter that
+    // searches instead of pressing the default button) and a live filter.
+    std::string m_quickSearch;
+    std::string m_fileSearch;
+    std::string m_docTitle = "Untitled";
+    std::string m_searchStatus = "Type in the file search";
+    DemoSearchBinding m_searchBinding;
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawSignUpFormUI(m_signUp).show();
-        drawTreeTableBindingUI(m_folders, m_files, m_folderPick, m_filePick).show();
+        drawSearchGalleryUI(m_quickSearch, m_fileSearch, m_docTitle, m_searchStatus).show();
+        drawSearchBindingUI(m_searchBinding).show();
         return true;
     }
 };
