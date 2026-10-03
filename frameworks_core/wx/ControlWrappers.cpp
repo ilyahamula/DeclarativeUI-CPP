@@ -1,5 +1,8 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/wx/DialogKeys.hpp"
+#ifdef __WXOSX__
+#include "frameworks_core/wx/OsxSliderTicks.hpp"
+#endif
 #include "frameworks_core/wx/TextField.hpp"
 #include "frameworks_core/wx/RefSync.hpp"
 #include <algorithm>
@@ -522,6 +525,16 @@ void SliderWrapper<T>::realize(void* parentWindow)
 	Logger::instance().log("SliderWrapper::realize()\t-> new wxSlider()\n");
 #endif
 	const T& val = m_value.get();
+	// A vertical wxSlider puts its minimum at the TOP on every port; Qt and
+	// ImGui put it at the bottom, which is also what a level meter means.
+	// wxSL_INVERSE flips it -- applied to the value by wxSliderBase itself
+	// (ValueInvertOrNot), so it holds on every port and GetValue() still
+	// reports the real value.
+	long style = m_style;
+	if (m_orient == Orientation::Vertical)
+		style |= wxSL_VERTICAL | wxSL_INVERSE;
+	if (m_tickStep > T {})
+		style |= wxSL_AUTOTICKS;
 	wxSlider* sl = nullptr;
 	if constexpr (std::is_floating_point_v<T>)
 	{
@@ -529,12 +542,28 @@ void SliderWrapper<T>::realize(void* parentWindow)
 		int iMax = static_cast<int>(m_range.max / m_range.step);
 		int iVal = static_cast<int>(val / m_range.step);
 		sl = new wxSlider(static_cast<wxWindow*>(parentWindow), wxID_ANY, iVal, iMin, iMax,
-			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), style);
 	}
 	else
 	{
 		sl = new wxSlider(static_cast<wxWindow*>(parentWindow), wxID_ANY, static_cast<int>(val), m_range.min, m_range.max,
-			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+			wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), style);
+	}
+	// The tick frequency is in the slider's integral units (step units for a
+	// float slider). wxOSX ignores it and draws a fixed comb, so there the
+	// native slider is told the COUNT instead -- the same marks, since both
+	// spread them evenly from the minimum.
+	if (m_tickStep > T {})
+	{
+		if constexpr (std::is_floating_point_v<T>)
+			sl->SetTickFreq(std::max(1, static_cast<int>(m_tickStep / m_range.step + 0.5f)));
+		else
+			sl->SetTickFreq(std::max(1, static_cast<int>(m_tickStep)));
+#ifdef __WXOSX__
+		const std::size_t ticks = tickFractions(m_range, m_tickStep).size();
+		if (ticks > 0)
+			wxOsxSetSliderTickCount(sl, static_cast<int>(ticks));
+#endif
 	}
 	m_nativeWidget = sl;
 

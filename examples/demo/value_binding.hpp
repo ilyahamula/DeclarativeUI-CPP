@@ -1814,3 +1814,61 @@ inline auto drawEditableComboBindingUI(DemoComboBinding& s)
         }
     };
 }
+
+// Slider orientation and ticks: three vertical channel faders (minimum at the
+// bottom on every backend, a tick every 25) each bound to an int shared with
+// the SpinBox under it, and a horizontal master on a float with a tick every
+// 0.25 while the value still moves in steps of 0.05. "Mute" disables every
+// fader through one bound bool. Ticks only mark positions: on wx the native
+// slider draws them, on macOS through the NSSlider tick count.
+struct DemoMixer
+{
+    int bass = 40;
+    int mid = 60;
+    int treble = 75;
+    float master = 0.8f;
+    bool muted = false;
+};
+
+inline auto drawMixerUI(DemoMixer& m)
+{
+    const auto channel = [&m](const char* name, int& value) {
+        return VStack {
+            Slider{ Range<int>{ .min = 0, .max = 100 }, value }
+                .withOrientation(Orientation::Vertical)
+                .withTicks(25)
+                .withSize({40, 160})
+                .withFlags(LayoutFlags().Center())
+                .isDisabled(m.muted),
+            SpinBox{ Range<int>{ .min = 0, .max = 100 }, value }
+                .withSize({70, -1})
+                .withFlags(LayoutFlags().Border(Side::Top, 6))
+                .isDisabled(m.muted),
+            StaticText{name}
+                .withAlign(TextAlign::Center)
+                .withSize({70, 20})
+        };
+    };
+    return Dialog {
+        "Mixer (vertical sliders + ticks)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                channel("Bass", m.bass),
+                Spacer{Size{16, 0}},
+                channel("Mid", m.mid),
+                Spacer{Size{16, 0}},
+                channel("Treble", m.treble)
+            },
+            StaticText{"Master"}
+                .withSize({260, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 12)),
+            Slider{ Range<float>{ .min = 0.0f, .max = 1.0f, .step = 0.05f }, m.master }
+                .withTicks(0.25f)
+                .withSize({260, -1})
+                .isDisabled(m.muted),
+            CheckBox{m.muted, "Mute"}
+                .withFlags(LayoutFlags().Border(Side::Top, 10))
+        }
+    };
+}

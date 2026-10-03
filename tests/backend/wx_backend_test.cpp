@@ -11,6 +11,10 @@
 #include <wx/listbox.h>
 #include <wx/statline.h>
 #include <wx/dataview.h>
+#include <wx/slider.h>
+#ifdef __WXOSX__
+#include "frameworks_core/wx/OsxSliderTicks.hpp"
+#endif
 #include <wx/srchctrl.h>
 #include <wx/statusbr.h>
 #include <wx/tooltip.h>
@@ -979,6 +983,58 @@ TEST(wx_editable_combo_takes_typing_and_picks)
 	font = "Georgia";
 	pump();
 	CHECK(combo->GetValue() == "Georgia");
+	w->Close();
+	pump();
+}
+
+// Slider orientation and ticks: a vertical wxSlider is created with
+// wxSL_INVERSE so its minimum is at the bottom like Qt's and ImGui's (wx's
+// default is the top), while GetValue() still reports the real value; ticks
+// are wxSL_AUTOTICKS at the step in the slider's own units.
+TEST(wx_vertical_slider_with_ticks)
+{
+	int level = 50;
+	float gain = 0.5f;
+	Dialog { "Levels",
+		HStack {
+			Slider{ Range<int>{ .min = 0, .max = 100 }, level }
+				.withOrientation(Orientation::Vertical)
+				.withTicks(25),
+			Slider{ Range<float>{ .min = 0.0f, .max = 1.0f, .step = 0.05f }, gain }
+				.withTicks(0.25f)
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Levels");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	auto* vertical = find<wxSlider>(w, [](wxSlider* s) { return s->HasFlag(wxSL_VERTICAL); });
+	auto* horizontal = find<wxSlider>(w, [](wxSlider* s) { return !s->HasFlag(wxSL_VERTICAL); });
+	CHECK(vertical != nullptr && horizontal != nullptr);
+	if (vertical == nullptr || horizontal == nullptr)
+		return;
+	CHECK(vertical->HasFlag(wxSL_INVERSE));
+	CHECK(vertical->HasFlag(wxSL_AUTOTICKS));
+	CHECK(horizontal->HasFlag(wxSL_AUTOTICKS));
+	CHECK(!horizontal->HasFlag(wxSL_INVERSE));
+	CHECK_EQ(vertical->GetValue(), 50); // inversion is visual only
+#ifdef __WXOSX__
+	// wxOSX ignores SetTickFreq; the native NSSlider is given the count
+	CHECK_EQ(wxOsxSliderTickCount(vertical), 5);   // 0..100 every 25
+	CHECK_EQ(wxOsxSliderTickCount(horizontal), 5); // 0..1 every 0.25
+#endif
+
+	vertical->SetValue(80);
+	wxCommandEvent moved(wxEVT_SLIDER, vertical->GetId());
+	moved.SetEventObject(vertical);
+	moved.SetInt(80);
+	vertical->ProcessWindowEvent(moved);
+	pump();
+	CHECK_EQ(level, 80);
+	level = 10;
+	pump();
+	CHECK_EQ(vertical->GetValue(), 10);
 	w->Close();
 	pump();
 }

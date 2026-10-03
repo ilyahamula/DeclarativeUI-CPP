@@ -765,24 +765,95 @@ void TimePickerWrapper::render(const Rect& frame)
 
 // SliderWrapper -----------------------------------------------------------
 
+namespace
+{
+
+// The band beside the track that tick marks are drawn in: a 4 px mark and a
+// 2 px gap. Measured in, so the ticks are always inside the engine's frame.
+constexpr float kSliderTickBand = 6.0f;
+
+// Where the grab's centre sits for fraction `t` of the range along a slider
+// whose frame spans [lo, hi] on its axis -- ImGui's own arithmetic
+// (SliderBehaviorT, imgui_widgets.cpp), so a tick sits exactly under the grab
+// at that value. Integer sliders size the grab to one unit when they can.
+float sliderGrabPos(float lo, float hi, float t, bool integral, float rangeUnits)
+{
+	constexpr float kGrabPadding = 2.0f;
+	const float sliderSize = (hi - lo) - kGrabPadding * 2.0f;
+	float grab = ImGui::GetStyle().GrabMinSize;
+	if (integral)
+		grab = std::max(sliderSize / (rangeUnits + 1.0f), grab);
+	grab = std::min(grab, sliderSize);
+	const float usableMin = lo + kGrabPadding + grab * 0.5f;
+	const float usableMax = hi - kGrabPadding - grab * 0.5f;
+	return usableMin + (usableMax - usableMin) * t;
+}
+
+} // unnamed namespace
+
 template <SliderValue T>
 Size SliderWrapper<T>::measureIntrinsic(const Constraints&)
 {
-	return Size { kDefaultControlWidth, frameHeight() };
+	const int band = tickFractions(m_range, m_tickStep).empty() ? 0 : static_cast<int>(kSliderTickBand);
+	if (m_orient == Orientation::Vertical)
+		return Size { frameHeight() + band, kDefaultControlWidth };
+	return Size { kDefaultControlWidth, frameHeight() + band };
 }
 
 template <SliderValue T>
 void SliderWrapper<T>::render(const Rect& frame)
 {
 	WidgetSnapshot<T> snapshot(m_value, m_stableId);
-	if (sized(frame))
-		ImGui::SetNextItemWidth((float)frame.width);
+	const std::vector<float> ticks = tickFractions(m_range, m_tickStep);
+	const float band = ticks.empty() ? 0.0f : kSliderTickBand;
+	const bool vertical = m_orient == Orientation::Vertical;
 	snapshot.pushId();
 	bool changed = false;
-	if constexpr (std::is_same_v<T, int>)
-		changed = ImGui::SliderInt("##slider", &m_value.get(), m_range.min, m_range.max);
+	if (vertical)
+	{
+		// VSlider takes its size outright: the frame, less the tick band.
+		const Size natural = measureIntrinsic({});
+		const ImVec2 size(std::max(1.0f, (sized(frame) ? (float)frame.width : (float)natural.width) - band),
+			sized(frame) ? (float)frame.height : (float)natural.height);
+		if constexpr (std::is_same_v<T, int>)
+			changed = ImGui::VSliderInt("##slider", size, &m_value.get(), m_range.min, m_range.max);
+		else
+			changed = ImGui::VSliderFloat("##slider", size, &m_value.get(), m_range.min, m_range.max);
+	}
 	else
-		changed = ImGui::SliderFloat("##slider", &m_value.get(), m_range.min, m_range.max);
+	{
+		if (sized(frame))
+			ImGui::SetNextItemWidth((float)frame.width);
+		if constexpr (std::is_same_v<T, int>)
+			changed = ImGui::SliderInt("##slider", &m_value.get(), m_range.min, m_range.max);
+		else
+			changed = ImGui::SliderFloat("##slider", &m_value.get(), m_range.min, m_range.max);
+	}
+
+	if (!ticks.empty())
+	{
+		// Beside the track, under the grab's positions; a vertical slider's
+		// minimum is at the bottom, so its fractions run upward.
+		const ImVec2 lo = ImGui::GetItemRectMin();
+		const ImVec2 hi = ImGui::GetItemRectMax();
+		const bool integral = std::is_integral_v<T>;
+		const float units = static_cast<float>(m_range.max - m_range.min);
+		const ImU32 colour = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		for (const float t : ticks)
+		{
+			if (vertical)
+			{
+				const float y = sliderGrabPos(lo.y, hi.y, 1.0f - t, integral, units);
+				draw->AddLine(ImVec2(hi.x + 2.0f, y), ImVec2(hi.x + band, y), colour);
+			}
+			else
+			{
+				const float x = sliderGrabPos(lo.x, hi.x, t, integral, units);
+				draw->AddLine(ImVec2(x, hi.y + 2.0f), ImVec2(x, hi.y + band), colour);
+			}
+		}
+	}
 	ImGui::PopID();
 
 	if (changed)

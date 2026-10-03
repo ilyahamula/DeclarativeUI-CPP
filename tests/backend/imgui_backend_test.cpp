@@ -802,6 +802,44 @@ TEST(imgui_editable_combo_takes_typing_and_picks)
 	frames(2);
 }
 
+// Slider orientation and ticks: a vertical slider has its minimum at the
+// bottom (a click near the top is a high value), and ticks are measured into
+// the frame -- one band beside the track -- so drawing them never overflows.
+TEST(imgui_vertical_slider_with_ticks)
+{
+	int level = 50;
+	g_ui = [&] {
+		Dialog { "Levels",
+			HStack {
+				Slider{ Range<int>{ .min = 0, .max = 100 }, level }
+					.withOrientation(Orientation::Vertical)
+					.withTicks(25)
+					.withSize({-1, 200})
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(4);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Levels");
+	const ImGuiStyle& st = ImGui::GetStyle();
+	const float x = w->Pos.x + st.WindowPadding.x + ImGui::GetFrameHeight() * 0.5f;
+	const float top = w->Pos.y + ImGui::GetFrameHeight() + st.WindowPadding.y;
+	click(x, top + 6.0f);
+	CHECK(level >= 95);
+	click(x, top + 194.0f);
+	CHECK(level <= 5);
+
+	SliderWrapper<int> plain(Range<int>{ 0, 100, 1 }, BoundValue<int>(level), {}, {}, 0);
+	SliderWrapper<int> ticked(Range<int>{ 0, 100, 1 }, BoundValue<int>(level), {}, {}, 0, {},
+		Orientation::Vertical, 25);
+	CHECK_EQ(ticked.measureIntrinsic({}).width, ImGui::GetFrameHeight() + 6.0f);
+	CHECK_EQ(plain.measureIntrinsic({}).height, ImGui::GetFrameHeight());
+	const auto fractions = SliderWrapper<int>::tickFractions(Range<int>{ 0, 100, 1 }, 25);
+	CHECK_EQ(fractions.size(), std::size_t(5));
+	CHECK(SliderWrapper<int>::tickFractions(Range<int>{ 0, 100000, 1 }, 1).empty()); // too dense
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

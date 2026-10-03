@@ -543,7 +543,19 @@ template <SliderValue T>
 void SliderWrapper<T>::realize(void* parentWindow)
 {
 	const T& initial = m_value.get();
-	auto* slider = new QSlider(Qt::Horizontal, static_cast<QWidget*>(parentWindow));
+	// A vertical QSlider already has its minimum at the bottom.
+	auto* slider = new QSlider(m_orient == Orientation::Vertical ? Qt::Vertical : Qt::Horizontal,
+		static_cast<QWidget*>(parentWindow));
+	// Ticks below a horizontal slider, right of a vertical one; the interval is
+	// in the slider's integral units (step units for a float slider).
+	if (m_tickStep > T {})
+	{
+		slider->setTickPosition(m_orient == Orientation::Vertical ? QSlider::TicksRight : QSlider::TicksBelow);
+		if constexpr (std::is_floating_point_v<T>)
+			slider->setTickInterval(std::max(1, static_cast<int>(m_tickStep / m_range.step + 0.5f)));
+		else
+			slider->setTickInterval(std::max(1, static_cast<int>(m_tickStep)));
+	}
 	if constexpr (std::is_floating_point_v<T>)
 	{
 		slider->setRange(static_cast<int>(m_range.min / m_range.step),

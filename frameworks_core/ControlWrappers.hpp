@@ -409,20 +409,45 @@ class SliderWrapper : public ControlWrapper
 public:
 	SliderWrapper(Range<T> range, BoundValue<T> value,
 		const Position& pos, const Size& size, long style,
-		EventCallback<T> onChange = {})
+		EventCallback<T> onChange = {},
+		Orientation orient = Orientation::Horizontal, T tickStep = T {})
 		: ControlWrapper(pos, size, style)
 		, m_range(range)
 		, m_value(std::move(value))
 		, m_onChange(std::move(onChange))
+		, m_orient(orient)
+		, m_tickStep(tickStep)
 	{
 	}
 
 	DECLARE_CONTROL_WRAPPER_OVERRIDES();
 
+	// Where a tick sits along the track, 0 at the minimum end and 1 at the
+	// maximum, for every multiple of the tick step from the minimum. Empty
+	// when the slider has no ticks or the step would draw an unreadable comb.
+	// Shared so the ImGui drawing and the tests read one rule.
+	static std::vector<float> tickFractions(const Range<T>& range, T tickStep)
+	{
+		std::vector<float> ticks;
+		const double span = static_cast<double>(range.max) - static_cast<double>(range.min);
+		if (tickStep <= T {} || span <= 0.0)
+			return ticks;
+		const double count = span / static_cast<double>(tickStep);
+		if (count > 200.0)
+			return ticks;
+		for (int i = 0; i <= static_cast<int>(count + 1e-9); ++i)
+			ticks.push_back(static_cast<float>(i * static_cast<double>(tickStep) / span));
+		return ticks;
+	}
+
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
 	EventCallback<T> m_onChange;
+	// Vertical sliders have their MINIMUM AT THE BOTTOM on all three backends
+	// (wx's default is the top; it is flipped with wxSL_INVERSE).
+	Orientation m_orient;
+	T m_tickStep; // value units between tick marks; 0 = none
 };
 
 extern template class SliderWrapper<int>;

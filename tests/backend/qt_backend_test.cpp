@@ -27,6 +27,7 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QPlainTextEdit>
+#include <QSlider>
 #include <QTableWidget>
 #include <QTimer>
 #include <QTreeWidget>
@@ -897,6 +898,50 @@ TEST(qt_editable_combo_takes_typing_and_picks)
 	font = "Georgia";
 	pump(200);
 	CHECK(combo->currentText() == "Georgia");
+	w->close();
+	pump();
+}
+
+// Slider orientation and ticks: a vertical QSlider (minimum at the bottom
+// natively), ticks beside it at the step in the slider's own units, the
+// binding unchanged.
+TEST(qt_vertical_slider_with_ticks)
+{
+	int level = 50;
+	float gain = 0.5f;
+	Dialog { "Levels",
+		HStack {
+			Slider{ Range<int>{ .min = 0, .max = 100 }, level }
+				.withOrientation(Orientation::Vertical)
+				.withTicks(25),
+			Slider{ Range<float>{ .min = 0.0f, .max = 1.0f, .step = 0.05f }, gain }
+				.withTicks(0.25f)
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Levels");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	const auto sliders = w->findChildren<QSlider*>();
+	CHECK_EQ(sliders.size(), 2);
+	if (sliders.size() != 2)
+		return;
+	QSlider* vertical = sliders[0]->orientation() == Qt::Vertical ? sliders[0] : sliders[1];
+	QSlider* horizontal = vertical == sliders[0] ? sliders[1] : sliders[0];
+	CHECK(vertical->orientation() == Qt::Vertical);
+	CHECK(!vertical->invertedAppearance()); // minimum at the bottom
+	CHECK(vertical->tickPosition() == QSlider::TicksRight);
+	CHECK_EQ(vertical->tickInterval(), 25);
+	CHECK(horizontal->tickPosition() == QSlider::TicksBelow);
+	CHECK_EQ(horizontal->tickInterval(), 5); // 0.25 in steps of 0.05
+
+	vertical->setValue(80);
+	pump();
+	CHECK_EQ(level, 80);
+	level = 10;
+	pump(200);
+	CHECK_EQ(vertical->value(), 10);
 	w->close();
 	pump();
 }

@@ -19,18 +19,19 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // EditableCombo: the gallery (free text vs the list-only ComboBox) and a
-    // shared text with a bound, growing list of suggestions.
+    // Slider orientation and ticks: vertical channel faders with a SpinBox
+    // each, and a ticked float master.
+    DemoMixer mixer;
+    // EditableCombo: the gallery (free text vs the list-only ComboBox).
     std::string comboFont = "Arial";
     std::string comboCity;
     std::string comboSize = "Medium";
     std::string comboStatus = "Pick or type";
-    DemoComboBinding comboBinding;
 
     runImGuiApp([&]
     {
         drawEditableComboGalleryUI(comboFont, comboCity, comboSize, comboStatus).show();
-        drawEditableComboBindingUI(comboBinding).show();
+        drawMixerUI(mixer).show();
     });
 
     return 0;

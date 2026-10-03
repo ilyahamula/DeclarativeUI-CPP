@@ -1827,19 +1827,42 @@ struct Slider : Widget<Slider<T>>
 		return *this;
 	}
 
+	// Horizontal (the default) or vertical. A vertical slider has its minimum
+	// at the BOTTOM on every backend, and sizes like any leaf: give it a
+	// height with withSize({-1, h}) or a Proportion in a column.
+	Slider& withOrientation(Orientation orient)
+	{
+		m_orient = orient;
+		return *this;
+	}
+
+	// A tick mark at every `step` from the minimum (value units, so 0.5 on a
+	// float slider is every half). Ticks only mark: the value still moves by
+	// the range's own step. A step that would draw more than 200 ticks draws
+	// none. On wx the native slider decides whether ticks show at all -- see
+	// the summary of SliderWrapper.
+	Slider& withTicks(T step)
+	{
+		m_tickStep = step;
+		return *this;
+	}
+
 private:
 	std::unique_ptr<ControlWrapper> createWrapper(
 		const Position& pos,
 		const Size& size,
 		long style) override
 	{
-		return std::make_unique<SliderWrapper<T>>(m_range, m_value, pos, size, style, m_onChange);
+		return std::make_unique<SliderWrapper<T>>(m_range, m_value, pos, size, style, m_onChange,
+			m_orient, m_tickStep);
 	}
 
 private:
 	Range<T> m_range;
 	BoundValue<T> m_value;
 	EventCallback<T> m_onChange;
+	Orientation m_orient = Orientation::Horizontal;
+	T m_tickStep {};
 };
 
 template <SliderValue T>

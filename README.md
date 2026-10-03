@@ -70,7 +70,7 @@ return Dialog {
 | Text input        | `TextCtrl`, `PasswordInput` (both `.withPlaceholder()`), `MultiLineTextCtrl`, `SearchField` (`.onSearch()`) |
 | Buttons & choice  | `Button`, `ToggleButton`, `CheckBox`, `RadioButton<T>`, `RadioGroup`, `ComboBox<T>` (list only), `EditableCombo` (free text + suggestions) |
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
-| Numeric           | `SpinBox<T>`, `Slider<T>` |
+| Numeric           | `SpinBox<T>`, `Slider<T>` (`.withOrientation()`, `.withTicks()`) |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
 | Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |

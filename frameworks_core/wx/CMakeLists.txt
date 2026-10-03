@@ -15,7 +15,10 @@ if(APPLE)
     # wx exposes no portable API for it. OBJCXX is enabled by the root
     # CMakeLists -- enabling a language here would not reach the directory
     # that owns the target.
-    target_sources(DeclarativeUI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OsxButtonBezel.mm)
+    target_sources(DeclarativeUI PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/OsxButtonBezel.mm
+        # NSSlider tick count: wxOSX ignores SetTickFreq (see OsxSliderTicks.hpp).
+        ${CMAKE_CURRENT_SOURCE_DIR}/OsxSliderTicks.mm)
     set_target_properties(DeclarativeUI PROPERTIES
         OBJCXX_STANDARD 20
         OBJCXX_STANDARD_REQUIRED ON
