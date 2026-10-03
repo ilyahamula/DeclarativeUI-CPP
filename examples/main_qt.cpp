@@ -12,17 +12,17 @@ int main(int argc, char** argv)
     // Demo state: locals of main, so the bound refs outlive the modeless
     // windows that read them for the whole of exec().
     //
-    // VirtualList: a million generated log lines beside a ListBox, and a
-    // list whose row, count and revision are caller-owned.
+    // VirtualList: a million generated log lines beside a ListBox. Custom
+    // composites: user structs/classes standing for a group of widgets.
     int logCount = 1000000;
     int logRow = -1;
     std::string languagePick = "C++";
     std::string listStatus = "Pick a log line";
-    DemoVirtualList virtualList;
+    DemoCustomComposites composites;
 
     // One show() per open on a retained backend.
     drawVirtualListGalleryUI(logCount, logRow, languagePick, listStatus).show();
-    drawVirtualListBindingUI(virtualList).show();
+    drawCustomCompositesUI(composites).show();
 
     return app.exec();
 }

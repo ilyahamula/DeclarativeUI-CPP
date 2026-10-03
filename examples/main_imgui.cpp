@@ -19,18 +19,18 @@ int main(int argc, char** argv)
     // Demo state. Bound by reference, so it has to outlive the frame loop --
     // ImGui rebuilds the tree every frame and reads these live.
     //
-    // VirtualList: a million generated log lines beside a ListBox, and a
-    // list whose row, count and revision are caller-owned.
+    // VirtualList: a million generated log lines beside a ListBox. Custom
+    // composites: user structs/classes standing for a group of widgets.
     int logCount = 1000000;
     int logRow = -1;
     std::string languagePick = "C++";
     std::string listStatus = "Pick a log line";
-    DemoVirtualList virtualList;
+    DemoCustomComposites composites;
 
     runImGuiApp([&]
     {
         drawVirtualListGalleryUI(logCount, logRow, languagePick, listStatus).show();
-        drawVirtualListBindingUI(virtualList).show();
+        drawCustomCompositesUI(composites).show();
     });
 
     return 0;

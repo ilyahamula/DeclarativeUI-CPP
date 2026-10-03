@@ -60,6 +60,7 @@ return Dialog {
 - **Focus and validation** — `TextCtrl{email}.isFocused(emailFocused).isInvalid(emailBad).onBlur(validate)`: a bound focus flag follows focus and moves it when set, `isFocused()` picks the field a window opens with, `onFocus`/`onBlur` report, and `isInvalid` tints the field without resizing it (text fields only)
 - **Stable ids** — `.withId("volume")` names a control: on ImGui its state is keyed by the name rather than its position in the tree (so an unbound value survives an `Expander` folding above it), and on wx/Qt it becomes the native window / object name
 - **Event callbacks** — `.onClick()`, `.onChange()`, `.onHover()`, plus `.onCellChange()` on `Table`; each also has an overload receiving the native widget handle
+- **Your own composite widgets** — `DECLARE_UI(HStack{…})` inside a struct or class turns it into a reusable widget group with `withFlags()`, `isDisabled()` and `isHidden()`, used anywhere a built-in widget fits (see [Custom composites](#custom-composites))
 - **Multi-backend** — compile against ImGui, wxWidgets, or Qt by switching one CMake variable
 
 ## Widget Catalogue
@@ -378,6 +379,69 @@ costs the layout *nothing at all* — not its size, not its margins, not even th
 above it — so an auto-fit dialog shrinks and grows as sections close and open. Bind
 the open state to a `bool&` and clicking the header writes through to it, exactly as
 the splitter's sash does with its `int&`.
+
+---
+
+## Custom composites
+
+Any type with a `std::unique_ptr<LayoutNode> buildNode()` can go wherever a widget
+can — a stack, a group box, a tab, a `Dialog`. `DECLARE_UI(...)` writes that
+function for you, so a struct or class body reads as the widgets it stands for:
+
+```cpp
+// An aggregate: the bound value is a public reference member.
+struct PasswordRow
+{
+    std::string& password;
+
+    DECLARE_UI(HStack {
+        StaticText{"Password:"}.withFlags(LayoutFlags().CenterVertical()),
+        PasswordInput{password}.withFlags(LayoutFlags().Proportion(1))
+    })
+};
+
+// A class: a constructor, private data kept inside, bound data by reference.
+class LabeledField
+{
+public:
+    LabeledField(std::string label, std::string& text)
+        : m_label(std::move(label)), m_text(text) {}
+
+    DECLARE_UI(HStack {
+        StaticText{m_label + ":"},
+        TextCtrl{m_text}.withFlags(LayoutFlags().Proportion(1))
+    })
+
+private:
+    std::string m_label;
+    std::string& m_text;
+};
+
+VStack {
+    LabeledField{"User", user}.withFlags(LayoutFlags().Expand()),
+    PasswordRow{password}.withFlags(LayoutFlags().Expand()).isDisabled(locked),
+}
+```
+
+The macro also gives the type the container modifiers — `withFlags()`,
+`isDisabled()` and `isHidden()`, fixed or bound to a `bool&` — and each returns the
+type itself, so chaining keeps it. They apply to the root of the declared tree; if
+that root already has its own `isDisabled()`/`isHidden()`, both flags apply.
+
+Things to know:
+
+- **Put `DECLARE_UI` after the data members of an aggregate.** It adds one member of
+  its own, and `PasswordRow{pw}` initialises members in order. A class with a
+  constructor can place it anywhere.
+- **It switches to `public:`**, so whatever follows it is public; put `private:` back
+  after it if needed.
+- **Never capture `this` in a handler.** Like every widget, a composite is a temporary
+  that is gone by the time a wx/Qt handler runs. Capture the caller-owned variables
+  instead: `.onClick([&status = m_status] { status = "Done"; })`.
+- Tooltips, context menus and `withId()` are leaf-only, so the composite does not offer
+  them; put them on the widgets inside.
+
+`examples/demo/custom_composites.hpp` shows all of this running on every backend.
 
 ---
 

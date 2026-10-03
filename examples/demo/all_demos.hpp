@@ -16,6 +16,7 @@
 #include "feedback_gallery.hpp"
 #include "app_shell.hpp"
 #include "layout_probes.hpp"
+#include "custom_composites.hpp"
 
 #ifdef USE_LOGGER
 #include "Logger.hpp"

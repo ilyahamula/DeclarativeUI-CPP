@@ -19,6 +19,7 @@
 #include "toast.hpp"
 #include "show_action.hpp"
 #include "ui_thread.hpp"
+#include "declare_ui.hpp"
 
 #include <type_traits>
 
@@ -261,3 +262,32 @@ static_assert(std::is_constructible_v<ListBox<std::string>, Observable<ItemList>
 static_assert(TabContent<VStack<Button>>);
 static_assert(IsTab<Tab<VStack<Button>>>);
 static_assert(NodeBuildable<TabPanel<Tab<VStack<Button>>>>);
+
+// DECLARE_UI: a user type is a NodeBuildable with a container's modifiers, as an
+// aggregate (initialised positionally, the macro's member trailing) or as a
+// class with a constructor and private data.
+namespace declare_ui_check
+{
+struct Row
+{
+	std::string& text;
+	DECLARE_UI(HStack { StaticText{"Label"}, TextCtrl{text} })
+};
+
+class Field
+{
+public:
+	explicit Field(std::string& text) : m_text(text) {}
+	DECLARE_UI(TextCtrl{m_text})
+
+private:
+	std::string& m_text;
+};
+}
+static_assert(NodeBuildable<declare_ui_check::Row>);
+static_assert(NodeBuildable<declare_ui_check::Field>);
+static_assert(Hideable<declare_ui_check::Row>);
+static_assert(Hideable<declare_ui_check::Field>);
+static_assert(requires(std::string& text) { declare_ui_check::Row{text}; });
+static_assert(std::is_same_v<decltype(std::declval<declare_ui_check::Row&>().withFlags({})), declare_ui_check::Row&>);
+static_assert(std::is_same_v<decltype(std::declval<declare_ui_check::Field&>().isDisabled()), declare_ui_check::Field&>);
