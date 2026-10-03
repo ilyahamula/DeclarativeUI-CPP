@@ -119,7 +119,16 @@ void DialogWrapper::runLayoutEngine(const std::string& title, const Size& size,
 	const Size contentRequest = fixed
 		? Size { size.width - chromeW, size.height - chromeH }
 		: Size { -1, -1 };
+	// The measure pass runs BEFORE Begin, so without a scope of its own every
+	// top-level would measure in the same ImGui id scope and share one
+	// per-frame measure counter -- and a window's measure-phase state (frozen
+	// first sizes, unbound sash positions, unbound Expander states) would be
+	// keyed by what the windows before it measured that frame, shifting
+	// whenever one opens or closes. The title is what ImGui keys the window
+	// by, so it scopes the measure exactly as Begin scopes the render.
+	ImGui::PushID(title.c_str());
 	const Size content = engine.resolve(root, contentRequest);
+	ImGui::PopID();
 
 	const ImVec2 winSize((float)(content.width + chromeW), (float)(content.height + chromeH));
 	ImGuiWindowFlags winFlags = ImGuiWindowFlags_None;

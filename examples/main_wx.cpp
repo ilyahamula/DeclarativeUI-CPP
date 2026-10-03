@@ -9,21 +9,17 @@ class DeclarativeApp : public wxApp
     // Demo state: members, so the bound refs outlive the modeless windows that
     // read them.
     //
-    // Slider orientation and ticks: vertical channel faders with a SpinBox
-    // each, and a ticked float master.
-    DemoMixer m_mixer;
-    // EditableCombo: the gallery (free text vs the list-only ComboBox).
-    std::string m_comboFont = "Arial";
-    std::string m_comboCity;
-    std::string m_comboSize = "Medium";
-    std::string m_comboStatus = "Pick or type";
+    // Spinner: the gallery (default, sized, logo, stopped) and a running
+    // flag shared by two spinners, a CheckBox and a ToggleButton.
+    bool m_spinnerBusy = true;
+    std::string m_spinnerStatus = "Working...";
 
 public:
     bool OnInit() override
     {
         // One show() per open on a retained backend.
-        drawEditableComboGalleryUI(m_comboFont, m_comboCity, m_comboSize, m_comboStatus).show();
-        drawMixerUI(m_mixer).show();
+        drawSpinnerGalleryUI().show();
+        drawSpinnerBindingUI(m_spinnerBusy, m_spinnerStatus).show();
         return true;
     }
 };

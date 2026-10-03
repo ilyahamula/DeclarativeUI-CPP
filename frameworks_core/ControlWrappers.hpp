@@ -4,6 +4,7 @@
 #include "frameworks_core/CoreTypes/BoundValue.hpp"
 #include "frameworks_core/CoreTypes/DialogKeys.hpp"
 #include "frameworks_core/CoreTypes/EventCallback.hpp"
+#include "frameworks_core/CoreTypes/Spinner.hpp"
 #include "frameworks_core/CoreTypes/StatusField.hpp"
 #include "frameworks_core/CoreTypes/TextField.hpp"
 #include "frameworks_core/CoreTypes/ToolItem.hpp"
@@ -1007,6 +1008,37 @@ private:
 	std::string m_placeholder;
 	EventCallback<const std::string&> m_onChange;
 	Size m_initialSize { 0, 0 }; // wx/Qt, bound items only: the first list's size
+};
+
+// SpinnerWrapper -----------------------------------------------------------
+// A busy indicator: no value, only "running or not". The default look is each
+// backend's own -- wxActivityIndicator on wx, a turning arc on Qt and ImGui --
+// and with an image (withImage) the IMAGE turns, drawn by the framework on all
+// three: an owner-drawn panel on wx (wxGraphicsContext rotates the bitmap),
+// a painted QWidget on Qt, a rotated texture quad on ImGui. A path that fails
+// to load is the default spinner (logged).
+//
+// Stopped, the default spinner draws nothing and an image rests unrotated; the
+// space is kept either way (isHidden removes it). It measures
+// kDefaultSpinnerSize square itself on every backend, so withSize() is the one
+// thing that changes it.
+class SpinnerWrapper : public ControlWrapper
+{
+public:
+	SpinnerWrapper(std::string imagePath, BoundValue<bool> running,
+		const Position& pos, const Size& size, long style)
+		: ControlWrapper(pos, size, style)
+		, m_imagePath(std::move(imagePath))
+		, m_running(std::move(running))
+	{
+	}
+
+	DECLARE_CONTROL_WRAPPER_OVERRIDES();
+	DECLARE_SELF_MEASURED_OVERRIDES(true);
+
+private:
+	std::string m_imagePath;
+	BoundValue<bool> m_running;
 };
 
 // Item-set decode/encode -----------------------------------------------------

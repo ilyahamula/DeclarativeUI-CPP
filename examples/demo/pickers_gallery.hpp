@@ -364,3 +364,47 @@ inline auto drawIndeterminateProgressUI()
         }
     };
 }
+
+// Spinner, beside the busy ProgressBar it is the round sibling of: the
+// platform's own indicator at the default 24 px and pinned larger, a logo
+// turning instead (withImage), and one stopped -- which draws nothing but
+// keeps its space -- next to a stopped logo, which rests unrotated.
+inline auto drawSpinnerGalleryUI()
+{
+    return Dialog {
+        "Spinners",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                VStack {
+                    Spinner{}.withFlags(LayoutFlags().Center()),
+                    StaticText{"Default"}.withAlign(TextAlign::Center).withSize({100, 20})
+                },
+                VStack {
+                    Spinner{}.withSize({40, 40}).withFlags(LayoutFlags().Center()),
+                    StaticText{"40 px"}.withAlign(TextAlign::Center).withSize({100, 20})
+                },
+                VStack {
+                    Spinner{}.withImage("images/logo_spinner.png").withSize({40, 40})
+                        .withTooltip("Spinner{}.withImage(\"logo.png\")")
+                        .withFlags(LayoutFlags().Center()),
+                    StaticText{"Logo"}.withAlign(TextAlign::Center).withSize({100, 20})
+                },
+                VStack {
+                    Spinner{}.isRunning(false).withSize({40, 40}).withFlags(LayoutFlags().Center()),
+                    StaticText{"Stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
+                },
+                VStack {
+                    Spinner{}.withImage("images/logo_spinner.png").isRunning(false).withSize({40, 40})
+                        .withFlags(LayoutFlags().Center()),
+                    StaticText{"Logo, stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
+                }
+            },
+            StaticText{"The bar form of the same thing:"}
+                .withSize({300, 20})
+                .withFlags(LayoutFlags().Border(Side::Top, 12)),
+            ProgressBar{}.Indeterminate()
+                .withSize({300, -1})
+        }
+    };
+}

@@ -1188,6 +1188,61 @@ private:
 	EventCallback<const std::string&> m_onChange;
 };
 
+// Spinner -----------------------------------------------------------
+// A busy indicator for work with no measurable progress -- the round sibling
+// of ProgressBar{}.Indeterminate():
+//
+//   Spinner{}.isRunning(loading)                    // the platform's own look
+//   Spinner{}.withImage("logo.png").withSize({48, 48}) // the logo turns
+//
+// One revolution per second on every backend. Stopped, the default spinner
+// draws nothing (its space is kept) and an image rests unrotated. Measures 24
+// px square unless withSize() says otherwise.
+struct Spinner : Widget<Spinner>
+{
+	using super = Widget<Spinner>;
+
+	Spinner()
+		: super()
+	{
+	}
+
+	// Turn this picture instead of the platform's indicator. It is scaled to
+	// fit the square (aspect kept) and turns about its centre, so a round
+	// logo works best. A path that fails to load is the default spinner.
+	Spinner& withImage(std::string path)
+	{
+		m_imagePath = std::move(path);
+		return *this;
+	}
+
+	// Bound, the caller's bool starts and stops it live.
+	Spinner& isRunning(bool& running)
+	{
+		m_running.bind(running);
+		return *this;
+	}
+
+	Spinner& isRunning(const bool& running = true)
+	{
+		m_running.snapshot(running);
+		return *this;
+	}
+
+private:
+	std::unique_ptr<ControlWrapper> createWrapper(
+		const Position& pos,
+		const Size& size,
+		long style) override
+	{
+		return std::make_unique<SpinnerWrapper>(m_imagePath, m_running, pos, size, style);
+	}
+
+private:
+	std::string m_imagePath;
+	BoundValue<bool> m_running { true };
+};
+
 // ListBox -----------------------------------------------------------
 // Scrollable list of selectable items. The bound type picks the mode:
 // int/std::string select one item, std::vector<int>/std::vector<std::string>

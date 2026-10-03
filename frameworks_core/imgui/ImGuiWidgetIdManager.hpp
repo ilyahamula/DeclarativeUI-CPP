@@ -24,7 +24,9 @@ public:
     // scope than render — sharing the widget counter would desync every
     // PushID() after the first measured widget. Measure visits each leaf exactly
     // once per frame in tree order, so the sequence is as stable as the widget
-    // one: a tree whose shape shifts renumbers both alike.
+    // one: a tree whose shape shifts renumbers both alike. Each top-level
+    // pushes its title around the measure pass (Dialog/WindowWrapper), so the
+    // sequence -- and every key built from it -- is per window.
     static int nextMeasureId() { return next(s_measureIds); }
 
     // Sequential integer for a leaf's CONTEXT MENU popup, taken in place().

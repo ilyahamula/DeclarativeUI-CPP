@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/qt/DialogKeys.hpp"
+#include "frameworks_core/qt/SpinnerView.hpp"
 #include "frameworks_core/qt/TextField.hpp"
 #include "frameworks_core/qt/RefSync.hpp"
 #include <algorithm>
@@ -1229,6 +1230,35 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// SpinnerWrapper -----------------------------------------------------------
+
+void SpinnerWrapper::realize(void* parentWindow)
+{
+	QPixmap image;
+	if (!m_imagePath.empty() && !image.load(qstr(m_imagePath)))
+	{
+#ifdef USE_LOGGER
+		Logger::instance().log("SpinnerWrapper::realize()\t-> image \"" + m_imagePath
+			+ "\" failed to load; the default spinner instead\n");
+#endif
+	}
+	auto* view = new SpinnerView(static_cast<QWidget*>(parentWindow), image);
+	view->setRunning(m_running.get());
+	m_nativeWidget = view;
+	if (const bool* bound = m_running.boundValue())
+	{
+		bindExternalRefSync(view,
+			[view] { return view->isRunning(); },
+			[bound] { return *bound; },
+			[view](bool on) { view->setRunning(on); });
+	}
+}
+
+Size SpinnerWrapper::measureIntrinsic(const Constraints&)
+{
+	return Size { kDefaultSpinnerSize, kDefaultSpinnerSize };
+}
 
 // EditableComboWrapper -----------------------------------------------------------
 

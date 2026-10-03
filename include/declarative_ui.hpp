@@ -203,6 +203,11 @@ concept Hideable = requires(T element, bool& flag) {
 static_assert(Hideable<Button>);
 static_assert(Hideable<StaticText>);
 static_assert(Hideable<SearchField>);
+// Spinner: a leaf with no value; its running flag binds.
+static_assert(NodeBuildable<Spinner>);
+static_assert(Hideable<Spinner>);
+static_assert(std::is_same_v<decltype(std::declval<Spinner&>().isRunning(std::declval<bool&>())), Spinner&>);
+static_assert(std::is_same_v<decltype(std::declval<Spinner&>().withImage(std::string{})), Spinner&>);
 // EditableCombo: free text with suggestions; both text and items bind.
 static_assert(NodeBuildable<EditableCombo>);
 static_assert(Hideable<EditableCombo>);

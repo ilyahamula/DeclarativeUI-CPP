@@ -1131,6 +1131,60 @@ void ComboBoxWrapper<T>::render(const Rect& frame)
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
 
+// SpinnerWrapper -----------------------------------------------------------
+// Drawn on the window draw list inside the frame, with a Dummy of the frame as
+// the item (hover, tooltip, drift guard) -- the Image/Separator move. The tree
+// is rebuilt every frame, so the clock is ImGui::GetTime() and nothing is kept.
+
+Size SpinnerWrapper::measureIntrinsic(const Constraints&)
+{
+	return Size { kDefaultSpinnerSize, kDefaultSpinnerSize };
+}
+
+void SpinnerWrapper::render(const Rect& frame)
+{
+	const ImVec2 box = sized(frame)
+		? ImVec2((float)frame.width, (float)frame.height)
+		: ImVec2((float)kDefaultSpinnerSize, (float)kDefaultSpinnerSize);
+	const ImVec2 origin = ImGui::GetCursorScreenPos();
+	const ImVec2 centre(origin.x + box.x * 0.5f, origin.y + box.y * 0.5f);
+	const float side = std::min(box.x, box.y);
+	const bool running = m_running.get();
+	const float angle = running
+		? (float)spinnerAngle(static_cast<std::int64_t>(ImGui::GetTime() * 1000.0))
+		: 0.0f;
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+
+	const CachedTexture& icon = m_imagePath.empty() ? CachedTexture {} : textureFor(m_imagePath);
+	if (icon.valid())
+	{
+		// The picture fitted to the square, aspect kept, turned about the
+		// centre: four rotated corners for AddImageQuad. Colour through
+		// GetColorU32, so a disabled scope dims it.
+		const float scale = side / (float)std::max(icon.width, icon.height);
+		const float hw = icon.width * scale * 0.5f;
+		const float hh = icon.height * scale * 0.5f;
+		const float c = std::cos(angle);
+		const float s = std::sin(angle);
+		const auto corner = [&](float x, float y) {
+			return ImVec2(centre.x + x * c - y * s, centre.y + x * s + y * c);
+		};
+		draw->AddImageQuad((ImTextureID)(std::uintptr_t)icon.id,
+			corner(-hw, -hh), corner(hw, -hh), corner(hw, hh), corner(-hw, hh),
+			ImVec2(0, 0), ImVec2(1, 0), ImVec2(1, 1), ImVec2(0, 1),
+			ImGui::GetColorU32(ImVec4(1, 1, 1, 1)));
+	}
+	else if (running)
+	{
+		// A three-quarter arc in the text colour, as on Qt.
+		const float thickness = std::max(2.0f, side / 9.0f);
+		const float radius = side * 0.5f - thickness;
+		draw->PathArcTo(centre, radius, angle, angle + 3.14159265f * 1.5f, 24);
+		draw->PathStroke(ImGui::GetColorU32(ImGuiCol_Text), ImDrawFlags_None, thickness);
+	}
+	ImGui::Dummy(box);
+}
+
 // EditableComboWrapper -----------------------------------------------------------
 // ImGui has no editable combo, so it is composed: an InputTextWithHint and an
 // ArrowButton side by side (no spacing between, so the two are exactly the

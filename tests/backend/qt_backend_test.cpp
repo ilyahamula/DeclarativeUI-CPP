@@ -5,10 +5,12 @@
 #include "../test_framework.hpp"
 
 #include "declarative_ui.hpp"
+#include "frameworks_core/qt/SpinnerView.hpp"
 
 #include <QApplication>
 
 #include <algorithm>
+#include <functional>
 #include <thread>
 #include <vector>
 #include <QElapsedTimer>
@@ -942,6 +944,54 @@ TEST(qt_vertical_slider_with_ticks)
 	level = 10;
 	pump(200);
 	CHECK_EQ(vertical->value(), 10);
+	w->close();
+	pump();
+}
+
+// Spinner: a painted SpinnerView, 24 px square unless sized; its timer runs
+// only while the (bound) flag is set; an image that loads turns, one that
+// does not is the default spinner.
+TEST(qt_spinner_runs_with_its_flag)
+{
+	bool busy = true;
+	Dialog { "Busy",
+		HStack {
+			Spinner{}.isRunning(busy),
+			Spinner{}.withImage(DUI_TEST_ICON).withSize({48, 48}),
+			Spinner{}.withImage("/no/such/logo.png").isRunning(false)
+		}
+	}.show();
+	pump();
+	QWidget* w = windowTitled("Busy");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	std::vector<SpinnerView*> views;
+	for (QWidget* child : w->findChildren<QWidget*>())
+	{
+		if (auto* view = dynamic_cast<SpinnerView*>(child))
+			views.push_back(view);
+	}
+	std::sort(views.begin(), views.end(), [](SpinnerView* a, SpinnerView* b) { return a->x() < b->x(); });
+	CHECK_EQ(views.size(), std::size_t(3));
+	if (views.size() != 3)
+		return;
+	CHECK(views[0]->size() == QSize(24, 24));
+	CHECK(views[1]->size() == QSize(48, 48));
+	CHECK(!views[0]->hasImage());
+	CHECK(views[1]->hasImage());
+	CHECK(!views[2]->hasImage());
+	CHECK(views[0]->timerActive());
+	CHECK(views[1]->timerActive());
+	CHECK(!views[2]->timerActive());
+
+	busy = false;
+	pump(200);
+	CHECK(!views[0]->isRunning());
+	CHECK(!views[0]->timerActive());
+	busy = true;
+	pump(200);
+	CHECK(views[0]->timerActive());
 	w->close();
 	pump();
 }

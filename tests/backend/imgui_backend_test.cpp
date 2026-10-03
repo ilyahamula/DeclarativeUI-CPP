@@ -840,6 +840,67 @@ TEST(imgui_vertical_slider_with_ticks)
 	frames(2);
 }
 
+// Spinner: measures kDefaultSpinnerSize square unless sized, draws inside its
+// frame (the drift guard would report otherwise), and an image path that
+// cannot load is the default spinner. A real image is covered on wx and Qt.
+TEST(imgui_spinner_measures_one_square_and_stays_in_frame)
+{
+	SpinnerWrapper plain({}, BoundValue<bool>(true), {}, {}, 0);
+	CHECK_EQ(plain.measureIntrinsic({}).width, kDefaultSpinnerSize);
+	CHECK_EQ(plain.measureIntrinsic({}).height, kDefaultSpinnerSize);
+	CHECK_EQ(plain.measureContent({}).width, kDefaultSpinnerSize);
+	SpinnerWrapper sized({}, BoundValue<bool>(true), {}, Size { 48, 48 }, 0);
+	CHECK_EQ(sized.measureContent({}).width, 48);
+
+	bool busy = true;
+	g_ui = [&] {
+		Dialog { "Busy",
+			HStack {
+				Spinner{}.isRunning(busy),
+				// no loadable image here: headless there is no GL context
+				// for the texture cache to upload into (see the icon test)
+				Spinner{}.withSize({48, 48}),
+				Spinner{}.withImage("/no/such/logo.png")
+			}
+		}.setPosition({0, 0}).show();
+	};
+	frames(5);
+	busy = false;
+	frames(3);
+	const ImGuiWindow* w = ImGui::FindWindowByName("Busy");
+	CHECK(w != nullptr);
+	g_ui = nullptr;
+	frames(2);
+}
+
+// Measure-phase state is per window. The measure pass runs before Begin, so
+// it used to share one id scope and one per-frame counter across every
+// top-level: closing the first window shifted the second window's measure
+// keys onto the first one's stored sizes, and its frozen bound-content size
+// changed under it. Each top-level now pushes its title around the measure.
+TEST(imgui_measure_state_is_per_window)
+{
+	std::string status = "x";
+	ItemList items { "a considerably long first item", "beta" };
+	std::string picked;
+	bool firstOpen = true;
+	g_ui = [&] {
+		if (firstOpen)
+			Dialog { "First", VStack { StaticText{status} } }.setPosition({0, 0}).show();
+		Dialog { "Second", VStack { ListBox{ items, picked }.withVisibleRows(3) } }
+			.setPosition({300, 0}).show();
+	};
+	frames(3);
+	const ImGuiWindow* second = ImGui::FindWindowByName("Second");
+	const ImVec2 size = second->Size;
+	firstOpen = false;
+	frames(3);
+	CHECK_EQ(second->Size.x, size.x);
+	CHECK_EQ(second->Size.y, size.y);
+	g_ui = nullptr;
+	frames(2);
+}
+
 int main()
 {
 	ImGui::CreateContext();

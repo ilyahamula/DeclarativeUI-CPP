@@ -72,7 +72,7 @@ return Dialog {
 | Lists & tables    | `ListBox<T>`, `CheckListBox<T>`, `TreeView<T>`, `Table<T>` |
 | Numeric           | `SpinBox<T>`, `Slider<T>` (`.withOrientation()`, `.withTicks()`) |
 | Pickers           | `DatePicker`, `TimePicker`, `ColorPicker`, `FilePicker` (Open / Save / Directory) |
-| Display           | `ProgressBar` (value or `.Indeterminate()`), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
+| Display           | `ProgressBar` (value or `.Indeterminate()`), `Spinner` (`.withImage()` turns a logo), `Separator` (horizontal or vertical), `Image` (`.withScaleMode()`) |
 | Layout            | `Spacer` |
 | Chrome            | `ToolBar` + `ToolItem`, `StatusBar` + `StatusField` |
 | Containers        | `VStack` / `HStack`, `VForEach` / `HForEach`, `Grid`, `ScrollPanel`, `HSplitter` / `VSplitter`, `Expander`, `VGroupBox` / `HGroupBox`, `TabPanel` + `Tab` |

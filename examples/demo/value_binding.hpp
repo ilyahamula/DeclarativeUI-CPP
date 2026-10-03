@@ -1872,3 +1872,41 @@ inline auto drawMixerUI(DemoMixer& m)
         }
     };
 }
+
+// Spinner running state shared by reference: one bool drives a default
+// spinner and a logo spinner, is flipped by a CheckBox and a ToggleButton
+// alike, and disables the "Start work" button while it is set -- so the
+// three controls and both spinners always agree on every backend.
+inline auto drawSpinnerBindingUI(bool& busy, std::string& status)
+{
+    return Dialog {
+        "Spinner (shared running flag)",
+        VStack {
+            LayoutFlags().Expand().Border(Side::All, 12),
+            HStack {
+                Spinner{}.isRunning(busy).withFlags(LayoutFlags().CenterVertical()),
+                Spinner{}.withImage("images/logo_spinner.png").isRunning(busy).withSize({48, 48})
+                    .withFlags(LayoutFlags().Border(Side::Left, 16)),
+                StaticText{status}
+                    .withSize({180, 20})
+                    .withFlags(LayoutFlags().Border(Side::Left, 16).CenterVertical())
+            },
+            HStack {
+                LayoutFlags().Border(Side::Top, 12),
+                CheckBox{busy, "Busy"}
+                    .withFlags(LayoutFlags().CenterVertical())
+                    .onChange([&status](bool on) { status = on ? "Working..." : "Idle"; }),
+                ToggleButton{busy, "Busy"}
+                    .withFlags(LayoutFlags().Border(Side::Left, 10))
+                    .onChange([&status](bool on) { status = on ? "Working..." : "Idle"; }),
+                Button{"Start work"}
+                    .isDisabled(busy)
+                    .withFlags(LayoutFlags().Border(Side::Left, 10))
+                    .onClick([&busy, &status] {
+                        busy = true;
+                        status = "Working...";
+                    })
+            }
+        }
+    };
+}

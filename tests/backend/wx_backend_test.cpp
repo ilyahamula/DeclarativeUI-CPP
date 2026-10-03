@@ -6,10 +6,12 @@
 #include "../test_framework.hpp"
 
 #include "declarative_ui.hpp"
+#include "frameworks_core/wx/SpinnerPanel.hpp"
 
 #include <wx/combobox.h>
 #include <wx/listbox.h>
 #include <wx/statline.h>
+#include <wx/activityindicator.h>
 #include <wx/dataview.h>
 #include <wx/slider.h>
 #ifdef __WXOSX__
@@ -1035,6 +1037,55 @@ TEST(wx_vertical_slider_with_ticks)
 	level = 10;
 	pump();
 	CHECK_EQ(vertical->GetValue(), 10);
+	w->Close();
+	pump();
+}
+
+// Spinner: the default is a native wxActivityIndicator, an image a
+// SpinnerPanel; 24 px square unless sized; both follow a bound running flag;
+// an image that cannot load is the native indicator.
+TEST(wx_spinner_runs_with_its_flag)
+{
+	bool busy = true;
+	bool logoBusy = true;
+	Dialog { "Busy",
+		HStack {
+			Spinner{}.isRunning(busy),
+			Spinner{}.withImage(DUI_TEST_ICON).withSize({48, 48}).isRunning(logoBusy),
+			Spinner{}.withImage("/no/such/logo.png")
+		}
+	}.show();
+	pump();
+	wxWindow* w = windowTitled("Busy");
+	CHECK(w != nullptr);
+	if (w == nullptr)
+		return;
+	std::vector<wxActivityIndicator*> natives;
+	std::function<void(wxWindow*)> collect = [&](wxWindow* parent) {
+		for (wxWindow* child : parent->GetChildren())
+		{
+			if (auto* a = dynamic_cast<wxActivityIndicator*>(child))
+				natives.push_back(a);
+			collect(child);
+		}
+	};
+	collect(w);
+	auto* panel = find<SpinnerPanel>(w, [](SpinnerPanel*) { return true; });
+	CHECK_EQ(natives.size(), std::size_t(2)); // the default and the failed image
+	CHECK(panel != nullptr);
+	if (natives.size() != 2 || panel == nullptr)
+		return;
+	wxActivityIndicator* first = natives[0]->GetPosition().x < natives[1]->GetPosition().x ? natives[0] : natives[1];
+	CHECK(first->GetSize() == wxSize(24, 24));
+	CHECK(panel->GetSize() == wxSize(48, 48));
+	CHECK(first->IsRunning());
+	CHECK(panel->isRunning());
+
+	busy = false;
+	logoBusy = false;
+	pump();
+	CHECK(!first->IsRunning());
+	CHECK(!panel->isRunning());
 	w->Close();
 	pump();
 }

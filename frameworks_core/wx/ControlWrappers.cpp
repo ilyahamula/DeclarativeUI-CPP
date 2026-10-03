@@ -1,5 +1,6 @@
 #include "frameworks_core/ControlWrappers.hpp"
 #include "frameworks_core/wx/DialogKeys.hpp"
+#include "frameworks_core/wx/SpinnerPanel.hpp"
 #ifdef __WXOSX__
 #include "frameworks_core/wx/OsxSliderTicks.hpp"
 #endif
@@ -18,6 +19,7 @@
 
 #include <wx/wx.h>
 #include <wx/hyperlink.h>
+#include <wx/activityindicator.h>
 #include <wx/srchctrl.h>
 #include <wx/spinctrl.h>
 #include <wx/datectrl.h>
@@ -1391,6 +1393,69 @@ Size ComboBoxWrapper<T>::measureIntrinsic(const Constraints&)
 
 template class ComboBoxWrapper<std::string>;
 template class ComboBoxWrapper<int>;
+
+// SpinnerWrapper -----------------------------------------------------------
+
+void SpinnerWrapper::realize(void* parentWindow)
+{
+#ifdef USE_LOGGER
+	Logger::instance().log("SpinnerWrapper::realize()\t-> spinner\n");
+#endif
+	auto* parent = static_cast<wxWindow*>(parentWindow);
+	wxImage image;
+	if (!m_imagePath.empty())
+	{
+		ensureImageHandlers();
+		image.LoadFile(m_imagePath, wxBITMAP_TYPE_ANY);
+#ifdef USE_LOGGER
+		if (!image.IsOk())
+			Logger::instance().log("SpinnerWrapper::realize()\t-> image \"" + m_imagePath
+				+ "\" failed to load; the default spinner instead\n");
+#endif
+	}
+
+	const bool running = m_running.get();
+	if (image.IsOk())
+	{
+		auto* panel = new SpinnerPanel(parent, image);
+		panel->setRunning(running);
+		m_nativeWidget = panel;
+		if (const bool* bound = m_running.boundValue())
+		{
+			bindExternalRefSync(panel,
+				[panel] { return panel->isRunning(); },
+				[bound] { return *bound; },
+				[panel](bool on) { panel->setRunning(on); });
+		}
+		return;
+	}
+
+	// The platform's own indicator: NSProgressIndicator on macOS, GtkSpinner
+	// on GTK, a generic one elsewhere. Stopped, it draws nothing.
+	auto* indicator = new wxActivityIndicator(parent, wxID_ANY,
+		wxPoint(m_pos.x, m_pos.y), wxSize(m_size.width, m_size.height), m_style);
+	if (running)
+		indicator->Start();
+	m_nativeWidget = indicator;
+	if (const bool* bound = m_running.boundValue())
+	{
+		bindExternalRefSync(indicator,
+			[indicator] { return indicator->IsRunning(); },
+			[bound] { return *bound; },
+			[indicator](bool on) {
+				if (on)
+					indicator->Start();
+				else
+					indicator->Stop();
+			});
+	}
+}
+
+Size SpinnerWrapper::measureIntrinsic(const Constraints&)
+{
+	// The native indicators' own sizes differ by port; one square everywhere.
+	return Size { kDefaultSpinnerSize, kDefaultSpinnerSize };
+}
 
 // EditableComboWrapper -----------------------------------------------------------
 
