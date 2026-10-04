@@ -44,81 +44,82 @@ inline auto drawTextUI(
     // usually fed: a value computed once and displayed.
     static const std::string buildInfo = "DeclarativeUI-CPP 0.1.0";
 
-    return Dialog {
-        "Text Controls",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            VGroupBox { "Read-only text",
-                LayoutFlags().MinSize({kBoxW, 150}),
-                HStack {
-                    StaticText{"Label:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    StaticText{"Plain StaticText -- not selectable"}
-                        .withSize({kFieldW, kLabelH})
-                        .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+    return
+        Dialog {
+            "Text Controls",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                VGroupBox { "Read-only text",
+                    LayoutFlags().MinSize({kBoxW, 150}),
+                    HStack {
+                        StaticText{"Label:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        StaticText{"Plain StaticText -- not selectable"}
+                            .withSize({kFieldW, kLabelH})
+                            .withFlags(LayoutFlags().Proportion(1).CenterVertical())
+                    },
+                    HStack {
+                        LayoutFlags().Border(Side::Top, 6),
+                        StaticText{"From literal:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        // The dangling case: the text is owned, so the literal it
+                        // was built from need not outlive this expression.
+                        ReadonlyTextCtrl{"Select and copy me."}
+                            .withSize({kFieldW, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1))
+                            .withTooltip("Read-only: focusable and copyable, never editable.")
+                            .isDisabled(fieldsDisabled)
+                    },
+                    HStack {
+                        LayoutFlags().Border(Side::Top, 6),
+                        StaticText{"From value:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        ReadonlyTextCtrl{buildInfo}
+                            .withSize({kFieldW, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1))
+                            .isDisabled(fieldsDisabled)
+                    }
+                },
+                VGroupBox { "Editable, for contrast",
+                    LayoutFlags().MinSize({kBoxW, 90}).Border(Side::Top, 8),
+                    HStack {
+                        StaticText{"Editable:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        TextCtrl{editableText}
+                            .withSize({kFieldW, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1))
+                            .withTooltip("Bound to the caller's string -- edits write through.")
+                            .isDisabled(fieldsDisabled)
+                    },
+                    HStack {
+                        LayoutFlags().Border(Side::Top, 6),
+                        ClickableText{"Clickable text"}
+                            .withSize({130, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical())
+                            .onClick([]() {}),
+                        LinkText{"Visit documentation"}
+                            .withSize({160, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 16))
+                            .onClick([]() {})
+                    }
                 },
                 HStack {
-                    LayoutFlags().Border(Side::Top, 6),
-                    StaticText{"From literal:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    // The dangling case: the text is owned, so the literal it
-                    // was built from need not outlive this expression.
-                    ReadonlyTextCtrl{"Select and copy me."}
-                        .withSize({kFieldW, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1))
-                        .withTooltip("Read-only: focusable and copyable, never editable.")
-                        .isDisabled(fieldsDisabled)
-                },
-                HStack {
-                    LayoutFlags().Border(Side::Top, 6),
-                    StaticText{"From value:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    ReadonlyTextCtrl{buildInfo}
-                        .withSize({kFieldW, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1))
-                        .isDisabled(fieldsDisabled)
-                }
-            },
-            VGroupBox { "Editable, for contrast",
-                LayoutFlags().MinSize({kBoxW, 90}).Border(Side::Top, 8),
-                HStack {
-                    StaticText{"Editable:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    TextCtrl{editableText}
-                        .withSize({kFieldW, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1))
-                        .withTooltip("Bound to the caller's string -- edits write through.")
-                        .isDisabled(fieldsDisabled)
-                },
-                HStack {
-                    LayoutFlags().Border(Side::Top, 6),
-                    ClickableText{"Clickable text"}
-                        .withSize({130, kLabelH})
+                    LayoutFlags().Border(Side::Top, 8),
+                    CheckBox{fieldsDisabled, "Disable the fields"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().CenterVertical()),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize(kButtonSize)
                         .withFlags(LayoutFlags().CenterVertical())
-                        .onClick([]() {}),
-                    LinkText{"Visit documentation"}
-                        .withSize({160, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 16))
                         .onClick([]() {})
                 }
-            },
-            HStack {
-                LayoutFlags().Border(Side::Top, 8),
-                CheckBox{fieldsDisabled, "Disable the fields"}
-                    .withSize({-1, kRowH})
-                    .withFlags(LayoutFlags().CenterVertical()),
-                Spacer{},
-                Button{"Close"}
-                    .withSize(kButtonSize)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
             }
-        }
-    };
+        };
 }
 
 // SearchField, among the text inputs it is usually seen with. The first one
@@ -131,38 +132,39 @@ inline auto drawSearchGalleryUI(std::string& quickSearch, std::string& fileSearc
     std::string& title, std::string& status)
 {
     constexpr int kFieldW = 260;
-    return Dialog {
-        "Search fields",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            StaticText{"Quick search (default placeholder):"}
-                .withSize({kFieldW, 20}),
-            SearchField{quickSearch}
-                .withSize({kFieldW, -1})
-                .withTooltip("Type, then press Enter"),
-            StaticText{"Files:"}
-                .withSize({kFieldW, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            SearchField{fileSearch}
-                .withPlaceholder("Search files...")
-                .withSize({kFieldW, -1})
-                .onChange([&status](const std::string& q) { status = "onChange: \"" + q + "\""; })
-                .onSearch([&status](const std::string& q) { status = "onSearch: \"" + q + "\""; }),
-            StaticText{"Document title (Enter saves):"}
-                .withSize({kFieldW, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            TextCtrl{title}
-                .withSize({kFieldW, -1}),
-            StaticText{status}
-                .withSize({kFieldW, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            HStack {
-                LayoutFlags().Border(Side::Top, 8),
-                Spacer{},
-                Button{"Save"}
-                    .isDefault()
-                    .onClick([&status, &title] { status = "Saved \"" + title + "\""; })
+    return
+        Dialog {
+            "Search fields",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                StaticText{"Quick search (default placeholder):"}
+                    .withSize({kFieldW, 20}),
+                SearchField{quickSearch}
+                    .withSize({kFieldW, -1})
+                    .withTooltip("Type, then press Enter"),
+                StaticText{"Files:"}
+                    .withSize({kFieldW, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                SearchField{fileSearch}
+                    .withPlaceholder("Search files...")
+                    .withSize({kFieldW, -1})
+                    .onChange([&status](const std::string& q) { status = "onChange: \"" + q + "\""; })
+                    .onSearch([&status](const std::string& q) { status = "onSearch: \"" + q + "\""; }),
+                StaticText{"Document title (Enter saves):"}
+                    .withSize({kFieldW, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                TextCtrl{title}
+                    .withSize({kFieldW, -1}),
+                StaticText{status}
+                    .withSize({kFieldW, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    Spacer{},
+                    Button{"Save"}
+                        .isDefault()
+                        .onClick([&status, &title] { status = "Saved \"" + title + "\""; })
+                }
             }
-        }
-    };
+        };
 }

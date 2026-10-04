@@ -83,214 +83,215 @@ inline auto drawPickersGalleryUI(std::string& openPath, std::string& savePath,
     constexpr int kPluginsW = 220;
     constexpr int kSummaryW = 270;
 
-    return Dialog {
-        "Pickers Gallery",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            VGroupBox { "FilePicker",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}),
-                StaticText{"Browse opens the native dialog on wx and Qt, a drawn one on ImGui."}
-                    .withSize({-1, kLabelH}),
+    return
+        Dialog {
+            "Pickers Gallery",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                VGroupBox { "FilePicker",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}),
+                    StaticText{"Browse opens the native dialog on wx and Qt, a drawn one on ImGui."}
+                        .withSize({-1, kLabelH}),
 
-                // Open: the filter is the wx wildcard spelling, parsed once by
-                // CoreTypes/FileFilter.hpp and mapped to each backend's own.
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    StaticText{"Open:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    FilePicker{openPath}
-                        .withMode(FileMode::Open)
-                        .withFilter("Sources (*.cpp;*.hpp)|*.cpp;*.hpp|All files|*")
-                        .withDialogTitle("Open a source file")
-                        .withSize(kPickerSize)
-                        .withTooltip("Pick an existing file, or type a path")
-                        .isDisabled(pickersDisabled)
+                    // Open: the filter is the wx wildcard spelling, parsed once by
+                    // CoreTypes/FileFilter.hpp and mapped to each backend's own.
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        StaticText{"Open:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        FilePicker{openPath}
+                            .withMode(FileMode::Open)
+                            .withFilter("Sources (*.cpp;*.hpp)|*.cpp;*.hpp|All files|*")
+                            .withDialogTitle("Open a source file")
+                            .withSize(kPickerSize)
+                            .withTooltip("Pick an existing file, or type a path")
+                            .isDisabled(pickersDisabled)
+                    },
+
+                    // Save: the same control in the mode that lets the user NAME a
+                    // file that does not exist yet.
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        StaticText{"Save as:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        FilePicker{savePath}
+                            .withMode(FileMode::Save)
+                            .withFilter("Text (*.txt)|*.txt|All files|*")
+                            .withDialogTitle("Save the report as")
+                            .withSize(kPickerSize)
+                            .isDisabled(pickersDisabled)
+                    },
+
+                    // Directory: no filter, because there are no files to filter --
+                    // every backend ignores one set here.
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        StaticText{"Folder:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        FilePicker{folderPath}
+                            .withMode(FileMode::Directory)
+                            .withDialogTitle("Choose an output folder")
+                            .withSize(kPickerSize)
+                            .isDisabled(pickersDisabled)
+                    },
+
+                    CheckBox{pickersDisabled, "Disable the pickers above"}
+                        .withSize({-1, kRowH})
+                        .withFlags(LayoutFlags().Border(Side::Top, 8))
                 },
 
-                // Save: the same control in the mode that lets the user NAME a
-                // file that does not exist yet.
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    StaticText{"Save as:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    FilePicker{savePath}
-                        .withMode(FileMode::Save)
-                        .withFilter("Text (*.txt)|*.txt|All files|*")
-                        .withDialogTitle("Save the report as")
-                        .withSize(kPickerSize)
-                        .isDisabled(pickersDisabled)
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+                VGroupBox { "CheckListBox",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                    StaticText{"A checkbox per row; the bound vector IS the checked set."}
+                        .withSize({-1, kLabelH}),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        // withVisibleRows() drives the intrinsic HEIGHT on all three
+                        // backends -- their native hints disagree far too much
+                        // otherwise (wx sizes to the item count, Qt returns a fixed
+                        // ~192 px, ImGui has no hint at all). The width is pinned
+                        // for the same reason the pickers above are.
+                        CheckListBox{
+                            {"Formatter", "Linter", "Debugger", "Profiler", "Spell check"},
+                            enabledPlugins}
+                            .withVisibleRows(4)
+                            .withSize({kPluginsW, -1})
+                            .withTooltip("Tick the plugins to load at startup")
+                            .isDisabled(pickersDisabled)
+                            // Value first, then the callback: the bound vector is
+                            // already the new set when this runs, so it is also
+                            // what the handler is handed.
+                            .onChange([&enabledSummary](const std::vector<std::string>& plugins) {
+                                enabledSummary = pluginSummary(plugins);
+                            }),
+                        Spacer{Size{12, 0}},
+                        // The same set as text. A BOUND, disabled field rather than
+                        // a ReadonlyTextCtrl, for the reason the FileDialog result
+                        // below is one: the readonly control owns a copy of its text
+                        // and would never show a value that arrives later on wx and
+                        // Qt, where the tree is built once.
+                        VStack {
+                            LayoutFlags().Expand(),
+                            StaticText{"Enabled:"}.withSize({-1, kLabelH}),
+                            TextCtrl{enabledSummary}
+                                .withSize({kSummaryW, kRowH})
+                                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                                .isDisabled(),
+                            Spacer{}
+                        }
+                    }
                 },
 
-                // Directory: no filter, because there are no files to filter --
-                // every backend ignores one set here.
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    StaticText{"Folder:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    FilePicker{folderPath}
-                        .withMode(FileMode::Directory)
-                        .withDialogTitle("Choose an output folder")
-                        .withSize(kPickerSize)
-                        .isDisabled(pickersDisabled)
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+
+                VGroupBox { "withPlaceholder (single-line fields)",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                    StaticText{"The hint shows while a field is empty and vanishes as you type."}
+                        .withSize({-1, kLabelH}),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        StaticText{"Search:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        // Starts empty, so this is the one showing its hint.
+                        TextCtrl{searchTerm}
+                            .withPlaceholder("Search files…")
+                            .withSize(kPickerSize)
+                            .withTooltip("Type to hide the hint; clear it to bring it back")
+                    },
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        StaticText{"API key:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        // A password field is what most wants a hint: the echo
+                        // hides the value, so there is nothing else to say what
+                        // belongs here.
+                        PasswordInput{apiKey}
+                            .withPlaceholder("Paste your key")
+                            .withSize(kPickerSize)
+                    },
+                    // The same modifier with the field NOT empty, so the hint is
+                    // hidden from the first frame -- the state the two above only
+                    // reach once the user types.
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        StaticText{"Prefilled:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        TextCtrl{std::string{"already has text"}}
+                            .withPlaceholder("you should not see this")
+                            .withSize(kPickerSize)
+                    }
                 },
 
-                CheckBox{pickersDisabled, "Disable the pickers above"}
-                    .withSize({-1, kRowH})
-                    .withFlags(LayoutFlags().Border(Side::Top, 8))
-            },
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
 
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-
-            VGroupBox { "CheckListBox",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
-                StaticText{"A checkbox per row; the bound vector IS the checked set."}
-                    .withSize({-1, kLabelH}),
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    // withVisibleRows() drives the intrinsic HEIGHT on all three
-                    // backends -- their native hints disagree far too much
-                    // otherwise (wx sizes to the item count, Qt returns a fixed
-                    // ~192 px, ImGui has no hint at all). The width is pinned
-                    // for the same reason the pickers above are.
-                    CheckListBox{
-                        {"Formatter", "Linter", "Debugger", "Profiler", "Spell check"},
-                        enabledPlugins}
-                        .withVisibleRows(4)
-                        .withSize({kPluginsW, -1})
-                        .withTooltip("Tick the plugins to load at startup")
-                        .isDisabled(pickersDisabled)
-                        // Value first, then the callback: the bound vector is
-                        // already the new set when this runs, so it is also
-                        // what the handler is handed.
-                        .onChange([&enabledSummary](const std::vector<std::string>& plugins) {
-                            enabledSummary = pluginSummary(plugins);
-                        }),
-                    Spacer{Size{12, 0}},
-                    // The same set as text. A BOUND, disabled field rather than
-                    // a ReadonlyTextCtrl, for the reason the FileDialog result
-                    // below is one: the readonly control owns a copy of its text
-                    // and would never show a value that arrives later on wx and
-                    // Qt, where the tree is built once.
-                    VStack {
-                        LayoutFlags().Expand(),
-                        StaticText{"Enabled:"}.withSize({-1, kLabelH}),
-                        TextCtrl{enabledSummary}
-                            .withSize({kSummaryW, kRowH})
-                            .withFlags(LayoutFlags().Border(Side::Top, 4))
-                            .isDisabled(),
+                VGroupBox { "FileDialog (one-shot, like MessageBox)",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                    StaticText{"Not a widget: no node, no layout. Called from the handler."}
+                        .withSize({-1, kLabelH}),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        Button{"Open a file..."}
+                            .withSize(kButtonSize)
+                            .isDisabled(pickersDisabled)
+                            .onClick([&lastDialogResult] {
+                                FileDialog{"Pick any file"}
+                                    .withMode(FileMode::Open)
+                                    .withFilter("All files|*")
+                                    .onResult([&lastDialogResult](const std::string& path) {
+                                        // "" on cancel -- the framework's "no
+                                        // selection" spelling for a path, so the
+                                        // result can be written straight through.
+                                        lastDialogResult = path.empty() ? "(cancelled)" : path;
+                                    })
+                                    .show();
+                            }),
+                        Spacer{Size{12, 0}},
+                        Button{"Choose a folder..."}
+                            .withSize(kButtonSize)
+                            .isDisabled(pickersDisabled)
+                            .onClick([&lastDialogResult] {
+                                FileDialog{"Pick a folder"}
+                                    .withMode(FileMode::Directory)
+                                    .onResult([&lastDialogResult](const std::string& path) {
+                                        lastDialogResult = path.empty() ? "(cancelled)" : path;
+                                    })
+                                    .show();
+                            }),
                         Spacer{}
+                    },
+                    // A BOUND field, disabled, rather than a ReadonlyTextCtrl: the
+                    // readonly one owns a copy of its text (T0.1) and so would
+                    // never show a result that arrives later on wx and Qt, where
+                    // the tree is built once. Bound, the RefSync poll mirrors it.
+                    // Pinned width, because a display widget must not measure its
+                    // live text -- an arriving path would resize this auto-fit
+                    // dialog.
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        StaticText{"Result:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        TextCtrl{lastDialogResult}
+                            .withSize(kPickerSize)
+                            .isDisabled()
                     }
                 }
-            },
-
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-
-            VGroupBox { "withPlaceholder (single-line fields)",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
-                StaticText{"The hint shows while a field is empty and vanishes as you type."}
-                    .withSize({-1, kLabelH}),
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    StaticText{"Search:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    // Starts empty, so this is the one showing its hint.
-                    TextCtrl{searchTerm}
-                        .withPlaceholder("Search files…")
-                        .withSize(kPickerSize)
-                        .withTooltip("Type to hide the hint; clear it to bring it back")
-                },
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    StaticText{"API key:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    // A password field is what most wants a hint: the echo
-                    // hides the value, so there is nothing else to say what
-                    // belongs here.
-                    PasswordInput{apiKey}
-                        .withPlaceholder("Paste your key")
-                        .withSize(kPickerSize)
-                },
-                // The same modifier with the field NOT empty, so the hint is
-                // hidden from the first frame -- the state the two above only
-                // reach once the user types.
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    StaticText{"Prefilled:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    TextCtrl{std::string{"already has text"}}
-                        .withPlaceholder("you should not see this")
-                        .withSize(kPickerSize)
-                }
-            },
-
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-
-            VGroupBox { "FileDialog (one-shot, like MessageBox)",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
-                StaticText{"Not a widget: no node, no layout. Called from the handler."}
-                    .withSize({-1, kLabelH}),
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    Button{"Open a file..."}
-                        .withSize(kButtonSize)
-                        .isDisabled(pickersDisabled)
-                        .onClick([&lastDialogResult] {
-                            FileDialog{"Pick any file"}
-                                .withMode(FileMode::Open)
-                                .withFilter("All files|*")
-                                .onResult([&lastDialogResult](const std::string& path) {
-                                    // "" on cancel -- the framework's "no
-                                    // selection" spelling for a path, so the
-                                    // result can be written straight through.
-                                    lastDialogResult = path.empty() ? "(cancelled)" : path;
-                                })
-                                .show();
-                        }),
-                    Spacer{Size{12, 0}},
-                    Button{"Choose a folder..."}
-                        .withSize(kButtonSize)
-                        .isDisabled(pickersDisabled)
-                        .onClick([&lastDialogResult] {
-                            FileDialog{"Pick a folder"}
-                                .withMode(FileMode::Directory)
-                                .onResult([&lastDialogResult](const std::string& path) {
-                                    lastDialogResult = path.empty() ? "(cancelled)" : path;
-                                })
-                                .show();
-                        }),
-                    Spacer{}
-                },
-                // A BOUND field, disabled, rather than a ReadonlyTextCtrl: the
-                // readonly one owns a copy of its text (T0.1) and so would
-                // never show a result that arrives later on wx and Qt, where
-                // the tree is built once. Bound, the RefSync poll mirrors it.
-                // Pinned width, because a display widget must not measure its
-                // live text -- an arriving path would resize this auto-fit
-                // dialog.
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    StaticText{"Result:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    TextCtrl{lastDialogResult}
-                        .withSize(kPickerSize)
-                        .isDisabled()
-                }
             }
-        }
-    };
+        };
 }
 
 // T3.4: ProgressBar::Indeterminate(), the busy spelling with no value at all.
@@ -322,47 +323,48 @@ inline auto drawIndeterminateProgressUI()
     // gauge heights disagree, and a busy bar has no content to measure at all.
     constexpr Size kBarSize { 380, 20 };
 
-    return Dialog {
-        "ProgressBar (determinate and busy)",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            VGroupBox { "ProgressBar::Indeterminate() (busy mode)",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}),
-                StaticText{"The top bar knows how far along it is; the bottom one does not."}
-                    .withSize({-1, kLabelH}),
+    return
+        Dialog {
+            "ProgressBar (determinate and busy)",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                VGroupBox { "ProgressBar::Indeterminate() (busy mode)",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}),
+                    StaticText{"The top bar knows how far along it is; the bottom one does not."}
+                        .withSize({-1, kLabelH}),
 
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    StaticText{"Copying:"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    ProgressBar{60.0f}
-                        .withSize(kBarSize)
-                        .withFlags(LayoutFlags().CenterVertical())
-                        .withTooltip("An ordinary 0..100 value")
-                },
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        StaticText{"Copying:"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        ProgressBar{60.0f}
+                            .withSize(kBarSize)
+                            .withFlags(LayoutFlags().CenterVertical())
+                            .withTooltip("An ordinary 0..100 value")
+                    },
 
-                Separator{}
-                    .withSize({-1, 1})
-                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
+                    Separator{}
+                        .withSize({-1, 1})
+                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
 
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    StaticText{"Indexing…"}
-                        .withSize({kLabelW, kLabelH})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
-                    // ProgressBar{} -- no value, because there is none to show.
-                    // Without the valueless constructor Indeterminate() would
-                    // leave a number nothing reads.
-                    ProgressBar{}
-                        .Indeterminate()
-                        .withSize(kBarSize)
-                        .withFlags(LayoutFlags().CenterVertical())
-                        .withTooltip("No value: the animation is the whole message")
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        StaticText{"Indexing…"}
+                            .withSize({kLabelW, kLabelH})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 8)),
+                        // ProgressBar{} -- no value, because there is none to show.
+                        // Without the valueless constructor Indeterminate() would
+                        // leave a number nothing reads.
+                        ProgressBar{}
+                            .Indeterminate()
+                            .withSize(kBarSize)
+                            .withFlags(LayoutFlags().CenterVertical())
+                            .withTooltip("No value: the animation is the whole message")
+                    }
                 }
             }
-        }
-    };
+        };
 }
 
 // Spinner, beside the busy ProgressBar it is the round sibling of: the
@@ -371,42 +373,43 @@ inline auto drawIndeterminateProgressUI()
 // keeps its space -- next to a stopped logo, which rests unrotated.
 inline auto drawSpinnerGalleryUI()
 {
-    return Dialog {
-        "Spinners",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            HStack {
-                VStack {
-                    Spinner{}.withFlags(LayoutFlags().Center()),
-                    StaticText{"Default"}.withAlign(TextAlign::Center).withSize({100, 20})
+    return
+        Dialog {
+            "Spinners",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                HStack {
+                    VStack {
+                        Spinner{}.withFlags(LayoutFlags().Center()),
+                        StaticText{"Default"}.withAlign(TextAlign::Center).withSize({100, 20})
+                    },
+                    VStack {
+                        Spinner{}.withSize({40, 40}).withFlags(LayoutFlags().Center()),
+                        StaticText{"40 px"}.withAlign(TextAlign::Center).withSize({100, 20})
+                    },
+                    VStack {
+                        Spinner{}.withImage("images/logo_spinner.png").withSize({40, 40})
+                            .withTooltip("Spinner{}.withImage(\"logo.png\")")
+                            .withFlags(LayoutFlags().Center()),
+                        StaticText{"Logo"}.withAlign(TextAlign::Center).withSize({100, 20})
+                    },
+                    VStack {
+                        Spinner{}.isRunning(false).withSize({40, 40}).withFlags(LayoutFlags().Center()),
+                        StaticText{"Stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
+                    },
+                    VStack {
+                        Spinner{}.withImage("images/logo_spinner.png").isRunning(false).withSize({40, 40})
+                            .withFlags(LayoutFlags().Center()),
+                        StaticText{"Logo, stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
+                    }
                 },
-                VStack {
-                    Spinner{}.withSize({40, 40}).withFlags(LayoutFlags().Center()),
-                    StaticText{"40 px"}.withAlign(TextAlign::Center).withSize({100, 20})
-                },
-                VStack {
-                    Spinner{}.withImage("images/logo_spinner.png").withSize({40, 40})
-                        .withTooltip("Spinner{}.withImage(\"logo.png\")")
-                        .withFlags(LayoutFlags().Center()),
-                    StaticText{"Logo"}.withAlign(TextAlign::Center).withSize({100, 20})
-                },
-                VStack {
-                    Spinner{}.isRunning(false).withSize({40, 40}).withFlags(LayoutFlags().Center()),
-                    StaticText{"Stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
-                },
-                VStack {
-                    Spinner{}.withImage("images/logo_spinner.png").isRunning(false).withSize({40, 40})
-                        .withFlags(LayoutFlags().Center()),
-                    StaticText{"Logo, stopped"}.withAlign(TextAlign::Center).withSize({100, 20})
-                }
-            },
-            StaticText{"The bar form of the same thing:"}
-                .withSize({300, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 12)),
-            ProgressBar{}.Indeterminate()
-                .withSize({300, -1})
-        }
-    };
+                StaticText{"The bar form of the same thing:"}
+                    .withSize({300, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 12)),
+                ProgressBar{}.Indeterminate()
+                    .withSize({300, -1})
+            }
+        };
 }
 
 // Calendar, in both week conventions side by side: Monday first (the default,
@@ -419,27 +422,28 @@ inline auto drawCalendarGalleryUI(Date& isoDate, Date& usDate, std::string& stat
         return std::string(name) + ": " + std::to_string(d.year) + "-" + std::to_string(d.month)
             + "-" + std::to_string(d.day);
     };
-    return Dialog {
-        "Calendars",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            HStack {
-                VStack {
-                    StaticText{"Monday first (default)"}.withSize({220, 20}),
-                    Calendar{isoDate}
-                        .onChange([&status, text](const Date& d) { status = text("Monday-first", d); })
+    return
+        Dialog {
+            "Calendars",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                HStack {
+                    VStack {
+                        StaticText{"Monday first (default)"}.withSize({220, 20}),
+                        Calendar{isoDate}
+                            .onChange([&status, text](const Date& d) { status = text("Monday-first", d); })
+                    },
+                    VStack {
+                        LayoutFlags().Border(Side::Left, 16),
+                        StaticText{"Sunday first (US)"}.withSize({220, 20}),
+                        Calendar{usDate}
+                            .withFirstDayOfWeek(FirstDayOfWeek::Sunday)
+                            .onChange([&status, text](const Date& d) { status = text("Sunday-first", d); })
+                    }
                 },
-                VStack {
-                    LayoutFlags().Border(Side::Left, 16),
-                    StaticText{"Sunday first (US)"}.withSize({220, 20}),
-                    Calendar{usDate}
-                        .withFirstDayOfWeek(FirstDayOfWeek::Sunday)
-                        .onChange([&status, text](const Date& d) { status = text("Sunday-first", d); })
-                }
-            },
-            StaticText{status}
-                .withSize({456, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10))
-        }
-    };
+                StaticText{status}
+                    .withSize({456, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10))
+            }
+        };
 }

@@ -32,15 +32,17 @@ struct PasswordRow
 {
     std::string& password;
 
-    DECLARE_UI(HStack {
-        StaticText{"Password:"}
-            .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
-            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
-        PasswordInput{password}
-            .withSize({-1, custom_composites::kRowH})
-            .withFlags(LayoutFlags().Proportion(1))
-            .withTooltip("At least 8 characters, one of them a digit.")
-    })
+    DECLARE_UI(
+        HStack {
+            StaticText{"Password:"}
+                .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
+                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
+            PasswordInput{password}
+                .withSize({-1, custom_composites::kRowH})
+                .withFlags(LayoutFlags().Proportion(1))
+                .withTooltip("At least 8 characters, one of them a digit.")
+        }
+    )
 };
 
 // 2. A class with private data and a constructor: the label and placeholder are
@@ -55,15 +57,17 @@ public:
     {
     }
 
-    DECLARE_UI(HStack {
-        StaticText{m_label + ":"}
-            .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
-            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
-        TextCtrl{m_text}
-            .withPlaceholder(m_placeholder)
-            .withSize({-1, custom_composites::kRowH})
-            .withFlags(LayoutFlags().Proportion(1))
-    })
+    DECLARE_UI(
+        HStack {
+            StaticText{m_label + ":"}
+                .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
+                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
+            TextCtrl{m_text}
+                .withPlaceholder(m_placeholder)
+                .withSize({-1, custom_composites::kRowH})
+                .withFlags(LayoutFlags().Proportion(1))
+        }
+    )
 
 private:
     std::string m_label;
@@ -84,21 +88,23 @@ public:
     {
     }
 
-    DECLARE_UI(VStack {
-        LabeledField{"User", m_user, "name@example.com"}
-            .withFlags(LayoutFlags().Expand()),
-        PasswordRow{m_password}
-            .withFlags(LayoutFlags().Expand()),
-        Button{"Sign in"}
-            .withSize({110, 28})
-            .isDefault()
-            .withFlags(LayoutFlags().Border(Side::Top, 4))
-            .onClick([&user = m_user, &password = m_password, &status = m_status] {
-                status = password.size() >= 8
-                    ? "Signed in as " + (user.empty() ? std::string("anonymous") : user)
-                    : "Password too short";
-            })
-    })
+    DECLARE_UI(
+        VStack {
+            LabeledField{"User", m_user, "name@example.com"}
+                .withFlags(LayoutFlags().Expand()),
+            PasswordRow{m_password}
+                .withFlags(LayoutFlags().Expand()),
+            Button{"Sign in"}
+                .withSize({110, 28})
+                .isDefault()
+                .withFlags(LayoutFlags().Border(Side::Top, 4))
+                .onClick([&user = m_user, &password = m_password, &status = m_status] {
+                    status = password.size() >= 8
+                        ? "Signed in as " + (user.empty() ? std::string("anonymous") : user)
+                        : "Password too short";
+                })
+        }
+    )
 
 private:
     std::string& m_user;
@@ -119,18 +125,20 @@ public:
     {
     }
 
-    DECLARE_UI(VGroupBox { "Server",
-        LayoutFlags().MinSize({340, 0}),
-        LabeledField{"Host", m_host, "localhost"}
-            .withFlags(LayoutFlags().Expand()),
-        HStack {
-            StaticText{"Port:"}
-                .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
-                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
-            SpinBox{ { .min = 1, .max = 65535 }, m_port }
-                .withSize({120, custom_composites::kRowH})
-        }
-    }.isDisabled(m_offline))
+    DECLARE_UI(
+        VGroupBox { "Server",
+            LayoutFlags().MinSize({340, 0}),
+            LabeledField{"Host", m_host, "localhost"}
+                .withFlags(LayoutFlags().Expand()),
+            HStack {
+                StaticText{"Port:"}
+                    .withSize({custom_composites::kLabelW, custom_composites::kLabelH})
+                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 5)),
+                SpinBox{ { .min = 1, .max = 65535 }, m_port }
+                    .withSize({120, custom_composites::kRowH})
+            }
+        }.isDisabled(m_offline)
+    )
 
 private:
     std::string& m_host;
@@ -156,33 +164,34 @@ struct DemoCustomComposites
 
 inline auto drawCustomCompositesUI(DemoCustomComposites& state)
 {
-    return Dialog {
-        "Custom composites",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            HStack {
-                CheckBox{state.lockAll, "Lock all"}
-                    .withTooltip("LoginForm{...}.isDisabled(lockAll) and ServerSettings{...}.isDisabled(lockAll)"),
-                CheckBox{state.hideLogin, "Hide login"}
-                    .withFlags(LayoutFlags().Border(Side::Left, 12))
-                    .withTooltip("LoginForm{...}.isHidden(hideLogin)"),
-                CheckBox{state.offline, "Offline"}
-                    .withFlags(LayoutFlags().Border(Side::Left, 12))
-                    .withTooltip("Disables the Server group from INSIDE the composite")
-            },
-            VGroupBox { "Login",
-                LayoutFlags().MinSize({340, 0}).Border(Side::Top, 8),
-                LoginForm{state.user, state.password, state.status}
-                    .withFlags(LayoutFlags().Expand())
-                    .isDisabled(state.lockAll)
-                    .isHidden(state.hideLogin)
-            },
-            ServerSettings{state.host, state.port, state.offline}
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
-                .isDisabled(state.lockAll),
-            StaticText{state.status}
-                .withSize({340, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10))
-        }
-    };
+    return
+        Dialog {
+            "Custom composites",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                HStack {
+                    CheckBox{state.lockAll, "Lock all"}
+                        .withTooltip("LoginForm{...}.isDisabled(lockAll) and ServerSettings{...}.isDisabled(lockAll)"),
+                    CheckBox{state.hideLogin, "Hide login"}
+                        .withFlags(LayoutFlags().Border(Side::Left, 12))
+                        .withTooltip("LoginForm{...}.isHidden(hideLogin)"),
+                    CheckBox{state.offline, "Offline"}
+                        .withFlags(LayoutFlags().Border(Side::Left, 12))
+                        .withTooltip("Disables the Server group from INSIDE the composite")
+                },
+                VGroupBox { "Login",
+                    LayoutFlags().MinSize({340, 0}).Border(Side::Top, 8),
+                    LoginForm{state.user, state.password, state.status}
+                        .withFlags(LayoutFlags().Expand())
+                        .isDisabled(state.lockAll)
+                        .isHidden(state.hideLogin)
+                },
+                ServerSettings{state.host, state.port, state.offline}
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+                    .isDisabled(state.lockAll),
+                StaticText{state.status}
+                    .withSize({340, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10))
+            }
+        };
 }

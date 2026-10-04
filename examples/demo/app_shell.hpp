@@ -227,144 +227,145 @@ inline auto drawAppShellUI(
         { "Notes", -1, /*sortable*/ false, /*editable*/ true },
     };
 
-    return Window {
-        "Application Shell",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            StaticText{"Drag either sash; the panes re-measure, they do not just move."}
-                .withSize({-1, kLabelH}),
-            // The tool bar. No icon files ship with the demo, so every tool
-            // falls back to its label -- which is exactly the R9.3 path a
-            // missing icon takes, and it renders identically on all three.
-            ToolBar {
-                ToolItem{"New"}.withTooltip("New file")
-                    .onClick([&notes]() { notes = "Toolbar > New"; }),
-                ToolItem{"Open"}.withTooltip("Open file")
-                    .onClick([&notes]() { notes = "Toolbar > Open"; }),
-                ToolItem{"Save"}.withTooltip("Save file")
-                    .onClick([&notes]() { notes = "Toolbar > Save"; }),
-                ToolItem::Separator(),
-                // A check tool: down while the bool is true, and it is the same
-                // bool as the View menu's check item and the control panel's
-                // check box -- a four-way binding once the toolbar joins in.
-                ToolItem{"Wrap"}.withTooltip("Word wrap (Ctrl+Shift+W)")
-                    .toggled(wordWrap),
-                ToolItem::Separator(),
-                // Greys out live when the shell is locked, like Edit > Undo.
-                ToolItem{"Delete"}.withTooltip("Disabled while the shell is locked")
-                    .isDisabled(shellDisabled)
-                    .onClick([&notes]() { notes = "Toolbar > Delete"; }),
-                ToolItem::Separator(),
-                // The same two dialogs the menus open, and the same flags:
-                // About is keyed by its title, Rename by `renameOpen` -- so a
-                // tool and a menu item can never stack up a second copy.
-                ToolItem{"Rename"}.withTooltip("Rename the selected file")
-                    .isDisabled(shellDisabled)
-                    .onClick(ShowAction(renameOpen, renameDialog)),
-                ToolItem{"About"}.withTooltip("Same dialog as Help > About")
-                    .onClick(ShowAction(aboutDialog)),
-            }
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
-            // 240 is the first pane's width in pixels, snapshotted from a
-            // literal -- the splitter keeps its own copy of it. The binding
-            // demo in value_binding.hpp is where an int& goes instead.
-            HSplitter { LayoutFlags().Expand().Border(Side::Top, 8).MinSize({720, kShellH}),
-                240,
-                VStack {
-                    LayoutFlags().Expand(),
-                    StaticText{"Project"}
-                        .withSize({-1, kLabelH}),
-                    TreeView { projectTree, selectedFile }
-                        .withVisibleRows(10)
-                        .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
+    return
+        Window {
+            "Application Shell",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                StaticText{"Drag either sash; the panes re-measure, they do not just move."}
+                    .withSize({-1, kLabelH}),
+                // The tool bar. No icon files ship with the demo, so every tool
+                // falls back to its label -- which is exactly the R9.3 path a
+                // missing icon takes, and it renders identically on all three.
+                ToolBar {
+                    ToolItem{"New"}.withTooltip("New file")
+                        .onClick([&notes]() { notes = "Toolbar > New"; }),
+                    ToolItem{"Open"}.withTooltip("Open file")
+                        .onClick([&notes]() { notes = "Toolbar > Open"; }),
+                    ToolItem{"Save"}.withTooltip("Save file")
+                        .onClick([&notes]() { notes = "Toolbar > Save"; }),
+                    ToolItem::Separator(),
+                    // A check tool: down while the bool is true, and it is the same
+                    // bool as the View menu's check item and the control panel's
+                    // check box -- a four-way binding once the toolbar joins in.
+                    ToolItem{"Wrap"}.withTooltip("Word wrap (Ctrl+Shift+W)")
+                        .toggled(wordWrap),
+                    ToolItem::Separator(),
+                    // Greys out live when the shell is locked, like Edit > Undo.
+                    ToolItem{"Delete"}.withTooltip("Disabled while the shell is locked")
                         .isDisabled(shellDisabled)
-                },
-                VSplitter { LayoutFlags().Expand(),
-                    220,
-                    VStack {
-                        LayoutFlags().Expand(),
-                        StaticText{"Files"}
-                            .withSize({-1, kLabelH}),
-                        Table { columns, rows, selectedRow }
-                            .withVisibleRows(6)
-                            .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
-                            .isDisabled(shellDisabled)
-                            // Right-click the table. Same MenuItem model as the
-                            // menu bar, so separators and submenus work here
-                            // too -- and locking the shell disables the table,
-                            // after which it opens no menu at all (a disabled
-                            // control has no context menu on any backend).
-                            .withContextMenu({
-                                MenuItem{"Open"}.onSelect([&notes]() { notes = "Context > Open"; }),
-                                MenuItem{"Rename..."}.onSelect(ShowAction(renameOpen, renameDialog)),
-                                MenuItem::Separator(),
-                                MenuItem{"Copy"}.withSubmenu({
-                                    MenuItem{"Copy name"}.onSelect([&notes]() { notes = "Context > Copy name"; }),
-                                    MenuItem{"Copy path"}.onSelect([&notes]() { notes = "Context > Copy path"; }),
-                                }),
-                                MenuItem::Separator(),
-                                MenuItem{"Reveal in project"}.onSelect([&notes]() { notes = "Context > Reveal"; }),
-                            })
-                    },
-                    VStack {
-                        LayoutFlags().Expand(),
-                        StaticText{"Notes"}
-                            .withSize({-1, kLabelH}),
-                        MultiLineTextCtrl{notes}
-                            .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
-                            .isDisabled(shellDisabled)
-                    }
+                        .onClick([&notes]() { notes = "Toolbar > Delete"; }),
+                    ToolItem::Separator(),
+                    // The same two dialogs the menus open, and the same flags:
+                    // About is keyed by its title, Rename by `renameOpen` -- so a
+                    // tool and a menu item can never stack up a second copy.
+                    ToolItem{"Rename"}.withTooltip("Rename the selected file")
+                        .isDisabled(shellDisabled)
+                        .onClick(ShowAction(renameOpen, renameDialog)),
+                    ToolItem{"About"}.withTooltip("Same dialog as Help > About")
+                        .onClick(ShowAction(aboutDialog)),
                 }
-                // The inner sash keeps the 40 px default on both panes.
-            }
-            // Neither outer pane may be dragged below this, whatever the user
-            // does with the sash -- a pane's own MinSize would say the same
-            // thing, and the larger of the two wins.
-            .withMinPaneSize(160, 300),
-            CheckBox{shellDisabled, "Lock the whole shell (sashes included)"}
-                .withSize({-1, kRowH})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            // The status bar. Its first field is BOUND to the same string the
-            // tree view writes its selection into, so clicking a file in the
-            // project pane updates the bar live -- nothing polls it in the
-            // demo, the backends do. The other two are fixed-width snapshots.
-            StatusBar {
-                StatusField{ selectedFile },
-                StatusField{ "Ln 1, Col 1", 120 },
-                StatusField{ "UTF-8", 70 },
-            }
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            HStack {
-                LayoutFlags().Border(Side::Top, 10),
-                Spacer{},
-                // Closing from inside is the same act as closing from the
-                // title bar: clear the bool and the window follows.
-                Button{"Close"}
-                    .withSize(kButtonSize)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([&shellOpen]() { shellOpen = false; })
-                    // A context menu on a plain leaf, carrying the two bound
-                    // kinds of item: a check mark that is the same bool as the
-                    // box above and the Edit menu's item, and a command that
-                    // greys itself live when that bool goes true.
-                    .withContextMenu({
-                        MenuItem{"Lock the shell"}.checkable(shellDisabled),
-                        MenuItem::Separator(),
-                        MenuItem{"Close the shell"}.withShortcut("Ctrl+W")
-                            .onSelect([&shellOpen]() { shellOpen = false; }),
-                        MenuItem{"Delete"}.isDisabled(shellDisabled)
-                            .onSelect([&notes]() { notes = "Context > Delete"; }),
-                    })
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 8)),
+                // 240 is the first pane's width in pixels, snapshotted from a
+                // literal -- the splitter keeps its own copy of it. The binding
+                // demo in value_binding.hpp is where an int& goes instead.
+                HSplitter { LayoutFlags().Expand().Border(Side::Top, 8).MinSize({720, kShellH}),
+                    240,
+                    VStack {
+                        LayoutFlags().Expand(),
+                        StaticText{"Project"}
+                            .withSize({-1, kLabelH}),
+                        TreeView { projectTree, selectedFile }
+                            .withVisibleRows(10)
+                            .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
+                            .isDisabled(shellDisabled)
+                    },
+                    VSplitter { LayoutFlags().Expand(),
+                        220,
+                        VStack {
+                            LayoutFlags().Expand(),
+                            StaticText{"Files"}
+                                .withSize({-1, kLabelH}),
+                            Table { columns, rows, selectedRow }
+                                .withVisibleRows(6)
+                                .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
+                                .isDisabled(shellDisabled)
+                                // Right-click the table. Same MenuItem model as the
+                                // menu bar, so separators and submenus work here
+                                // too -- and locking the shell disables the table,
+                                // after which it opens no menu at all (a disabled
+                                // control has no context menu on any backend).
+                                .withContextMenu({
+                                    MenuItem{"Open"}.onSelect([&notes]() { notes = "Context > Open"; }),
+                                    MenuItem{"Rename..."}.onSelect(ShowAction(renameOpen, renameDialog)),
+                                    MenuItem::Separator(),
+                                    MenuItem{"Copy"}.withSubmenu({
+                                        MenuItem{"Copy name"}.onSelect([&notes]() { notes = "Context > Copy name"; }),
+                                        MenuItem{"Copy path"}.onSelect([&notes]() { notes = "Context > Copy path"; }),
+                                    }),
+                                    MenuItem::Separator(),
+                                    MenuItem{"Reveal in project"}.onSelect([&notes]() { notes = "Context > Reveal"; }),
+                                })
+                        },
+                        VStack {
+                            LayoutFlags().Expand(),
+                            StaticText{"Notes"}
+                                .withSize({-1, kLabelH}),
+                            MultiLineTextCtrl{notes}
+                                .withFlags(LayoutFlags().Proportion(1).Expand().Border(Side::Top, 4))
+                                .isDisabled(shellDisabled)
+                        }
+                    }
+                    // The inner sash keeps the 40 px default on both panes.
+                }
+                // Neither outer pane may be dragged below this, whatever the user
+                // does with the sash -- a pane's own MinSize would say the same
+                // thing, and the larger of the two wins.
+                .withMinPaneSize(160, 300),
+                CheckBox{shellDisabled, "Lock the whole shell (sashes included)"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+                // The status bar. Its first field is BOUND to the same string the
+                // tree view writes its selection into, so clicking a file in the
+                // project pane updates the bar live -- nothing polls it in the
+                // demo, the backends do. The other two are fixed-width snapshots.
+                StatusBar {
+                    StatusField{ selectedFile },
+                    StatusField{ "Ln 1, Col 1", 120 },
+                    StatusField{ "UTF-8", 70 },
+                }
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+                HStack {
+                    LayoutFlags().Border(Side::Top, 10),
+                    Spacer{},
+                    // Closing from inside is the same act as closing from the
+                    // title bar: clear the bool and the window follows.
+                    Button{"Close"}
+                        .withSize(kButtonSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .onClick([&shellOpen]() { shellOpen = false; })
+                        // A context menu on a plain leaf, carrying the two bound
+                        // kinds of item: a check mark that is the same bool as the
+                        // box above and the Edit menu's item, and a command that
+                        // greys itself live when that bool goes true.
+                        .withContextMenu({
+                            MenuItem{"Lock the shell"}.checkable(shellDisabled),
+                            MenuItem::Separator(),
+                            MenuItem{"Close the shell"}.withShortcut("Ctrl+W")
+                                .onSelect([&shellOpen]() { shellOpen = false; }),
+                            MenuItem{"Delete"}.isDisabled(shellDisabled)
+                                .onSelect([&notes]() { notes = "Context > Delete"; }),
+                        })
+                }
             }
         }
-    }
-    .withMenuBar(std::move(menuBar))
-    // Fires once however the window went away -- this button, the title bar's
-    // close button, or the control panel's check box clearing the bool.
-    .onClose([&shellStatus]() {
-        shellStatus = "Shell closed -- onClose() fired once.";
-    });
+        .withMenuBar(std::move(menuBar))
+        // Fires once however the window went away -- this button, the title bar's
+        // close button, or the control panel's check box clearing the bool.
+        .onClose([&shellStatus]() {
+            shellStatus = "Shell closed -- onClose() fired once.";
+        });
 }

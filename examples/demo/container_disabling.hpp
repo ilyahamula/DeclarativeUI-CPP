@@ -28,49 +28,50 @@ inline auto drawGroupBoxDisabling(std::string& name,
     constexpr int kRowH = 26;
     constexpr int kFieldW = 170;
 
-    return Dialog {
-        "Disable a whole group box",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            VGroupBox { "Delivery details",
-                LayoutFlags().Expand().MinSize({320, -1}),
-                HStack {
-                    StaticText{"Name:"}
-                        .withSize({kLabelW, 20})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
-                    TextCtrl{name}
-                        .withSize({kFieldW, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1))
-                },
-                HStack {
-                    LayoutFlags().Border(Side::Top, 6),
-                    StaticText{"Email:"}
-                        .withSize({kLabelW, 20})
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
-                    TextCtrl{email}
-                        .withSize({kFieldW, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1))
-                },
-                // inherits the outer box's state without naming the flag
-                HGroupBox { "Options",
-                    LayoutFlags().Expand().Border(Side::Top, 8),
-                    SpinBox { { .min = 1, .max = 99 }, copies }
-                        .withSize({80, kRowH}),
-                    CheckBox{express, "Express"}
-                        .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 10)),
-                    // an explicit false cannot escape a disabled ancestor
-                    Button{"Send"}
-                        .withSize({80, 28})
-                        .withFlags(LayoutFlags().Border(Side::Left, 10))
-                        .isDisabled(false)
+    return
+        Dialog {
+            "Disable a whole group box",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                VGroupBox { "Delivery details",
+                    LayoutFlags().Expand().MinSize({320, -1}),
+                    HStack {
+                        StaticText{"Name:"}
+                            .withSize({kLabelW, 20})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
+                        TextCtrl{name}
+                            .withSize({kFieldW, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1))
+                    },
+                    HStack {
+                        LayoutFlags().Border(Side::Top, 6),
+                        StaticText{"Email:"}
+                            .withSize({kLabelW, 20})
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
+                        TextCtrl{email}
+                            .withSize({kFieldW, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1))
+                    },
+                    // inherits the outer box's state without naming the flag
+                    HGroupBox { "Options",
+                        LayoutFlags().Expand().Border(Side::Top, 8),
+                        SpinBox { { .min = 1, .max = 99 }, copies }
+                            .withSize({80, kRowH}),
+                        CheckBox{express, "Express"}
+                            .withFlags(LayoutFlags().CenterVertical().Border(Side::Left, 10)),
+                        // an explicit false cannot escape a disabled ancestor
+                        Button{"Send"}
+                            .withSize({80, 28})
+                            .withFlags(LayoutFlags().Border(Side::Left, 10))
+                            .isDisabled(false)
+                    }
                 }
+                .isDisabled(disabled),
+                // outside the box, so it stays clickable and can switch it back on
+                CheckBox{disabled, "Disable the whole group"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 12))
             }
-            .isDisabled(disabled),
-            // outside the box, so it stays clickable and can switch it back on
-            CheckBox{disabled, "Disable the whole group"}
-                .withFlags(LayoutFlags().Border(Side::Top, 12))
-        }
-    };
+        };
 }
 
 // Stacks carry the same modifier. A TabPanel can disable one page -- its content
@@ -82,47 +83,48 @@ inline auto drawStackAndTabDisabling(std::string& note,
     bool& pageDisabled,
     bool& panelDisabled)
 {
-    return Dialog {
-        "Disable a stack / a tab",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            TabPanel {
-                LayoutFlags().Expand().MinSize({320, 190}),
-                Tab { "Always on",
-                    VStack {
-                        LayoutFlags().Expand().Border(Side::All, 8),
-                        StaticText{"This page is never disabled."}
-                            .withSize({-1, 20}),
-                        // a row disabled on its own, inside an enabled page
-                        HStack {
-                            LayoutFlags().Border(Side::Top, 10),
-                            StaticText{"Level:"}
-                                .withSize({50, 20})
-                                .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
-                            Slider { Range<int>{ .min = 0, .max = 10 }, level }
-                                .withSize({160, 24})
-                                .withFlags(LayoutFlags().Proportion(1))
+    return
+        Dialog {
+            "Disable a stack / a tab",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                TabPanel {
+                    LayoutFlags().Expand().MinSize({320, 190}),
+                    Tab { "Always on",
+                        VStack {
+                            LayoutFlags().Expand().Border(Side::All, 8),
+                            StaticText{"This page is never disabled."}
+                                .withSize({-1, 20}),
+                            // a row disabled on its own, inside an enabled page
+                            HStack {
+                                LayoutFlags().Border(Side::Top, 10),
+                                StaticText{"Level:"}
+                                    .withSize({50, 20})
+                                    .withFlags(LayoutFlags().CenterVertical().Border(Side::Right, 6)),
+                                Slider { Range<int>{ .min = 0, .max = 10 }, level }
+                                    .withSize({160, 24})
+                                    .withFlags(LayoutFlags().Proportion(1))
+                            }
+                            .isDisabled(pageDisabled)
                         }
-                        .isDisabled(pageDisabled)
+                    },
+                    Tab { "Advanced",
+                        VStack {
+                            LayoutFlags().Expand().Border(Side::All, 8),
+                            MultiLineTextCtrl{note}
+                                .withSize({-1, 80})
+                                .withFlags(LayoutFlags().Expand()),
+                            CheckBox{logging, "Verbose logging"}
+                                .withFlags(LayoutFlags().Border(Side::Top, 8))
+                        }
                     }
-                },
-                Tab { "Advanced",
-                    VStack {
-                        LayoutFlags().Expand().Border(Side::All, 8),
-                        MultiLineTextCtrl{note}
-                            .withSize({-1, 80})
-                            .withFlags(LayoutFlags().Expand()),
-                        CheckBox{logging, "Verbose logging"}
-                            .withFlags(LayoutFlags().Border(Side::Top, 8))
-                    }
+                    .isDisabled(pageDisabled)
                 }
-                .isDisabled(pageDisabled)
+                .isDisabled(panelDisabled),
+                CheckBox{pageDisabled, "Disable the 'Advanced' page and the Level row"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 12)),
+                CheckBox{panelDisabled, "Disable the whole tab panel"}
+                    .withFlags(LayoutFlags().Border(Side::Top, 6))
             }
-            .isDisabled(panelDisabled),
-            CheckBox{pageDisabled, "Disable the 'Advanced' page and the Level row"}
-                .withFlags(LayoutFlags().Border(Side::Top, 12)),
-            CheckBox{panelDisabled, "Disable the whole tab panel"}
-                .withFlags(LayoutFlags().Border(Side::Top, 6))
-        }
-    };
+        };
 }

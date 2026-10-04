@@ -49,118 +49,119 @@ inline auto drawLayoutPrimitivesUI(bool& rowsDisabled)
     constexpr Size kButtonSize { 96, 28 };
     constexpr Size kCloseSize { 110, 28 };
 
-    return Dialog {
-        "Layout Primitives",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            VGroupBox { "Flexible spacer",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}),
-                StaticText{"One Spacer{} between the buttons pushes them to the two ends:"}
-                    .withSize({-1, kLabelH}),
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    Button{"Left"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled),
-                    Spacer{},
-                    Button{"Right"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled)
-                },
-                StaticText{"Two spacers, weights 1 and 2, split the same leftover 1:2:"}
-                    .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
-                HStack {
-                    LayoutFlags().Expand().Border(Side::Top, 6),
-                    Button{"A"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled),
-                    Spacer{},
-                    Button{"B"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled),
-                    Spacer{}
-                        .withFlags(LayoutFlags().Proportion(2)),
-                    Button{"C"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled)
-                }
-            },
-            // The native hairline differs per backend (1 px on ImGui, 2 on wx,
-            // 3 on Qt), so it is pinned here the way the galleries pin every
-            // other leaf -- otherwise the rows below it would sit 1-2 px apart
-            // across the three builds.
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            VGroupBox { "Fixed spacer",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
-                StaticText{"A fixed gap does not flex; the row stays left-packed:"}
-                    .withSize({-1, kLabelH}),
-                HStack {
-                    LayoutFlags().Border(Side::Top, 6),
-                    Button{"Cut"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled),
-                    // Spacer{px} is px on BOTH axes -- the widget cannot know
-                    // which way its parent runs. The parent spends the main
-                    // one; the other still asks the row for that much cross
-                    // band, so Spacer{Size{px, 0}} is the spelling to reach for
-                    // when the row must stay as tall as its controls.
-                    Spacer{Size{40, 0}},
-                    Button{"Copy"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled),
-                    Spacer{Size{40, 0}},
-                    Button{"Paste"}
-                        .withSize(kButtonSize)
-                        .isDisabled(rowsDisabled)
-                },
-                // The same 24 on both axes costs nothing in a column this wide,
-                // so the plain int form reads as a 24 px vertical gap here.
-                Spacer{24},
-                CheckBox{rowsDisabled, "Disable the buttons above"}
-                    .withSize({-1, kRowH})
-            },
-            VGroupBox { "Vertical divider",
-                LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
-                HStack {
-                    LayoutFlags().Expand(),
-                    VStack {
-                        LayoutFlags().Proportion(1).Expand(),
-                        StaticText{"Left column"}
-                            .withSize({-1, kLabelH}),
-                        Button{"One"}
+    return
+        Dialog {
+            "Layout Primitives",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                VGroupBox { "Flexible spacer",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}),
+                    StaticText{"One Spacer{} between the buttons pushes them to the two ends:"}
+                        .withSize({-1, kLabelH}),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        Button{"Left"}
                             .withSize(kButtonSize)
-                            .withFlags(LayoutFlags().Border(Side::Top, 6))
+                            .isDisabled(rowsDisabled),
+                        Spacer{},
+                        Button{"Right"}
+                            .withSize(kButtonSize)
                             .isDisabled(rowsDisabled)
                     },
-                    // Expand() is what gives the line its length: without it the
-                    // leaf's Start cross-alignment would leave it 0 px tall.
-                    Separator{Orientation::Vertical}
-                        .withSize({1, -1})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Left, 14).Border(Side::Right, 14)),
-                    VStack {
-                        LayoutFlags().Proportion(1).Expand(),
-                        StaticText{"Right column"}
-                            .withSize({-1, kLabelH}),
-                        Button{"Two"}
+                    StaticText{"Two spacers, weights 1 and 2, split the same leftover 1:2:"}
+                        .withSize({-1, kLabelH})
+                        .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                    HStack {
+                        LayoutFlags().Expand().Border(Side::Top, 6),
+                        Button{"A"}
                             .withSize(kButtonSize)
-                            .withFlags(LayoutFlags().Border(Side::Top, 6))
+                            .isDisabled(rowsDisabled),
+                        Spacer{},
+                        Button{"B"}
+                            .withSize(kButtonSize)
+                            .isDisabled(rowsDisabled),
+                        Spacer{}
+                            .withFlags(LayoutFlags().Proportion(2)),
+                        Button{"C"}
+                            .withSize(kButtonSize)
                             .isDisabled(rowsDisabled)
                     }
+                },
+                // The native hairline differs per backend (1 px on ImGui, 2 on wx,
+                // 3 on Qt), so it is pinned here the way the galleries pin every
+                // other leaf -- otherwise the rows below it would sit 1-2 px apart
+                // across the three builds.
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+                VGroupBox { "Fixed spacer",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                    StaticText{"A fixed gap does not flex; the row stays left-packed:"}
+                        .withSize({-1, kLabelH}),
+                    HStack {
+                        LayoutFlags().Border(Side::Top, 6),
+                        Button{"Cut"}
+                            .withSize(kButtonSize)
+                            .isDisabled(rowsDisabled),
+                        // Spacer{px} is px on BOTH axes -- the widget cannot know
+                        // which way its parent runs. The parent spends the main
+                        // one; the other still asks the row for that much cross
+                        // band, so Spacer{Size{px, 0}} is the spelling to reach for
+                        // when the row must stay as tall as its controls.
+                        Spacer{Size{40, 0}},
+                        Button{"Copy"}
+                            .withSize(kButtonSize)
+                            .isDisabled(rowsDisabled),
+                        Spacer{Size{40, 0}},
+                        Button{"Paste"}
+                            .withSize(kButtonSize)
+                            .isDisabled(rowsDisabled)
+                    },
+                    // The same 24 on both axes costs nothing in a column this wide,
+                    // so the plain int form reads as a 24 px vertical gap here.
+                    Spacer{24},
+                    CheckBox{rowsDisabled, "Disable the buttons above"}
+                        .withSize({-1, kRowH})
+                },
+                VGroupBox { "Vertical divider",
+                    LayoutFlags().Expand().MinSize({kBoxW, -1}).Border(Side::Top, 10),
+                    HStack {
+                        LayoutFlags().Expand(),
+                        VStack {
+                            LayoutFlags().Proportion(1).Expand(),
+                            StaticText{"Left column"}
+                                .withSize({-1, kLabelH}),
+                            Button{"One"}
+                                .withSize(kButtonSize)
+                                .withFlags(LayoutFlags().Border(Side::Top, 6))
+                                .isDisabled(rowsDisabled)
+                        },
+                        // Expand() is what gives the line its length: without it the
+                        // leaf's Start cross-alignment would leave it 0 px tall.
+                        Separator{Orientation::Vertical}
+                            .withSize({1, -1})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Left, 14).Border(Side::Right, 14)),
+                        VStack {
+                            LayoutFlags().Proportion(1).Expand(),
+                            StaticText{"Right column"}
+                                .withSize({-1, kLabelH}),
+                            Button{"Two"}
+                                .withSize(kButtonSize)
+                                .withFlags(LayoutFlags().Border(Side::Top, 6))
+                                .isDisabled(rowsDisabled)
+                        }
+                    }
+                },
+                HStack {
+                    LayoutFlags().Border(Side::Top, 10),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize(kCloseSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .onClick([]() {})
                 }
-            },
-            HStack {
-                LayoutFlags().Border(Side::Top, 10),
-                Spacer{},
-                Button{"Close"}
-                    .withSize(kCloseSize)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
             }
-        }
-    };
+        };
 }
 
 // The Account form: the gallery dialog for Grid.
@@ -195,69 +196,70 @@ inline auto drawAccountFormUI(
     constexpr Size kSideButton { 90, 26 };
     constexpr Size kFootButton { 100, 28 };
 
-    return Dialog {
-        "Account",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            Grid { 3, LayoutFlags().Expand().MinSize({520, -1}),
-                StaticText{"Name:"}
-                    .withAlign(TextAlign::Right)
-                    .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().Expand().CenterVertical()),
-                TextCtrl{name}
-                    .withSize({-1, kFieldH})
-                    .withFlags(LayoutFlags().Proportion(1).Expand())
-                    .isDisabled(formDisabled),
-                Button{"Check"}
-                    .withSize(kSideButton)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .isDisabled(formDisabled),
+    return
+        Dialog {
+            "Account",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                Grid { 3, LayoutFlags().Expand().MinSize({520, -1}),
+                    StaticText{"Name:"}
+                        .withAlign(TextAlign::Right)
+                        .withSize({-1, kLabelH})
+                        .withFlags(LayoutFlags().Expand().CenterVertical()),
+                    TextCtrl{name}
+                        .withSize({-1, kFieldH})
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(formDisabled),
+                    Button{"Check"}
+                        .withSize(kSideButton)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .isDisabled(formDisabled),
 
-                StaticText{"E-mail:"}
-                    .withAlign(TextAlign::Right)
-                    .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().Expand().CenterVertical()),
-                TextCtrl{email}
-                    .withSize({-1, kFieldH})
-                    .withFlags(LayoutFlags().Proportion(1).Expand())
-                    .isDisabled(formDisabled),
-                Button{"Verify"}
-                    .withSize(kSideButton)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .isDisabled(formDisabled),
+                    StaticText{"E-mail:"}
+                        .withAlign(TextAlign::Right)
+                        .withSize({-1, kLabelH})
+                        .withFlags(LayoutFlags().Expand().CenterVertical()),
+                    TextCtrl{email}
+                        .withSize({-1, kFieldH})
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(formDisabled),
+                    Button{"Verify"}
+                        .withSize(kSideButton)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .isDisabled(formDisabled),
 
-                StaticText{"Password:"}
-                    .withAlign(TextAlign::Right)
-                    .withSize({-1, kLabelH})
-                    .withFlags(LayoutFlags().Expand().CenterVertical()),
-                PasswordInput{password}
+                    StaticText{"Password:"}
+                        .withAlign(TextAlign::Right)
+                        .withSize({-1, kLabelH})
+                        .withFlags(LayoutFlags().Expand().CenterVertical()),
+                    PasswordInput{password}
+                        .withSize({-1, kFieldH})
+                        .withFlags(LayoutFlags().Proportion(1).Expand())
+                        .isDisabled(formDisabled),
+                    Button{"Show"}
+                        .withSize(kSideButton)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .isDisabled(formDisabled)
+                },
+                CheckBox{formDisabled, "Lock the form"}
                     .withSize({-1, kFieldH})
-                    .withFlags(LayoutFlags().Proportion(1).Expand())
-                    .isDisabled(formDisabled),
-                Button{"Show"}
-                    .withSize(kSideButton)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .isDisabled(formDisabled)
-            },
-            CheckBox{formDisabled, "Lock the form"}
-                .withSize({-1, kFieldH})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            HStack {
-                LayoutFlags().Border(Side::Top, 10),
-                Spacer{},
-                Button{"OK"}
-                    .withSize(kFootButton)
-                    .onClick([]() {}),
-                Button{"Cancel"}
-                    .withSize(kFootButton)
-                    .withFlags(LayoutFlags().Border(Side::Left, 8))
-                    .onClick([]() {})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+                HStack {
+                    LayoutFlags().Border(Side::Top, 10),
+                    Spacer{},
+                    Button{"OK"}
+                        .withSize(kFootButton)
+                        .onClick([]() {}),
+                    Button{"Cancel"}
+                        .withSize(kFootButton)
+                        .withFlags(LayoutFlags().Border(Side::Left, 8))
+                        .onClick([]() {})
+                }
             }
-        }
-    };
+        };
 }
 
 // The scrollable option list: the gallery dialog for ScrollPanel.
@@ -276,88 +278,89 @@ inline auto drawScrollPanelUI(bool& optionsDisabled)
     constexpr int kRowH = 30;
     constexpr int kPanelW = 340;
 
-    return Dialog {
-        "Scrollable Options",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12),
-            StaticText{"600 px of options in a 240 px viewport (scroll it):"}
-                .withSize({-1, 20}),
-            ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6).MinSize({kPanelW, -1}),
-                VStack {
-                    // MinSize pins the content extent, so the demo really is
-                    // 600 px of content on all three backends however tall each
-                    // one draws a check box.
-                    LayoutFlags().Expand().MinSize({-1, 600}),
-                    CheckBox{false, "Option 1"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 2"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{true, "Option 3"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 4"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 5"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{true, "Option 6"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 7"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 8"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{true, "Option 9"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 10"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{false, "Option 11"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    CheckBox{true, "Option 12"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand())
+    return
+        Dialog {
+            "Scrollable Options",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12),
+                StaticText{"600 px of options in a 240 px viewport (scroll it):"}
+                    .withSize({-1, 20}),
+                ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6).MinSize({kPanelW, -1}),
+                    VStack {
+                        // MinSize pins the content extent, so the demo really is
+                        // 600 px of content on all three backends however tall each
+                        // one draws a check box.
+                        LayoutFlags().Expand().MinSize({-1, 600}),
+                        CheckBox{false, "Option 1"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 2"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{true, "Option 3"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 4"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 5"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{true, "Option 6"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 7"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 8"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{true, "Option 9"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 10"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{false, "Option 11"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand()),
+                        CheckBox{true, "Option 12"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand())
+                    }
+                    .isDisabled(optionsDisabled)
+                },
+                CheckBox{optionsDisabled, "Disable the whole list"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
+                StaticText{"A wide row in a horizontal panel: the width caps, the height does not."}
+                    .withSize({-1, 20})
+                    .withFlags(LayoutFlags().Border(Side::Top, 10)),
+                ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6),
+                    HStack {
+                        LayoutFlags().Expand(),
+                        Button{"One"}.withSize({120, 28}),
+                        Button{"Two"}.withSize({120, 28}),
+                        Button{"Three"}.withSize({120, 28}),
+                        Button{"Four"}.withSize({120, 28}),
+                        Button{"Five"}.withSize({120, 28}),
+                        Button{"Six"}.withSize({120, 28})
+                    }
                 }
-                .isDisabled(optionsDisabled)
-            },
-            CheckBox{optionsDisabled, "Disable the whole list"}
-                .withSize({-1, kRowH})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            StaticText{"A wide row in a horizontal panel: the width caps, the height does not."}
-                .withSize({-1, 20})
-                .withFlags(LayoutFlags().Border(Side::Top, 10)),
-            ScrollPanel { LayoutFlags().Expand().Border(Side::Top, 6),
+                .withScroll(ScrollAxis::Horizontal),
                 HStack {
-                    LayoutFlags().Expand(),
-                    Button{"One"}.withSize({120, 28}),
-                    Button{"Two"}.withSize({120, 28}),
-                    Button{"Three"}.withSize({120, 28}),
-                    Button{"Four"}.withSize({120, 28}),
-                    Button{"Five"}.withSize({120, 28}),
-                    Button{"Six"}.withSize({120, 28})
+                    LayoutFlags().Border(Side::Top, 12),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize({110, 28})
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .onClick([]() {})
                 }
             }
-            .withScroll(ScrollAxis::Horizontal),
-            HStack {
-                LayoutFlags().Border(Side::Top, 12),
-                Spacer{},
-                Button{"Close"}
-                    .withSize({110, 28})
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
-            }
-        }
-    };
+        };
 }
 
 
@@ -397,87 +400,88 @@ inline auto drawExpanderUI(
     constexpr int kDialogW = 420;
     constexpr int kLabelW = 90;
 
-    return Dialog {
-        "Settings",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 12).MinSize({kDialogW, -1}),
-            StaticText{"Click a header: the dialog grows and shrinks with it."}
-                .withSize({-1, kLabelH}),
+    return
+        Dialog {
+            "Settings",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 12).MinSize({kDialogW, -1}),
+                StaticText{"Click a header: the dialog grows and shrinks with it."}
+                    .withSize({-1, kLabelH}),
 
-            Expander { "Basic",
-                LayoutFlags().Expand().Border(Side::Top, 10),
-                basicOpen,
-                VStack {
-                    LayoutFlags().Expand().Border(Side::Left, 16),
-                    CheckBox{logging, "Enable logging"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand()),
-                    HStack {
-                        LayoutFlags().Expand().Border(Side::Top, 6),
-                        StaticText{"Level:"}
-                            .withSize({kLabelW, kRowH})
-                            .withFlags(LayoutFlags().CenterVertical()),
-                        ComboBox{ {"Error", "Warning", "Info", "Debug"}, level }
+                Expander { "Basic",
+                    LayoutFlags().Expand().Border(Side::Top, 10),
+                    basicOpen,
+                    VStack {
+                        LayoutFlags().Expand().Border(Side::Left, 16),
+                        CheckBox{logging, "Enable logging"}
                             .withSize({-1, kRowH})
-                            .withFlags(LayoutFlags().Proportion(1).Expand())
+                            .withFlags(LayoutFlags().Expand()),
+                        HStack {
+                            LayoutFlags().Expand().Border(Side::Top, 6),
+                            StaticText{"Level:"}
+                                .withSize({kLabelW, kRowH})
+                                .withFlags(LayoutFlags().CenterVertical()),
+                            ComboBox{ {"Error", "Warning", "Info", "Debug"}, level }
+                                .withSize({-1, kRowH})
+                                .withFlags(LayoutFlags().Proportion(1).Expand())
+                        }
                     }
                 }
-            }
-            .isDisabled(sectionsDisabled),
+                .isDisabled(sectionsDisabled),
 
-            Expander { "Advanced",
-                LayoutFlags().Expand().Border(Side::Top, 8),
-                advancedOpen,
-                VStack {
-                    LayoutFlags().Expand().Border(Side::Left, 16),
+                Expander { "Advanced",
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    advancedOpen,
+                    VStack {
+                        LayoutFlags().Expand().Border(Side::Left, 16),
+                        HStack {
+                            LayoutFlags().Expand(),
+                            StaticText{"Retries:"}
+                                .withSize({kLabelW, kRowH})
+                                .withFlags(LayoutFlags().CenterVertical()),
+                            SpinBox { Range<int>{ .min = 0, .max = 10 }, retries }
+                                .withSize({90, kRowH})
+                        },
+                        StaticText{"This section starts collapsed; nothing below it moved."}
+                            .withSize({-1, kLabelH})
+                            .withFlags(LayoutFlags().Border(Side::Top, 6))
+                    }
+                }
+                .isDisabled(sectionsDisabled),
+
+                Expander { "Network",
+                    LayoutFlags().Expand().Border(Side::Top, 8),
+                    networkOpen,
                     HStack {
-                        LayoutFlags().Expand(),
-                        StaticText{"Retries:"}
+                        LayoutFlags().Expand().Border(Side::Left, 16),
+                        StaticText{"Proxy:"}
                             .withSize({kLabelW, kRowH})
                             .withFlags(LayoutFlags().CenterVertical()),
-                        SpinBox { Range<int>{ .min = 0, .max = 10 }, retries }
-                            .withSize({90, kRowH})
-                    },
-                    StaticText{"This section starts collapsed; nothing below it moved."}
-                        .withSize({-1, kLabelH})
-                        .withFlags(LayoutFlags().Border(Side::Top, 6))
+                        TextCtrl{proxy}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Proportion(1).Expand()),
+                        Button{"Test"}
+                            .withSize({80, kRowH})
+                            .withFlags(LayoutFlags().Border(Side::Left, 6))
+                            .onClick([]() {})
+                    }
                 }
-            }
-            .isDisabled(sectionsDisabled),
+                .isDisabled(sectionsDisabled),
 
-            Expander { "Network",
-                LayoutFlags().Expand().Border(Side::Top, 8),
-                networkOpen,
+                CheckBox{sectionsDisabled, "Lock every section (headers included)"}
+                    .withSize({-1, kRowH})
+                    .withFlags(LayoutFlags().Border(Side::Top, 12)),
+                Separator{}
+                    .withSize({-1, 1})
+                    .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
                 HStack {
-                    LayoutFlags().Expand().Border(Side::Left, 16),
-                    StaticText{"Proxy:"}
-                        .withSize({kLabelW, kRowH})
-                        .withFlags(LayoutFlags().CenterVertical()),
-                    TextCtrl{proxy}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Proportion(1).Expand()),
-                    Button{"Test"}
-                        .withSize({80, kRowH})
-                        .withFlags(LayoutFlags().Border(Side::Left, 6))
+                    LayoutFlags().Border(Side::Top, 10),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize({110, 28})
+                        .withFlags(LayoutFlags().CenterVertical())
                         .onClick([]() {})
                 }
             }
-            .isDisabled(sectionsDisabled),
-
-            CheckBox{sectionsDisabled, "Lock every section (headers included)"}
-                .withSize({-1, kRowH})
-                .withFlags(LayoutFlags().Border(Side::Top, 12)),
-            Separator{}
-                .withSize({-1, 1})
-                .withFlags(LayoutFlags().Expand().Border(Side::Top, 10)),
-            HStack {
-                LayoutFlags().Border(Side::Top, 10),
-                Spacer{},
-                Button{"Close"}
-                    .withSize({110, 28})
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
-            }
-        }
-    };
+        };
 }

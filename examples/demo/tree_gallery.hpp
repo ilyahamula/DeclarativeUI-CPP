@@ -49,54 +49,55 @@ inline auto drawTreeUI(
         { "tests", { { "layout_tests.cpp" } } },
     };
 
-    return Dialog {
-        "Tree Controls",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            HStack {
-                VGroupBox { "Single select",
-                    LayoutFlags().MinSize({kBoxW, 280}),
-                    StaticText{"Pick one file:"}
-                        .withSize({-1, kLabelH}),
-                    // Bound to a std::string: the selection is one item's path,
-                    // e.g. "src/engine/layout.cpp".
-                    TreeView { projectTree, selectedFile }
-                        .withVisibleRows(8)
-                        .withSize({-1, kTreeH})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
-                        .isDisabled(treesDisabled),
-                    // Shows the bound path live -- the tree writes through to
-                    // the same string this field is bound to.
-                    TextCtrl{selectedFile}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
-                        .isDisabled(treesDisabled)
+    return
+        Dialog {
+            "Tree Controls",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                HStack {
+                    VGroupBox { "Single select",
+                        LayoutFlags().MinSize({kBoxW, 280}),
+                        StaticText{"Pick one file:"}
+                            .withSize({-1, kLabelH}),
+                        // Bound to a std::string: the selection is one item's path,
+                        // e.g. "src/engine/layout.cpp".
+                        TreeView { projectTree, selectedFile }
+                            .withVisibleRows(8)
+                            .withSize({-1, kTreeH})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
+                            .isDisabled(treesDisabled),
+                        // Shows the bound path live -- the tree writes through to
+                        // the same string this field is bound to.
+                        TextCtrl{selectedFile}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Top, 8))
+                            .isDisabled(treesDisabled)
+                    },
+                    VGroupBox { "Multi select",
+                        LayoutFlags().MinSize({kBoxW, 280}).Border(Side::Left, 12),
+                        StaticText{"Modules (ctrl-click):"}
+                            .withSize({-1, kLabelH}),
+                        // Same items, a vector binding, and isMultiSelect() -- the
+                        // vector alone would still select one path at a time.
+                        TreeView { projectTree, selectedModules }
+                            .isMultiSelect()
+                            .withVisibleRows(8)
+                            .withSize({-1, kTreeH})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
+                            .isDisabled(treesDisabled),
+                        CheckBox{treesDisabled, "Disable both trees"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Border(Side::Top, 8))
+                    }
                 },
-                VGroupBox { "Multi select",
-                    LayoutFlags().MinSize({kBoxW, 280}).Border(Side::Left, 12),
-                    StaticText{"Modules (ctrl-click):"}
-                        .withSize({-1, kLabelH}),
-                    // Same items, a vector binding, and isMultiSelect() -- the
-                    // vector alone would still select one path at a time.
-                    TreeView { projectTree, selectedModules }
-                        .isMultiSelect()
-                        .withVisibleRows(8)
-                        .withSize({-1, kTreeH})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
-                        .isDisabled(treesDisabled),
-                    CheckBox{treesDisabled, "Disable both trees"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Border(Side::Top, 8))
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize(kButtonSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .onClick([]() {})
                 }
-            },
-            HStack {
-                LayoutFlags().Border(Side::Top, 8),
-                Spacer{},
-                Button{"Close"}
-                    .withSize(kButtonSize)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
             }
-        }
-    };
+        };
 }

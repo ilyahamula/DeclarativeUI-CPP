@@ -62,70 +62,71 @@ inline auto drawTableUI(
         { "Notes", -1, /*sortable*/ false, /*editable*/ true },
     };
 
-    return Dialog {
-        "Table Controls",
-        VStack {
-            LayoutFlags().Expand().Border(Side::All, 10),
-            HStack {
-                VGroupBox { "Single select (row index)",
-                    LayoutFlags().MinSize({kBoxW, 300}),
-                    StaticText{"Click a row, sort by File or Size:"}
-                        .withSize({-1, kLabelH}),
-                    // Bound to an int: the selection is one ORIGINAL row index,
-                    // unchanged by sorting. -1 means nothing is selected.
-                    Table { columns, rows, selectedRow }
-                        .withVisibleRows(6)
-                        .withSize({-1, kTableH})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
-                        .isDisabled(tablesDisabled),
-                    // Shows the bound index live -- the table writes through to
-                    // the same int this spin box is bound to, so it also drives
-                    // the selection when you type into it.
-                    HStack {
-                        LayoutFlags().Border(Side::Top, 8),
-                        StaticText{"Selected row:"}
-                            .withSize({95, kRowH})
-                            .withFlags(LayoutFlags().CenterVertical()),
-                        SpinBox { Range<int>{ .min = -1, .max = 99 }, selectedRow }
-                            .withSize({80, kRowH})
-                            .withFlags(LayoutFlags().Border(Side::Left, 6))
-                            .isDisabled(tablesDisabled)
+    return
+        Dialog {
+            "Table Controls",
+            VStack {
+                LayoutFlags().Expand().Border(Side::All, 10),
+                HStack {
+                    VGroupBox { "Single select (row index)",
+                        LayoutFlags().MinSize({kBoxW, 300}),
+                        StaticText{"Click a row, sort by File or Size:"}
+                            .withSize({-1, kLabelH}),
+                        // Bound to an int: the selection is one ORIGINAL row index,
+                        // unchanged by sorting. -1 means nothing is selected.
+                        Table { columns, rows, selectedRow }
+                            .withVisibleRows(6)
+                            .withSize({-1, kTableH})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
+                            .isDisabled(tablesDisabled),
+                        // Shows the bound index live -- the table writes through to
+                        // the same int this spin box is bound to, so it also drives
+                        // the selection when you type into it.
+                        HStack {
+                            LayoutFlags().Border(Side::Top, 8),
+                            StaticText{"Selected row:"}
+                                .withSize({95, kRowH})
+                                .withFlags(LayoutFlags().CenterVertical()),
+                            SpinBox { Range<int>{ .min = -1, .max = 99 }, selectedRow }
+                                .withSize({80, kRowH})
+                                .withFlags(LayoutFlags().Border(Side::Left, 6))
+                                .isDisabled(tablesDisabled)
+                        }
+                    },
+                    VGroupBox { "Multi select (row indices)",
+                        LayoutFlags().MinSize({kBoxW, 300}).Border(Side::Left, 12),
+                        StaticText{"Ctrl-click rows; double-click Notes to edit:"}
+                            .withSize({-1, kLabelH}),
+                        // Same columns and the same bound rows, a vector binding:
+                        // unlike TreeView there is no isMultiSelect() to call, the
+                        // bound type is the mode. Edits made here show up in the
+                        // table on the left, because both read the caller's rows.
+                        //
+                        // Columns declared fluently rather than from `columns` above
+                        // -- the two spellings build the same table. Either overload
+                        // works: a braced TableColumn, or the fields unpacked with
+                        // everything after the label defaulted.
+                        Table { rows, checkedRows }
+                            .addColumn("File", -1, /*sortable*/ true)
+                            .addColumn({ "Size", 70, /*sortable*/ true })
+                            .addColumn("Notes", -1, /*sortable*/ false, /*editable*/ true)
+                            .withVisibleRows(6)
+                            .withSize({-1, kTableH})
+                            .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
+                            .isDisabled(tablesDisabled),
+                        CheckBox{tablesDisabled, "Disable both tables"}
+                            .withSize({-1, kRowH})
+                            .withFlags(LayoutFlags().Border(Side::Top, 8))
                     }
                 },
-                VGroupBox { "Multi select (row indices)",
-                    LayoutFlags().MinSize({kBoxW, 300}).Border(Side::Left, 12),
-                    StaticText{"Ctrl-click rows; double-click Notes to edit:"}
-                        .withSize({-1, kLabelH}),
-                    // Same columns and the same bound rows, a vector binding:
-                    // unlike TreeView there is no isMultiSelect() to call, the
-                    // bound type is the mode. Edits made here show up in the
-                    // table on the left, because both read the caller's rows.
-                    //
-                    // Columns declared fluently rather than from `columns` above
-                    // -- the two spellings build the same table. Either overload
-                    // works: a braced TableColumn, or the fields unpacked with
-                    // everything after the label defaulted.
-                    Table { rows, checkedRows }
-                        .addColumn("File", -1, /*sortable*/ true)
-                        .addColumn({ "Size", 70, /*sortable*/ true })
-                        .addColumn("Notes", -1, /*sortable*/ false, /*editable*/ true)
-                        .withVisibleRows(6)
-                        .withSize({-1, kTableH})
-                        .withFlags(LayoutFlags().Expand().Border(Side::Top, 5))
-                        .isDisabled(tablesDisabled),
-                    CheckBox{tablesDisabled, "Disable both tables"}
-                        .withSize({-1, kRowH})
-                        .withFlags(LayoutFlags().Border(Side::Top, 8))
+                HStack {
+                    LayoutFlags().Border(Side::Top, 8),
+                    Spacer{},
+                    Button{"Close"}
+                        .withSize(kButtonSize)
+                        .withFlags(LayoutFlags().CenterVertical())
+                        .onClick([]() {})
                 }
-            },
-            HStack {
-                LayoutFlags().Border(Side::Top, 8),
-                Spacer{},
-                Button{"Close"}
-                    .withSize(kButtonSize)
-                    .withFlags(LayoutFlags().CenterVertical())
-                    .onClick([]() {})
             }
-        }
-    };
+        };
 }
